@@ -1,15 +1,27 @@
 {
-  "name": "nodejs",
+  "name": "literary-translator",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "type": "module",
+  "description": "Personal literary translator app",
+  "main": "server/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "node server/index.js",
+    "start": "node server/index.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@types/node": "^22.13.11"
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@types/node": "^22.13.11",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "jszip": "^3.10.1",
+    "multer": "^1.4.5-lts.1",
+    "openai": "^4.77.3",
+    "p-limit": "^6.2.0",
+    "p-retry": "^6.2.1",
+    "pdf-parse": "^1.1.1",
+    "pdfmake": "^0.2.15"
   }
 }

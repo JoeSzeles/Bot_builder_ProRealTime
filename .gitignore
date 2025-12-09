@@ -131,3 +131,7 @@ dist
 
 # Replit debugger
 .breakpoints
+
+# App-specific
+downloads/
+data/
