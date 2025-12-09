@@ -41,12 +41,13 @@ const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY
 });
 
+const FONTS_DIR = path.join(__dirname, '..', 'fonts');
 const fonts = {
-  NotoSerif: {
-    normal: 'https://cdn.jsdelivr.net/npm/@fontsource/noto-serif@4.5.0/files/noto-serif-latin-400-normal.woff',
-    bold: 'https://cdn.jsdelivr.net/npm/@fontsource/noto-serif@4.5.0/files/noto-serif-latin-700-normal.woff',
-    italics: 'https://cdn.jsdelivr.net/npm/@fontsource/noto-serif@4.5.0/files/noto-serif-latin-400-italic.woff',
-    bolditalics: 'https://cdn.jsdelivr.net/npm/@fontsource/noto-serif@4.5.0/files/noto-serif-latin-700-italic.woff'
+  Roboto: {
+    normal: path.join(FONTS_DIR, 'Roboto-Regular.ttf'),
+    bold: path.join(FONTS_DIR, 'Roboto-Medium.ttf'),
+    italics: path.join(FONTS_DIR, 'Roboto-Italic.ttf'),
+    bolditalics: path.join(FONTS_DIR, 'Roboto-MediumItalic.ttf')
   }
 };
 
@@ -333,7 +334,7 @@ app.post('/api/generate-pdf', async (req, res) => {
         }
       },
       defaultStyle: {
-        font: 'NotoSerif'
+        font: 'Roboto'
       },
       pageMargins: [72, 72, 72, 72]
     });

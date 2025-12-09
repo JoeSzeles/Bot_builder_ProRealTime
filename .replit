@@ -15,7 +15,7 @@ ignorePorts = false
 
 [agent]
 expertMode = true
-integrations = ["javascript_openai_ai_integrations:1.0.0"]
+integrations = ["javascript_openai_ai_integrations:1.0.0", "javascript_anthropic_ai_integrations:1.0.0"]
 
 [workflows]
 runButton = "Project"
