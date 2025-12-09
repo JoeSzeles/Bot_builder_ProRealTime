@@ -30,11 +30,13 @@ A personal-use full-stack translator app for translating literary texts using AI
 
 ## Features
 1. **Text Input**: Paste text or drag-and-drop .txt/.pdf/.md files
-2. **Translation**: AI-powered literary translation with custom instructions
-3. **PDF Generation**: Single PDF or chapter-split ZIP with professional book layout
-4. **History**: Automatic saving, loading, and deletion of past translations
-5. **Dark Mode**: Toggle between light and dark themes
-6. **Mobile Responsive**: Collapsible sidebar with hamburger menu
+2. **Auto-detect Metadata**: AI-powered detection of book title and author from input text
+3. **Translation**: AI-powered literary translation with custom instructions
+4. **Story Collection Mode**: Checkbox for anthology/collection books - AI detects individual stories
+5. **PDF Generation**: Single PDF, chapter-split ZIP, or story-split ZIP with professional book layout
+6. **History**: Automatic saving, loading, and deletion of past translations
+7. **Dark Mode**: Toggle between light and dark themes
+8. **Mobile Responsive**: Collapsible sidebar with hamburger menu
 
 ## API Endpoints
 - `POST /api/parse-pdf` - Extract text from uploaded PDF
