@@ -12,6 +12,8 @@ const elements = {
   bookTitle: document.getElementById('bookTitle'),
   authorName: document.getElementById('authorName'),
   customInstructions: document.getElementById('customInstructions'),
+  storyCollection: document.getElementById('storyCollection'),
+  autoDetectBtn: document.getElementById('autoDetectBtn'),
   translateBtn: document.getElementById('translateBtn'),
   progressSection: document.getElementById('progressSection'),
   progressBar: document.getElementById('progressBar'),
@@ -22,9 +24,18 @@ const elements = {
   copyBtn: document.getElementById('copyBtn'),
   chaptersPreview: document.getElementById('chaptersPreview'),
   chapterCount: document.getElementById('chapterCount'),
+  splitOptionLabel: document.getElementById('splitOptionLabel'),
   downloadBtn: document.getElementById('downloadBtn'),
   historyList: document.getElementById('historyList')
 };
+
+function updateSplitOptionLabel(isStoryMode) {
+  if (elements.splitOptionLabel) {
+    elements.splitOptionLabel.textContent = isStoryMode 
+      ? 'One per story (ZIP)' 
+      : 'One per chapter (ZIP)';
+  }
+}
 
 function initDarkMode() {
   const isDark = localStorage.getItem('darkMode') === 'true' || 
@@ -103,6 +114,41 @@ async function handleFiles(files) {
   }
 }
 
+async function autoDetect() {
+  const text = elements.inputText.value.trim();
+  if (!text) {
+    alert('Please enter or upload some text first');
+    return;
+  }
+
+  elements.autoDetectBtn.disabled = true;
+  elements.autoDetectBtn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Detecting...';
+
+  try {
+    const response = await fetch('/api/detect-metadata', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text.slice(0, 5000) })
+    });
+    
+    const data = await response.json();
+    if (data.error) throw new Error(data.error);
+    
+    if (data.title && !elements.bookTitle.value) {
+      elements.bookTitle.value = data.title;
+    }
+    if (data.author && !elements.authorName.value) {
+      elements.authorName.value = data.author;
+    }
+  } catch (err) {
+    console.error('Auto-detect error:', err);
+    alert('Could not auto-detect title/author. Please enter manually.');
+  } finally {
+    elements.autoDetectBtn.disabled = false;
+    elements.autoDetectBtn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg> Auto-detect Title & Author from Text';
+  }
+}
+
 async function translate() {
   const text = elements.inputText.value.trim();
   if (!text) {
@@ -124,7 +170,8 @@ async function translate() {
         text,
         title: elements.bookTitle.value,
         author: elements.authorName.value,
-        customInstructions: elements.customInstructions.value
+        customInstructions: elements.customInstructions.value,
+        isStoryCollection: elements.storyCollection.checked
       })
     });
 
@@ -155,16 +202,28 @@ async function translate() {
           if (data.complete) {
             fullText = data.translatedText;
             chapters = data.chapters || [];
+            const userRequestedStoryMode = elements.storyCollection.checked;
+            const effectiveStoryMode = data.isStoryCollection !== undefined ? data.isStoryCollection : userRequestedStoryMode;
             currentTranslation = {
               id: data.id,
-              title: elements.bookTitle.value || fullText.slice(0, 30),
-              author: elements.authorName.value,
+              title: elements.bookTitle.value || data.title || fullText.slice(0, 30),
+              author: elements.authorName.value || data.author,
               originalText: text,
               translatedText: fullText,
               customInstructions: elements.customInstructions.value,
               chapters,
+              stories: data.stories || [],
+              isStoryCollection: effectiveStoryMode,
+              userRequestedStoryMode: userRequestedStoryMode,
               date: new Date().toISOString()
             };
+            elements.storyCollection.checked = effectiveStoryMode;
+            if (data.title && !elements.bookTitle.value) {
+              elements.bookTitle.value = data.title;
+            }
+            if (data.author && !elements.authorName.value) {
+              elements.authorName.value = data.author;
+            }
           }
         } catch (e) {}
       }
@@ -173,9 +232,22 @@ async function translate() {
     elements.translatedText.textContent = fullText;
     elements.outputSection.classList.remove('hidden');
     
-    if (chapters.length > 1) {
+    const stories = currentTranslation?.stories || [];
+    const isStoryMode = currentTranslation?.isStoryCollection || false;
+    const requestedStoryMode = currentTranslation?.userRequestedStoryMode || false;
+    
+    if (requestedStoryMode && !isStoryMode) {
+      alert('No individual stories detected. The entire text will be treated as one document.');
+    }
+    
+    updateSplitOptionLabel(isStoryMode);
+    
+    if (isStoryMode && stories.length > 1) {
       elements.chaptersPreview.classList.remove('hidden');
-      elements.chapterCount.textContent = chapters.length;
+      elements.chapterCount.textContent = stories.length + ' stories';
+    } else if (chapters.length > 1) {
+      elements.chaptersPreview.classList.remove('hidden');
+      elements.chapterCount.textContent = chapters.length + ' chapters';
     } else {
       elements.chaptersPreview.classList.add('hidden');
     }
@@ -210,7 +282,15 @@ async function copyTranslatedText() {
 async function downloadPdf() {
   if (!currentTranslation) return;
 
-  const pdfOption = document.querySelector('input[name="pdfOption"]:checked')?.value || 'single';
+  let pdfOption = document.querySelector('input[name="pdfOption"]:checked')?.value || 'single';
+  
+  const isStoryMode = currentTranslation.isStoryCollection;
+  const hasStories = isStoryMode && currentTranslation.stories && currentTranslation.stories.length > 1;
+  const hasChapters = currentTranslation.chapters && currentTranslation.chapters.length > 1;
+  
+  if (pdfOption === 'chapters' && !hasStories && !hasChapters) {
+    pdfOption = 'single';
+  }
   
   elements.downloadBtn.disabled = true;
   elements.downloadBtn.innerHTML = '<svg class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Generating...';
@@ -287,15 +367,28 @@ window.loadHistoryItem = async function(id) {
     elements.authorName.value = item.author || '';
     elements.customInstructions.value = item.customInstructions || '';
     elements.translatedText.textContent = item.translatedText || '';
+    elements.storyCollection.checked = item.isStoryCollection || false;
     
     currentTranslation = item;
     
     elements.outputSection.classList.remove('hidden');
     elements.progressSection.classList.add('hidden');
     
-    if (item.chapters && item.chapters.length > 1) {
+    const hasValidStories = item.stories && item.stories.length > 1;
+    const hasChapters = item.chapters && item.chapters.length > 1;
+    
+    const effectiveStoryMode = item.isStoryCollection && hasValidStories;
+    elements.storyCollection.checked = effectiveStoryMode;
+    currentTranslation.isStoryCollection = effectiveStoryMode;
+    
+    updateSplitOptionLabel(effectiveStoryMode);
+    
+    if (effectiveStoryMode) {
       elements.chaptersPreview.classList.remove('hidden');
-      elements.chapterCount.textContent = item.chapters.length;
+      elements.chapterCount.textContent = item.stories.length + ' stories';
+    } else if (hasChapters) {
+      elements.chaptersPreview.classList.remove('hidden');
+      elements.chapterCount.textContent = item.chapters.length + ' chapters';
     } else {
       elements.chaptersPreview.classList.add('hidden');
     }
@@ -326,6 +419,7 @@ document.addEventListener('DOMContentLoaded', () => {
   elements.menuToggle.addEventListener('click', () => toggleSidebar());
   elements.overlay.addEventListener('click', () => toggleSidebar(false));
   elements.darkModeToggle.addEventListener('click', toggleDarkMode);
+  elements.autoDetectBtn.addEventListener('click', autoDetect);
   elements.translateBtn.addEventListener('click', translate);
   elements.copyBtn.addEventListener('click', copyTranslatedText);
   elements.downloadBtn.addEventListener('click', downloadPdf);

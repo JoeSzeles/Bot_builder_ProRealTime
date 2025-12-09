@@ -135,6 +135,82 @@ function detectChapters(text) {
   return result;
 }
 
+async function detectMetadata(text) {
+  const preview = text.slice(0, 3000);
+  
+  try {
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-5',
+      max_tokens: 500,
+      system: 'You are a literary expert. Extract the book/collection title and author name from the given text. Respond ONLY with valid JSON: {"title": "...", "author": "..."} or {"title": null, "author": null} if not found.',
+      messages: [{ role: 'user', content: `Extract the title and author from this text:\n\n${preview}` }]
+    });
+    
+    const content = message.content[0]?.text || '';
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+  } catch (e) {
+    console.error('Metadata detection error:', e);
+  }
+  return { title: null, author: null };
+}
+
+async function detectStories(text) {
+  const preview = text.slice(0, 10000);
+  
+  try {
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-5',
+      max_tokens: 2000,
+      system: `You are a literary expert. Analyze this text to find individual stories in a collection.
+For each story, identify its title and the exact text that starts it.
+Respond ONLY with valid JSON array: [{"title": "Story Title", "startMarker": "exact first 30-50 chars of story"}]
+If this is not a story collection or you cannot identify stories, respond with: []`,
+      messages: [{ role: 'user', content: preview }]
+    });
+    
+    const content = message.content[0]?.text || '';
+    const jsonMatch = content.match(/\[[\s\S]*\]/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+  } catch (e) {
+    console.error('Story detection error:', e);
+  }
+  return [];
+}
+
+function splitTextByStories(text, storyMarkers) {
+  if (!storyMarkers || storyMarkers.length === 0) {
+    return [{ title: 'Full Text', content: text }];
+  }
+
+  const stories = [];
+  const positions = [];
+  
+  for (const marker of storyMarkers) {
+    const idx = text.indexOf(marker.startMarker);
+    if (idx !== -1) {
+      positions.push({ title: marker.title, start: idx });
+    }
+  }
+  
+  positions.sort((a, b) => a.start - b.start);
+  
+  for (let i = 0; i < positions.length; i++) {
+    const start = positions[i].start;
+    const end = i < positions.length - 1 ? positions[i + 1].start : text.length;
+    stories.push({
+      title: positions[i].title,
+      content: text.slice(start, end).trim()
+    });
+  }
+  
+  return stories.length > 0 ? stories : [{ title: 'Full Text', content: text }];
+}
+
 function isRateLimitError(error) {
   const errorMsg = error?.message || String(error);
   return (
@@ -223,8 +299,23 @@ app.post('/api/parse-pdf', upload.single('file'), async (req, res) => {
   }
 });
 
+app.post('/api/detect-metadata', async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text) {
+      return res.status(400).json({ error: 'No text provided' });
+    }
+    
+    const metadata = await detectMetadata(text);
+    res.json(metadata);
+  } catch (error) {
+    console.error('Metadata detection error:', error);
+    res.status(500).json({ error: 'Failed to detect metadata' });
+  }
+});
+
 app.post('/api/translate', async (req, res) => {
-  const { text, title, author, customInstructions } = req.body;
+  const { text, title, author, customInstructions, isStoryCollection } = req.body;
 
   if (!text) {
     return res.status(400).json({ error: 'No text provided' });
@@ -239,8 +330,17 @@ app.post('/api/translate', async (req, res) => {
   };
 
   try {
+    let detectedTitle = title;
+    let detectedAuthor = author;
+    
+    if (!title || !author) {
+      sendEvent({ progress: 2, status: 'Detecting title and author...' });
+      const metadata = await detectMetadata(text);
+      detectedTitle = title || metadata.title;
+      detectedAuthor = author || metadata.author;
+    }
+
     const chunks = chunkText(text);
-    const translatedChunks = [];
     const limit = pLimit(2);
 
     sendEvent({ progress: 5, status: `Translating ${chunks.length} chunks...` });
@@ -248,7 +348,7 @@ app.post('/api/translate', async (req, res) => {
     const translationPromises = chunks.map((chunk, i) =>
       limit(async () => {
         const translated = await translateChunk(chunk, customInstructions);
-        const progress = 5 + ((i + 1) / chunks.length) * 90;
+        const progress = 5 + ((i + 1) / chunks.length) * 85;
         sendEvent({ progress, status: `Translated chunk ${i + 1}/${chunks.length}` });
         return { index: i, text: translated };
       })
@@ -258,19 +358,33 @@ app.post('/api/translate', async (req, res) => {
     results.sort((a, b) => a.index - b.index);
     const translatedText = results.map(r => r.text).join('\n\n');
 
-    const chapters = detectChapters(translatedText);
+    let chapters = detectChapters(translatedText);
+    let stories = [];
+    let effectiveStoryCollection = isStoryCollection;
+    
+    if (isStoryCollection) {
+      sendEvent({ progress: 92, status: 'Detecting individual stories...' });
+      const storyMarkers = await detectStories(translatedText);
+      stories = splitTextByStories(translatedText, storyMarkers);
+      if (stories.length <= 1) {
+        effectiveStoryCollection = false;
+      }
+    }
+
     const id = generateId();
 
     const db = loadDB();
     db[id] = {
       id,
       date: new Date().toISOString(),
-      title: title || translatedText.slice(0, 30),
-      author,
+      title: detectedTitle || translatedText.slice(0, 30),
+      author: detectedAuthor,
       customInstructions,
       originalText: text,
       translatedText,
-      chapters
+      chapters,
+      stories,
+      isStoryCollection: effectiveStoryCollection
     };
     saveDB(db);
 
@@ -278,7 +392,11 @@ app.post('/api/translate', async (req, res) => {
       complete: true,
       id,
       translatedText,
-      chapters
+      chapters,
+      stories,
+      title: detectedTitle,
+      author: detectedAuthor,
+      isStoryCollection: effectiveStoryCollection
     });
 
     res.end();
@@ -339,13 +457,21 @@ app.post('/api/generate-pdf', async (req, res) => {
       pageMargins: [72, 72, 72, 72]
     });
 
-    if (option === 'chapters' && translation.chapters.length > 1) {
+    const isStoryCollection = translation.isStoryCollection && translation.stories && translation.stories.length > 1;
+    const hasMultipleChapters = translation.chapters && translation.chapters.length > 1;
+    
+    if (option === 'chapters' && (isStoryCollection || hasMultipleChapters)) {
       const zip = new JSZip();
+      const items = isStoryCollection ? translation.stories : translation.chapters;
+      const itemType = isStoryCollection ? 'stories' : 'chapters';
+      const authorPrefix = translation.author ? `${translation.author.replace(/[^a-z0-9]/gi, '_')}_` : '';
+      const bookPrefix = translation.title ? `${translation.title.replace(/[^a-z0-9]/gi, '_').slice(0, 30)}_` : '';
 
-      for (const chapter of translation.chapters) {
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
         const docDef = createDocDefinition(
-          chapter.title,
-          chapter.content,
+          item.title,
+          item.content,
           translation.author
         );
         
@@ -359,12 +485,14 @@ app.post('/api/generate-pdf', async (req, res) => {
           pdfDoc.end();
         });
 
-        const sanitizedTitle = chapter.title.replace(/[^a-z0-9]/gi, '_').slice(0, 50);
-        zip.file(`${sanitizedTitle}.pdf`, Buffer.concat(chunks));
+        const sanitizedTitle = item.title.replace(/[^a-z0-9]/gi, '_').slice(0, 50);
+        const paddedNum = String(i + 1).padStart(2, '0');
+        const filename = `${paddedNum}_${authorPrefix}${sanitizedTitle}.pdf`;
+        zip.file(filename, Buffer.concat(chunks));
       }
 
       const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
-      const filename = `${translation.title || 'translation'}_chapters.zip`;
+      const filename = `${bookPrefix}${authorPrefix}${itemType}.zip`.replace(/__+/g, '_');
       const filepath = path.join(downloadDir, filename);
       fs.writeFileSync(filepath, zipBuffer);
 
