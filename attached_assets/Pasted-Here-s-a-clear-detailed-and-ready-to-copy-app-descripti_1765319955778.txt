@@ -1,0 +1,79 @@
+Here’s a clear, detailed and ready-to-copy app description that you can directly paste into Replit Agent (or any developer/coder) so they can build exactly what you want — 100% free AI translation, JavaScript/Node.js based, works perfectly on Replit.
+
+### App Name (suggested)
+**Free AI Book Translator → English PDF**
+
+### One-sentence summary
+A public web app on Replit (Node.js) that lets users paste text or upload TXT / PDF / MD files containing one or multiple stories in any language, translates everything to natural English using free AI models, and outputs either one beautiful PDF or multiple PDFs (one per story/chapter), ready to download.
+
+### Core Requirements (must-have)
+
+1. Tech stack (must run on Replit without paid plans)
+   - Node.js + Express
+   - Pure HTML/CSS/JS frontend (no React needed, keep it simple and fast)
+   - Everything must use only free-tier or self-hosted services
+
+2. Input methods (user can choose one)
+   - Paste plain text directly into a big textarea
+   - Upload file: .txt, .pdf, .md (single or multiple files via drag-and-drop or button)
+
+3. Free translation (zero cost, no API keys required)
+   Use one or a combination (in order of preference):
+   - LibreTranslate public/free instances (https://libretranslate.com or https://libretranslate.de)
+   - Argos Translate via public API
+   - Hugging Face Inference API (free tier) with NLLB-200, M2M100, or Helsinki-NLP models
+   - Fallback: google-translate-api-x (unofficial, unlimited, works in 2025)
+
+   → The app must auto-detect source language and translate to English (US).
+
+4. Smart story/chapter detection
+   - Automatically detect if the text contains one story or multiple stories/chapters
+   - Detection rules (in priority order):
+     - Split on headings that look like “Chapter 1”, “Chapter One”, “CHAPTER 2”, “Part I”, etc.
+     - Split on lines like “===”, “***”, “— — —” (common story separators)
+     - Split on very large gaps (multiple empty lines)
+     - If no clear separators → treat as single story
+   - Show user a preview: “We detected X stories/chapters. Generate one PDF or one per story?”
+
+5. Output options (user chooses)
+   - One single PDF containing everything
+   - Multiple PDFs (one file per detected story/chapter, downloadable as ZIP or individually)
+
+6. Beautiful PDF generation (must look like a real book)
+   - Use pure JavaScript: PDF-lib or pdfmake (both work perfectly on Replit, no native dependencies)
+   - Nice typography: proper fonts (include Noto Serif or Liberation Serif via Google Fonts or base64)
+   - Justified text, page numbers, optional title page, headings styled correctly
+   - A5 or Letter size, good margins
+
+7. Download
+   - Immediate download button(s)
+   - If multiple PDFs → auto-zip them and offer “Download all as ZIP”
+
+8. Nice, mobile-friendly UI
+   - Clean, modern look (Tailwind CSS or plain CSS)
+   - Progress bar while translating and generating
+   - Success message with download buttons
+
+### Bonus (nice to have, if easy)
+- Option to enter book title and author (added to title page)
+- Remember last used settings
+- Dark mode toggle
+- “Copy translated text only” button
+
+### Non-requirements
+- No user accounts
+- No payment, no API keys from the user
+- No OpenAI, DeepL, Google Cloud, or any paid API
+
+### Example user flow
+1. User lands on page → sees paste box + upload button
+2. Pastes or uploads a Spanish short-story collection (.txt)
+3. App detects 8 stories → shows preview
+4. User clicks “One PDF per story”
+5. App translates with free NLLB/HuggingFace or LibreTranslate → generates 8 PDFs → zips them → downloads automatically
+6. Done in under 2–5 minutes even for a 100-page book
+
+### Final instruction to Replit Agent / developer
+“Build this exactly as described using only free tools. Prioritize LibreTranslate + pdfmake or PDF-lib. The entire app must run forever on a free Replit account with no API keys needed from users. Make the PDFs look professional and book-like.”
+
+Copy and paste the text above directly to Replit Agent — it has all the details needed to build your perfect free e-book translator in one go.

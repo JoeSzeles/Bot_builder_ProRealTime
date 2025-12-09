@@ -1,0 +1,55 @@
+Build a private, personal-use-only full-stack translator app on Replit that I will only run by clicking "Run" (never deploy, no public URL).
+
+Tech stack:
+- Frontend: Vite (Vanilla JS + HTML) with instant hot reload
+- Backend: Node.js + Express in the same Repl
+- Styling: Tailwind CSS via Vite plugin
+- Persistence: Use Replit Database (key-value) + Replit file storage (for large texts/PDFs)
+
+Layout (single-page, responsive):
+- Left sidebar (collapsible on mobile): "Translation History"
+  → List of all past translations with date, book title (or first 30 chars), and delete button
+  → Clicking an entry instantly loads that book’s original text, custom prompt, translated text, and re-generates PDFs on demand
+- Main area:
+  1. Input section:
+     • Big textarea OR drag-and-drop for .txt / .pdf / .md
+     • Optional: Book Title, Author
+     • "Custom Instructions" textarea (same examples as before)
+     • Big "Translate & Generate PDF(s)" button
+  2. After translation:
+     • Full translated text shown in a scrollable, copyable area (raw AI response)
+     • Detected chapters preview + radio: [One PDF] or [One per chapter → ZIP]
+     • Progress bar + live status
+     • Generate & download PDFs (pdfmake + Noto Serif, professional book layout)
+  3. Dark mode toggle at top
+
+Translation:
+- Use ONLY Replit-managed AI models (prefer Claude 3.5 Sonnet → GPT-4o-mini fallback)
+- System prompt: "You are an expert literary translator."
+- Full prompt = system + user’s Custom Instructions + "Translate to beautiful, natural English (or as specified):" + chunk
+- Smart chunking with overlap
+
+History & Storage (automatic, no extra clicks):
+- On every successful translation:
+  → Save to Replit Database:
+    key = timestamp + random ID
+    value = { date, title, author, customPrompt, originalText, translatedText, chapters[] }
+  → Save generated PDF(s) or ZIP to Replit file storage (/downloads/uuid/)
+  → Sidebar instantly updates with new entry
+- Clicking a history item loads everything back (text, prompt, translated result) and lets me re-download PDFs
+
+Extra polish:
+- "Copy translated text" button
+- "Delete" button per history item
+- Auto-scroll sidebar to newest entry
+- Mobile-friendly (sidebar collapses to hamburger menu)
+
+Rules:
+- NEVER ask for API keys — use only Replit-managed models
+- Use Replit Database and file storage (already available on Pro)
+- This Repl stays 100% private forever
+- Vite hot reload must work perfectly
+
+When finished, just say “Done — click Run and open the Vite preview”.
+
+Start building now.
