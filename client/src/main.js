@@ -2,43 +2,6 @@ let currentTranslation = null;
 let historyItems = [];
 let savedPrompts = [];
 
-const SUNO_TEMPLATE = {
-  name: 'Suno Song Format',
-  instructions: `Do not translate it into different language. Turn the provided text into a complete Suno-compatible song, using the following required formatting rules and musical structure.
-
-📌 FORMATTING RULES (MANDATORY)
-
-All section labels must be written inside brackets [ ], including:
-
-[Intro]
-
-[Verse 1], [Verse 2], …
-
-[Chorus]
-
-[Pre-Chorus]
-
-[Bridge]
-
-[Outro]
-
-Any timing or description cues.
-
-Lyrics themselves must NOT be inside brackets.
-Brackets are only for instructions/titles/sections.
-
-If musical directions appear, also put them in brackets, e.g.:
-
-[Slow atmospheric intro with drone note]
-
-[Chanting fades in]
-
-Maintain poetic flow but stay loyal to the meaning of the source text.
-
-Keep sections clear and Suno-friendly.`,
-  styles: 'Electronic ambient, atmospheric, cinematic'
-};
-
 const elements = {
   menuToggle: document.getElementById('menuToggle'),
   promptsToggle: document.getElementById('promptsToggle'),
@@ -104,79 +67,90 @@ function togglePromptsSidebar(show) {
   elements.overlayRight.classList.toggle('hidden', !isVisible);
 }
 
-function isLocalStorageAvailable() {
+async function loadSavedPrompts() {
+  const localPrompts = getLocalStoragePrompts();
+  
   try {
-    const testKey = '__test__';
-    localStorage.setItem(testKey, testKey);
-    localStorage.removeItem(testKey);
-    return true;
-  } catch (e) {
-    return false;
+    const res = await fetch('/api/prompts');
+    if (!res.ok) throw new Error('Server error');
+    const data = await res.json();
+    savedPrompts = data.prompts || [];
+    
+    if (localPrompts.length > 0) {
+      await migrateLocalPromptsToServer(localPrompts);
+    }
+    
+    renderPrompts();
+  } catch (err) {
+    console.error('Failed to load prompts from server:', err);
+    if (localPrompts.length > 0) {
+      savedPrompts = localPrompts;
+    }
+    renderPrompts();
   }
 }
 
-function loadSavedPrompts() {
-  if (!isLocalStorageAvailable()) {
-    console.warn('localStorage not available - prompts will not persist');
-    savedPrompts = [SUNO_TEMPLATE];
-    renderPrompts();
-    return;
-  }
-  
+function getLocalStoragePrompts() {
   try {
     const stored = localStorage.getItem('savedPrompts');
     if (stored) {
       const parsed = JSON.parse(stored);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        savedPrompts = parsed;
-      } else {
-        savedPrompts = [SUNO_TEMPLATE];
-        localStorage.setItem('savedPrompts', JSON.stringify(savedPrompts));
+        return parsed;
       }
-    } else {
-      savedPrompts = [SUNO_TEMPLATE];
-      localStorage.setItem('savedPrompts', JSON.stringify(savedPrompts));
     }
   } catch (e) {
-    console.error('Error loading saved prompts:', e);
-    savedPrompts = [SUNO_TEMPLATE];
-    try {
-      localStorage.setItem('savedPrompts', JSON.stringify(savedPrompts));
-    } catch (saveError) {
-      console.error('Could not save default prompts:', saveError);
-    }
+    console.error('Error reading localStorage prompts:', e);
   }
-  renderPrompts();
+  return [];
 }
 
-function savePromptsToStorage() {
-  if (!isLocalStorageAvailable()) {
-    console.warn('localStorage not available - cannot save prompts');
-    return;
-  }
+async function migrateLocalPromptsToServer(localPrompts) {
   try {
-    localStorage.setItem('savedPrompts', JSON.stringify(savedPrompts));
-  } catch (e) {
-    console.error('Error saving prompts:', e);
-    alert('Could not save prompt - storage may be full or disabled');
+    const res = await fetch('/api/prompts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompts: localPrompts })
+    });
+    const data = await res.json();
+    savedPrompts = data.prompts || savedPrompts;
+    
+    try {
+      localStorage.removeItem('savedPrompts');
+    } catch (e) {}
+    
+    console.log('Migrated local prompts to server');
+  } catch (err) {
+    console.error('Failed to migrate prompts:', err);
   }
 }
 
-function addPrompt(name, instructions, styles) {
-  const existing = savedPrompts.findIndex(p => p.name === name);
-  if (existing >= 0) {
-    savedPrompts[existing] = { name, instructions, styles };
-  } else {
-    savedPrompts.push({ name, instructions, styles });
+async function addPrompt(name, instructions, styles) {
+  try {
+    const res = await fetch('/api/prompts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, instructions, styles })
+    });
+    const data = await res.json();
+    savedPrompts = data.prompts || savedPrompts;
+    renderPrompts();
+  } catch (err) {
+    console.error('Failed to add prompt:', err);
+    alert('Failed to save prompt');
   }
-  savePromptsToStorage();
-  renderPrompts();
 }
 
-function deletePrompt(index) {
-  savedPrompts.splice(index, 1);
-  savePromptsToStorage();
-  renderPrompts();
+async function deletePrompt(index) {
+  try {
+    const res = await fetch(`/api/prompts/${index}`, { method: 'DELETE' });
+    const data = await res.json();
+    savedPrompts = data.prompts || [];
+    renderPrompts();
+  } catch (err) {
+    console.error('Failed to delete prompt:', err);
+    alert('Failed to delete prompt');
+  }
 }
 
 function applyPrompt(index) {
@@ -339,7 +313,7 @@ async function translate() {
 
   if (shouldSavePrompt && (customInstructions || customStyles)) {
     const promptName = elements.bookTitle.value || `Prompt ${new Date().toLocaleDateString()}`;
-    addPrompt(promptName, customInstructions, customStyles);
+    await addPrompt(promptName, customInstructions, customStyles);
   }
 
   elements.translateBtn.disabled = true;

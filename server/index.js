@@ -51,10 +51,50 @@ const fonts = {
   }
 };
 
-const DB_FILE = path.join(__dirname, '..', 'data', 'translations.json');
-if (!fs.existsSync(path.dirname(DB_FILE))) {
-  fs.mkdirSync(path.dirname(DB_FILE), { recursive: true });
+const DATA_DIR = path.join(__dirname, '..', 'data');
+const DB_FILE = path.join(DATA_DIR, 'translations.json');
+const PROMPTS_FILE = path.join(DATA_DIR, 'prompts.json');
+
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
 }
+
+const SUNO_TEMPLATE = {
+  name: 'Suno Song Format',
+  instructions: `Do not translate it into different language. Turn the provided text into a complete Suno-compatible song, using the following required formatting rules and musical structure.
+
+📌 FORMATTING RULES (MANDATORY)
+
+All section labels must be written inside brackets [ ], including:
+
+[Intro]
+
+[Verse 1], [Verse 2], …
+
+[Chorus]
+
+[Pre-Chorus]
+
+[Bridge]
+
+[Outro]
+
+Any timing or description cues.
+
+Lyrics themselves must NOT be inside brackets.
+Brackets are only for instructions/titles/sections.
+
+If musical directions appear, also put them in brackets, e.g.:
+
+[Slow atmospheric intro with drone note]
+
+[Chanting fades in]
+
+Maintain poetic flow but stay loyal to the meaning of the source text.
+
+Keep sections clear and Suno-friendly.`,
+  styles: 'Electronic ambient, atmospheric, cinematic'
+};
 
 function loadDB() {
   try {
@@ -67,6 +107,24 @@ function loadDB() {
 
 function saveDB(data) {
   fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
+}
+
+function loadPrompts() {
+  try {
+    if (fs.existsSync(PROMPTS_FILE)) {
+      const prompts = JSON.parse(fs.readFileSync(PROMPTS_FILE, 'utf-8'));
+      if (Array.isArray(prompts) && prompts.length > 0) {
+        return prompts;
+      }
+    }
+  } catch (e) {
+    console.error('Error loading prompts:', e);
+  }
+  return [SUNO_TEMPLATE];
+}
+
+function savePrompts(prompts) {
+  fs.writeFileSync(PROMPTS_FILE, JSON.stringify(prompts, null, 2));
 }
 
 function generateId() {
@@ -602,6 +660,68 @@ app.delete('/api/history/:id', (req, res) => {
   }
 
   res.json({ success: true });
+});
+
+app.get('/api/prompts', (req, res) => {
+  const prompts = loadPrompts();
+  res.json({ prompts });
+});
+
+app.post('/api/prompts', (req, res) => {
+  const { name, instructions, styles, prompts: migratedPrompts } = req.body;
+  
+  if (migratedPrompts && Array.isArray(migratedPrompts)) {
+    const currentPrompts = loadPrompts();
+    const promptNames = new Set(currentPrompts.map(p => p.name));
+    
+    for (const prompt of migratedPrompts) {
+      if (prompt.name && !promptNames.has(prompt.name)) {
+        currentPrompts.push({
+          name: prompt.name,
+          instructions: prompt.instructions || '',
+          styles: prompt.styles || ''
+        });
+        promptNames.add(prompt.name);
+      }
+    }
+    
+    savePrompts(currentPrompts);
+    return res.json({ prompts: currentPrompts });
+  }
+  
+  if (!name) {
+    return res.status(400).json({ error: 'Prompt name is required' });
+  }
+  
+  const prompts = loadPrompts();
+  const existingIndex = prompts.findIndex(p => p.name === name);
+  
+  if (existingIndex >= 0) {
+    prompts[existingIndex] = { name, instructions: instructions || '', styles: styles || '' };
+  } else {
+    prompts.push({ name, instructions: instructions || '', styles: styles || '' });
+  }
+  
+  savePrompts(prompts);
+  res.json({ prompts });
+});
+
+app.delete('/api/prompts/:index', (req, res) => {
+  const index = parseInt(req.params.index, 10);
+  const prompts = loadPrompts();
+  
+  if (isNaN(index) || index < 0 || index >= prompts.length) {
+    return res.status(400).json({ error: 'Invalid prompt index' });
+  }
+  
+  prompts.splice(index, 1);
+  
+  if (prompts.length === 0) {
+    prompts.push(SUNO_TEMPLATE);
+  }
+  
+  savePrompts(prompts);
+  res.json({ prompts });
 });
 
 const PORT = process.env.PORT || 3001;
