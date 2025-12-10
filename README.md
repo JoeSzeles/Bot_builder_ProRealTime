@@ -1,12 +1,24 @@
 # Literator
 
-A full-stack AI-powered application for translating and transforming literary texts with professional PDF generation.
+A full-stack AI-powered application for translating, transforming, and generating literary content with professional PDF output.
 
 ## Features
 
-### Text Input
+### Two Modes of Operation
+
+**1. Translation/Transformation Mode**
+- Paste or upload source text
+- AI translates or transforms it according to your instructions
+
+**2. Content Generation Mode**
+- Leave the source text empty
+- Describe a topic in the "Topic or Instructions" field
+- AI researches and writes original content in your requested style
+
+### Text Input (Optional)
 - **Drag & Drop**: Upload .txt, .pdf, or .md files directly
 - **Paste Text**: Copy and paste text into the input area
+- **Leave Empty**: Skip to generate content from a topic instead
 - **Auto-detect Metadata**: AI automatically detects book title and author from the text
 
 ### Translation & Transformation

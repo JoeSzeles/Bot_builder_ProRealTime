@@ -302,14 +302,17 @@ async function autoDetect() {
 
 async function translate() {
   const text = elements.inputText.value.trim();
-  if (!text) {
-    alert('Please enter or upload some text to translate');
+  const customInstructions = elements.customInstructions.value.trim();
+  const customStyles = elements.customStyles.value.trim();
+  
+  // Allow either text input OR topic/instructions for generation mode
+  if (!text && !customInstructions) {
+    alert('Please enter some text to transform, or provide a topic in the Topic/Instructions field to generate new content');
     return;
   }
 
   const shouldSavePrompt = elements.savePrompt.checked;
-  const customInstructions = elements.customInstructions.value.trim();
-  const customStyles = elements.customStyles.value.trim();
+  const isGenerationMode = !text && customInstructions;
 
   if (shouldSavePrompt && (customInstructions || customStyles)) {
     const promptName = elements.bookTitle.value || `Prompt ${new Date().toLocaleDateString()}`;
@@ -320,7 +323,7 @@ async function translate() {
   elements.progressSection.classList.remove('hidden');
   elements.outputSection.classList.add('hidden');
   
-  updateProgress(0, 'Starting translation...');
+  updateProgress(0, isGenerationMode ? 'Generating content...' : 'Starting translation...');
 
   try {
     const response = await fetch('/api/translate', {

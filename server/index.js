@@ -375,6 +375,53 @@ async function translateChunk(text, customInstructions, customStyles, useFallbac
   );
 }
 
+// Content generation mode - research topic and write in requested style
+async function generateContent(topic, customStyles) {
+  const systemPrompt = `You are an expert writer and researcher. Your task is to research and write comprehensive, engaging content about the topic provided by the user. 
+
+Your writing should be:
+- Well-researched and informative
+- Engaging and readable
+- Properly structured with clear sections
+- Original and creative in presentation
+
+If the user specifies a particular style or format, follow it exactly. If they want song lyrics, write song lyrics. If they want poetry, write poetry. If they want an essay, write an essay.`;
+
+  let userPrompt = `TOPIC/INSTRUCTIONS:\n${topic}\n\n`;
+  
+  if (customStyles) {
+    userPrompt += `OUTPUT STYLE & FORMAT:\n${customStyles}\n\n`;
+  }
+  
+  userPrompt += `Please write comprehensive content about this topic in the specified style and format. Be creative, thorough, and engaging.`;
+
+  try {
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-5',
+      max_tokens: 8192,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }]
+    });
+
+    const content = message.content[0];
+    if (content.type === 'text') {
+      return content.text;
+    }
+    throw new Error('Unexpected response type');
+  } catch (error) {
+    console.log('Claude generation failed, falling back to OpenAI');
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      max_tokens: 8192
+    });
+    return response.choices[0]?.message?.content || '';
+  }
+}
+
 app.post('/api/parse-pdf', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
@@ -407,9 +454,12 @@ app.post('/api/detect-metadata', async (req, res) => {
 app.post('/api/translate', async (req, res) => {
   const { text, title, author, customInstructions, customStyles, isStoryCollection } = req.body;
 
-  if (!text) {
-    return res.status(400).json({ error: 'No text provided' });
+  // Allow either text OR customInstructions for generation mode
+  if (!text && !customInstructions) {
+    return res.status(400).json({ error: 'Please provide text to transform or a topic to generate content about' });
   }
+  
+  const isGenerationMode = !text && customInstructions;
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -422,31 +472,47 @@ app.post('/api/translate', async (req, res) => {
   try {
     let detectedTitle = title;
     let detectedAuthor = author;
+    let translatedText = '';
     
-    if (!title || !author) {
-      sendEvent({ progress: 2, status: 'Detecting title and author...' });
-      const metadata = await detectMetadata(text);
-      detectedTitle = title || metadata.title;
-      detectedAuthor = author || metadata.author;
+    if (isGenerationMode) {
+      // Generation mode: create content from topic
+      sendEvent({ progress: 10, status: 'Researching and generating content...' });
+      translatedText = await generateContent(customInstructions, customStyles);
+      sendEvent({ progress: 90, status: 'Content generated successfully' });
+      
+      // Use provided title or extract from instructions
+      if (!detectedTitle) {
+        const topicPreview = customInstructions.slice(0, 50).replace(/[^a-zA-Z0-9\s]/g, '');
+        detectedTitle = topicPreview || 'Generated Content';
+      }
+      detectedAuthor = detectedAuthor || 'Literator AI';
+    } else {
+      // Translation/transformation mode
+      if (!title || !author) {
+        sendEvent({ progress: 2, status: 'Detecting title and author...' });
+        const metadata = await detectMetadata(text);
+        detectedTitle = title || metadata.title;
+        detectedAuthor = author || metadata.author;
+      }
+
+      const chunks = chunkText(text);
+      const limit = pLimit(2);
+
+      sendEvent({ progress: 5, status: `Processing ${chunks.length} chunks...` });
+
+      const translationPromises = chunks.map((chunk, i) =>
+        limit(async () => {
+          const translated = await translateChunk(chunk, customInstructions, customStyles);
+          const progress = 5 + ((i + 1) / chunks.length) * 85;
+          sendEvent({ progress, status: `Processed chunk ${i + 1}/${chunks.length}` });
+          return { index: i, text: translated };
+        })
+      );
+
+      const results = await Promise.all(translationPromises);
+      results.sort((a, b) => a.index - b.index);
+      translatedText = results.map(r => r.text).join('\n\n');
     }
-
-    const chunks = chunkText(text);
-    const limit = pLimit(2);
-
-    sendEvent({ progress: 5, status: `Translating ${chunks.length} chunks...` });
-
-    const translationPromises = chunks.map((chunk, i) =>
-      limit(async () => {
-        const translated = await translateChunk(chunk, customInstructions, customStyles);
-        const progress = 5 + ((i + 1) / chunks.length) * 85;
-        sendEvent({ progress, status: `Translated chunk ${i + 1}/${chunks.length}` });
-        return { index: i, text: translated };
-      })
-    );
-
-    const results = await Promise.all(translationPromises);
-    results.sort((a, b) => a.index - b.index);
-    const translatedText = results.map(r => r.text).join('\n\n');
 
     let chapters = detectChapters(translatedText);
     let stories = [];
@@ -471,11 +537,12 @@ app.post('/api/translate', async (req, res) => {
       author: detectedAuthor,
       customInstructions,
       customStyles,
-      originalText: text,
+      originalText: text || '',
       translatedText,
       chapters,
       stories,
-      isStoryCollection: effectiveStoryCollection
+      isStoryCollection: effectiveStoryCollection,
+      isGenerationMode
     };
     saveDB(db);
 

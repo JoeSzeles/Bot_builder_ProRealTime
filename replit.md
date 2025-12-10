@@ -77,6 +77,7 @@ The frontend proxies API requests to the backend.
 - Save Prompt checkbox enabled by default to save custom prompts
 
 ## Recent Changes (Dec 10, 2025)
+- **Added Content Generation Mode**: Source text is now optional - leave empty and describe a topic to generate original content
 - **Rebranded to "Literator"** with unique SVG logo (purple/indigo book with orange-red pen)
 - Added comprehensive README.md documentation
 - Added Custom Styles text field below Custom Instructions
