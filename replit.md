@@ -1,6 +1,6 @@
-# Literary Translator App
+# Literator
 
-A personal-use full-stack translator app for translating literary texts using AI and generating professional PDFs.
+A personal-use full-stack app for translating and transforming literary texts using AI and generating professional PDFs.
 
 ## Overview
 - **Purpose**: Translate texts (books, documents) from any language to English using AI, with support for custom translation instructions

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Literary Translator</title>
+  <title>Literator</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
@@ -43,7 +43,26 @@
       <!-- Header -->
       <header class="sticky top-0 z-20 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 p-4">
         <div class="max-w-4xl mx-auto flex items-center justify-between">
-          <h1 class="text-xl lg:text-2xl font-bold text-gray-800 dark:text-white ml-12 lg:ml-0">Literary Translator</h1>
+          <div class="flex items-center gap-3 ml-12 lg:ml-0">
+            <svg class="w-8 h-8 lg:w-10 lg:h-10" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="bookGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" style="stop-color:#6366f1"/>
+                  <stop offset="100%" style="stop-color:#8b5cf6"/>
+                </linearGradient>
+                <linearGradient id="penGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" style="stop-color:#f59e0b"/>
+                  <stop offset="100%" style="stop-color:#ef4444"/>
+                </linearGradient>
+              </defs>
+              <path d="M8 12C8 9.79 9.79 8 12 8H32C34.21 8 36 9.79 36 12V40L22 34L8 40V12Z" fill="url(#bookGrad)" opacity="0.9"/>
+              <path d="M12 12H32V8H12C9.79 8 8 9.79 8 12V14C8 11.79 9.79 10 12 10V12Z" fill="white" opacity="0.3"/>
+              <path d="M40 8L28 36L26 32L36 8H40Z" fill="url(#penGrad)"/>
+              <path d="M28 36L26 32L24 38L28 36Z" fill="#1f2937"/>
+              <circle cx="38" cy="10" r="2" fill="#fbbf24"/>
+            </svg>
+            <h1 class="text-xl lg:text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">Literator</h1>
+          </div>
           <button id="darkModeToggle" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors mr-12 lg:mr-0">
             <svg id="sunIcon" class="w-6 h-6 text-gray-600 dark:text-gray-300 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
