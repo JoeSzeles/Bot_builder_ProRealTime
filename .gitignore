@@ -129,9 +129,18 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
-# Replit debugger
+# Replit
 .breakpoints
+.replit
+replit.nix
+.upm/
+replit.md
 
 # App-specific
 downloads/
 data/
+
+# Secrets (never commit)
+.env*
+*.pem
+*.key
