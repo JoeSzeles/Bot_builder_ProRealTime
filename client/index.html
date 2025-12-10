@@ -11,14 +11,21 @@
 </head>
 <body class="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
   <div id="app" class="flex min-h-screen">
-    <!-- Mobile Menu Button -->
+    <!-- Mobile Menu Button (Left) -->
     <button id="menuToggle" class="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-white dark:bg-gray-800 shadow-lg">
       <svg class="w-6 h-6 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
       </svg>
     </button>
 
-    <!-- Sidebar -->
+    <!-- Mobile Menu Button (Right) -->
+    <button id="promptsToggle" class="lg:hidden fixed top-4 right-4 z-50 p-2 rounded-lg bg-white dark:bg-gray-800 shadow-lg">
+      <svg class="w-6 h-6 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+      </svg>
+    </button>
+
+    <!-- Left Sidebar - History -->
     <aside id="sidebar" class="fixed lg:static inset-y-0 left-0 z-40 w-72 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 flex flex-col">
       <div class="p-4 border-b border-gray-200 dark:border-gray-700">
         <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">Translation History</h2>
@@ -28,7 +35,7 @@
       </div>
     </aside>
 
-    <!-- Overlay for mobile -->
+    <!-- Overlay for mobile (left) -->
     <div id="overlay" class="fixed inset-0 bg-black/50 z-30 hidden lg:hidden"></div>
 
     <!-- Main Content -->
@@ -37,7 +44,7 @@
       <header class="sticky top-0 z-20 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 p-4">
         <div class="max-w-4xl mx-auto flex items-center justify-between">
           <h1 class="text-xl lg:text-2xl font-bold text-gray-800 dark:text-white ml-12 lg:ml-0">Literary Translator</h1>
-          <button id="darkModeToggle" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+          <button id="darkModeToggle" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors mr-12 lg:mr-0">
             <svg id="sunIcon" class="w-6 h-6 text-gray-600 dark:text-gray-300 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
             </svg>
@@ -87,12 +94,24 @@
               <textarea id="customInstructions" rows="3" class="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y" placeholder="e.g., Preserve poetic rhythm, keep honorifics in original language, translate to French..."></textarea>
             </div>
 
-            <!-- Story Collection Option -->
-            <div class="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-              <input type="checkbox" id="storyCollection" class="w-5 h-5 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
-              <div>
+            <!-- Custom Styles -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Custom Styles (optional)</label>
+              <textarea id="customStyles" rows="2" class="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y" placeholder="e.g., Victorian prose, minimalist poetry, electronic ambient music..."></textarea>
+            </div>
+
+            <!-- Options Row -->
+            <div class="flex flex-wrap items-center gap-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+              <!-- Story Collection Option -->
+              <div class="flex items-center gap-2">
+                <input type="checkbox" id="storyCollection" class="w-5 h-5 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
                 <label for="storyCollection" class="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer">Story Collection</label>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Check this if the book contains multiple separate stories. Each story will become its own PDF.</p>
+              </div>
+              
+              <!-- Save Prompt Option -->
+              <div class="flex items-center gap-2">
+                <input type="checkbox" id="savePrompt" checked class="w-5 h-5 rounded border-gray-300 dark:border-gray-600 text-green-600 focus:ring-green-500">
+                <label for="savePrompt" class="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer">Save Prompt</label>
               </div>
             </div>
 
@@ -168,6 +187,19 @@
         </section>
       </div>
     </main>
+
+    <!-- Right Sidebar - Saved Prompts -->
+    <aside id="promptsSidebar" class="fixed lg:static inset-y-0 right-0 z-40 w-72 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 transform translate-x-full lg:translate-x-0 transition-transform duration-300 flex flex-col">
+      <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+        <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">Saved Prompts</h2>
+      </div>
+      <div id="promptsList" class="flex-1 overflow-y-auto p-2 space-y-2 scrollbar-thin">
+        <p class="text-sm text-gray-500 dark:text-gray-400 p-2">No saved prompts yet</p>
+      </div>
+    </aside>
+
+    <!-- Overlay for mobile (right) -->
+    <div id="overlayRight" class="fixed inset-0 bg-black/50 z-30 hidden lg:hidden"></div>
   </div>
 
   <script type="module" src="/src/main.js"></script>

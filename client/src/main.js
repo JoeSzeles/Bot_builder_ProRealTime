@@ -1,10 +1,51 @@
 let currentTranslation = null;
 let historyItems = [];
+let savedPrompts = [];
+
+const SUNO_TEMPLATE = {
+  name: 'Suno Song Format',
+  instructions: `Do not translate it into different language. Turn the provided text into a complete Suno-compatible song, using the following required formatting rules and musical structure.
+
+📌 FORMATTING RULES (MANDATORY)
+
+All section labels must be written inside brackets [ ], including:
+
+[Intro]
+
+[Verse 1], [Verse 2], …
+
+[Chorus]
+
+[Pre-Chorus]
+
+[Bridge]
+
+[Outro]
+
+Any timing or description cues.
+
+Lyrics themselves must NOT be inside brackets.
+Brackets are only for instructions/titles/sections.
+
+If musical directions appear, also put them in brackets, e.g.:
+
+[Slow atmospheric intro with drone note]
+
+[Chanting fades in]
+
+Maintain poetic flow but stay loyal to the meaning of the source text.
+
+Keep sections clear and Suno-friendly.`,
+  styles: 'Electronic ambient, atmospheric, cinematic'
+};
 
 const elements = {
   menuToggle: document.getElementById('menuToggle'),
+  promptsToggle: document.getElementById('promptsToggle'),
   sidebar: document.getElementById('sidebar'),
+  promptsSidebar: document.getElementById('promptsSidebar'),
   overlay: document.getElementById('overlay'),
+  overlayRight: document.getElementById('overlayRight'),
   darkModeToggle: document.getElementById('darkModeToggle'),
   dropZone: document.getElementById('dropZone'),
   fileInput: document.getElementById('fileInput'),
@@ -12,7 +53,9 @@ const elements = {
   bookTitle: document.getElementById('bookTitle'),
   authorName: document.getElementById('authorName'),
   customInstructions: document.getElementById('customInstructions'),
+  customStyles: document.getElementById('customStyles'),
   storyCollection: document.getElementById('storyCollection'),
+  savePrompt: document.getElementById('savePrompt'),
   autoDetectBtn: document.getElementById('autoDetectBtn'),
   translateBtn: document.getElementById('translateBtn'),
   progressSection: document.getElementById('progressSection'),
@@ -26,7 +69,8 @@ const elements = {
   chapterCount: document.getElementById('chapterCount'),
   splitOptionLabel: document.getElementById('splitOptionLabel'),
   downloadBtn: document.getElementById('downloadBtn'),
-  historyList: document.getElementById('historyList')
+  historyList: document.getElementById('historyList'),
+  promptsList: document.getElementById('promptsList')
 };
 
 function updateSplitOptionLabel(isStoryMode) {
@@ -52,6 +96,100 @@ function toggleSidebar(show) {
   const isVisible = show ?? elements.sidebar.classList.contains('-translate-x-full');
   elements.sidebar.classList.toggle('-translate-x-full', !isVisible);
   elements.overlay.classList.toggle('hidden', !isVisible);
+}
+
+function togglePromptsSidebar(show) {
+  const isVisible = show ?? elements.promptsSidebar.classList.contains('translate-x-full');
+  elements.promptsSidebar.classList.toggle('translate-x-full', !isVisible);
+  elements.overlayRight.classList.toggle('hidden', !isVisible);
+}
+
+function loadSavedPrompts() {
+  try {
+    const stored = localStorage.getItem('savedPrompts');
+    if (stored) {
+      savedPrompts = JSON.parse(stored);
+    } else {
+      savedPrompts = [SUNO_TEMPLATE];
+      localStorage.setItem('savedPrompts', JSON.stringify(savedPrompts));
+    }
+  } catch (e) {
+    savedPrompts = [SUNO_TEMPLATE];
+  }
+  renderPrompts();
+}
+
+function savePromptsToStorage() {
+  localStorage.setItem('savedPrompts', JSON.stringify(savedPrompts));
+}
+
+function addPrompt(name, instructions, styles) {
+  const existing = savedPrompts.findIndex(p => p.name === name);
+  if (existing >= 0) {
+    savedPrompts[existing] = { name, instructions, styles };
+  } else {
+    savedPrompts.push({ name, instructions, styles });
+  }
+  savePromptsToStorage();
+  renderPrompts();
+}
+
+function deletePrompt(index) {
+  savedPrompts.splice(index, 1);
+  savePromptsToStorage();
+  renderPrompts();
+}
+
+function applyPrompt(index) {
+  const prompt = savedPrompts[index];
+  if (prompt) {
+    elements.customInstructions.value = prompt.instructions || '';
+    elements.customStyles.value = prompt.styles || '';
+  }
+  togglePromptsSidebar(false);
+}
+
+function renderPrompts() {
+  if (!savedPrompts.length) {
+    elements.promptsList.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400 p-2">No saved prompts yet</p>';
+    return;
+  }
+
+  elements.promptsList.innerHTML = savedPrompts.map((prompt, index) => `
+    <div class="prompt-item p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition-colors group" data-prompt-index="${index}">
+      <div class="flex items-start justify-between gap-2">
+        <div class="flex-1 min-w-0 prompt-content">
+          <p class="font-medium text-gray-800 dark:text-gray-200 truncate">${prompt.name || 'Untitled Prompt'}</p>
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">${prompt.styles || 'No style specified'}</p>
+          <p class="text-xs text-gray-400 dark:text-gray-500 mt-1 line-clamp-2">${(prompt.instructions || '').slice(0, 80)}${(prompt.instructions || '').length > 80 ? '...' : ''}</p>
+        </div>
+        <button class="delete-prompt-btn p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" data-prompt-index="${index}">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function setupPromptsEventDelegation() {
+  elements.promptsList.addEventListener('click', (e) => {
+    const deleteBtn = e.target.closest('.delete-prompt-btn');
+    if (deleteBtn) {
+      e.stopPropagation();
+      const index = parseInt(deleteBtn.dataset.promptIndex, 10);
+      if (!confirm('Delete this prompt?')) return;
+      deletePrompt(index);
+      return;
+    }
+    
+    const promptItem = e.target.closest('.prompt-item');
+    if (promptItem) {
+      const index = parseInt(promptItem.dataset.promptIndex, 10);
+      applyPrompt(index);
+    }
+  });
 }
 
 function setupDragDrop() {
@@ -156,6 +294,15 @@ async function translate() {
     return;
   }
 
+  const shouldSavePrompt = elements.savePrompt.checked;
+  const customInstructions = elements.customInstructions.value.trim();
+  const customStyles = elements.customStyles.value.trim();
+
+  if (shouldSavePrompt && (customInstructions || customStyles)) {
+    const promptName = elements.bookTitle.value || `Prompt ${new Date().toLocaleDateString()}`;
+    addPrompt(promptName, customInstructions, customStyles);
+  }
+
   elements.translateBtn.disabled = true;
   elements.progressSection.classList.remove('hidden');
   elements.outputSection.classList.add('hidden');
@@ -170,7 +317,8 @@ async function translate() {
         text,
         title: elements.bookTitle.value,
         author: elements.authorName.value,
-        customInstructions: elements.customInstructions.value,
+        customInstructions: customInstructions,
+        customStyles: customStyles,
         isStoryCollection: elements.storyCollection.checked
       })
     });
@@ -210,7 +358,8 @@ async function translate() {
               author: elements.authorName.value || data.author,
               originalText: text,
               translatedText: fullText,
-              customInstructions: elements.customInstructions.value,
+              customInstructions: customInstructions,
+              customStyles: customStyles,
               chapters,
               stories: data.stories || [],
               isStoryCollection: effectiveStoryMode,
@@ -338,26 +487,110 @@ function renderHistory() {
     return;
   }
 
-  elements.historyList.innerHTML = historyItems.map(item => `
-    <div class="history-item p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition-colors group" data-id="${item.id}">
-      <div class="flex items-start justify-between gap-2">
-        <div class="flex-1 min-w-0" onclick="loadHistoryItem('${item.id}')">
-          <p class="font-medium text-gray-800 dark:text-gray-200 truncate">${item.title || 'Untitled'}</p>
-          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">${new Date(item.date).toLocaleDateString()}</p>
-        </div>
-        <button onclick="deleteHistoryItem('${item.id}', event)" class="p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-          </svg>
-        </button>
+  elements.historyList.innerHTML = historyItems.map(item => {
+    const hasStories = item.stories && item.stories.length > 1;
+    const storiesHtml = hasStories ? `
+      <div class="stories-list mt-2 ml-4 space-y-1 hidden" data-stories-for="${item.id}">
+        ${item.stories.map((story, idx) => `
+          <div class="story-item text-xs text-gray-500 dark:text-gray-400 py-1 px-2 rounded hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer" data-history-id="${item.id}" data-story-index="${idx}">
+            ${idx + 1}. ${story.title || 'Untitled Story'}
+          </div>
+        `).join('')}
       </div>
-    </div>
-  `).join('');
+    ` : '';
+
+    const expandBtn = hasStories ? `
+      <button class="expand-stories-btn p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors" data-expand-for="${item.id}">
+        <svg class="w-4 h-4 transform transition-transform" data-expand-icon="${item.id}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+      </button>
+    ` : '';
+
+    return `
+      <div class="history-item p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group" data-history-id="${item.id}">
+        <div class="flex items-start justify-between gap-2">
+          ${expandBtn}
+          <div class="flex-1 min-w-0 cursor-pointer history-content" data-history-id="${item.id}">
+            <p class="font-medium text-gray-800 dark:text-gray-200 truncate">${item.title || 'Untitled'}</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">${new Date(item.date).toLocaleDateString()}${hasStories ? ` · ${item.stories.length} stories` : ''}</p>
+          </div>
+          <button class="delete-history-btn p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" data-history-id="${item.id}">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+            </svg>
+          </button>
+        </div>
+        ${storiesHtml}
+      </div>
+    `;
+  }).join('');
 
   elements.historyList.scrollTop = 0;
 }
 
-window.loadHistoryItem = async function(id) {
+function setupHistoryEventDelegation() {
+  elements.historyList.addEventListener('click', async (e) => {
+    const expandBtn = e.target.closest('.expand-stories-btn');
+    if (expandBtn) {
+      e.stopPropagation();
+      const id = expandBtn.dataset.expandFor;
+      const storiesList = document.querySelector(`[data-stories-for="${id}"]`);
+      const expandIcon = document.querySelector(`[data-expand-icon="${id}"]`);
+      if (storiesList) {
+        storiesList.classList.toggle('hidden');
+        expandIcon?.classList.toggle('rotate-180');
+      }
+      return;
+    }
+    
+    const deleteBtn = e.target.closest('.delete-history-btn');
+    if (deleteBtn) {
+      e.stopPropagation();
+      const id = deleteBtn.dataset.historyId;
+      if (!confirm('Delete this translation?')) return;
+      try {
+        await fetch(`/api/history/${id}`, { method: 'DELETE' });
+        loadHistory();
+      } catch (err) {
+        alert('Failed to delete: ' + err.message);
+      }
+      return;
+    }
+    
+    const storyItem = e.target.closest('.story-item');
+    if (storyItem) {
+      e.stopPropagation();
+      const id = storyItem.dataset.historyId;
+      const storyIndex = parseInt(storyItem.dataset.storyIndex, 10);
+      try {
+        const res = await fetch(`/api/history/${id}`);
+        const item = await res.json();
+        
+        if (item.stories && item.stories[storyIndex]) {
+          const story = item.stories[storyIndex];
+          elements.translatedText.textContent = story.content || '';
+          elements.outputSection.classList.remove('hidden');
+          elements.progressSection.classList.add('hidden');
+          elements.chaptersPreview.classList.add('hidden');
+        }
+        
+        toggleSidebar(false);
+      } catch (err) {
+        alert('Failed to load story: ' + err.message);
+      }
+      return;
+    }
+    
+    const historyContent = e.target.closest('.history-content');
+    if (historyContent) {
+      const id = historyContent.dataset.historyId;
+      await loadHistoryItem(id);
+    }
+  });
+}
+
+async function loadHistoryItem(id) {
   try {
     const res = await fetch(`/api/history/${id}`);
     const item = await res.json();
@@ -366,6 +599,7 @@ window.loadHistoryItem = async function(id) {
     elements.bookTitle.value = item.title || '';
     elements.authorName.value = item.author || '';
     elements.customInstructions.value = item.customInstructions || '';
+    elements.customStyles.value = item.customStyles || '';
     elements.translatedText.textContent = item.translatedText || '';
     elements.storyCollection.checked = item.isStoryCollection || false;
     
@@ -397,27 +631,20 @@ window.loadHistoryItem = async function(id) {
   } catch (err) {
     alert('Failed to load translation: ' + err.message);
   }
-};
-
-window.deleteHistoryItem = async function(id, event) {
-  event.stopPropagation();
-  if (!confirm('Delete this translation?')) return;
-
-  try {
-    await fetch(`/api/history/${id}`, { method: 'DELETE' });
-    loadHistory();
-  } catch (err) {
-    alert('Failed to delete: ' + err.message);
-  }
-};
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   initDarkMode();
   setupDragDrop();
+  setupHistoryEventDelegation();
+  setupPromptsEventDelegation();
   loadHistory();
+  loadSavedPrompts();
 
   elements.menuToggle.addEventListener('click', () => toggleSidebar());
+  elements.promptsToggle.addEventListener('click', () => togglePromptsSidebar());
   elements.overlay.addEventListener('click', () => toggleSidebar(false));
+  elements.overlayRight.addEventListener('click', () => togglePromptsSidebar(false));
   elements.darkModeToggle.addEventListener('click', toggleDarkMode);
   elements.autoDetectBtn.addEventListener('click', autoDetect);
   elements.translateBtn.addEventListener('click', translate);

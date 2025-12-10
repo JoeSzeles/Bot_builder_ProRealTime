@@ -315,7 +315,7 @@ app.post('/api/detect-metadata', async (req, res) => {
 });
 
 app.post('/api/translate', async (req, res) => {
-  const { text, title, author, customInstructions, isStoryCollection } = req.body;
+  const { text, title, author, customInstructions, customStyles, isStoryCollection } = req.body;
 
   if (!text) {
     return res.status(400).json({ error: 'No text provided' });
@@ -380,6 +380,7 @@ app.post('/api/translate', async (req, res) => {
       title: detectedTitle || translatedText.slice(0, 30),
       author: detectedAuthor,
       customInstructions,
+      customStyles,
       originalText: text,
       translatedText,
       chapters,
@@ -536,7 +537,10 @@ app.get('/api/history', (req, res) => {
   const db = loadDB();
   const items = Object.values(db)
     .sort((a, b) => new Date(b.date) - new Date(a.date))
-    .map(({ id, date, title, author }) => ({ id, date, title, author }));
+    .map(({ id, date, title, author, stories, isStoryCollection }) => ({ 
+      id, date, title, author, 
+      stories: isStoryCollection && stories ? stories.map(s => ({ title: s.title })) : []
+    }));
   res.json({ items });
 });
 
