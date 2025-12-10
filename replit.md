@@ -6,7 +6,7 @@ A personal-use full-stack app for translating and transforming literary texts us
 - **Purpose**: Translate texts (books, documents) from any language to English using AI, with support for custom translation instructions
 - **Tech Stack**: Vite (Vanilla JS + Tailwind CSS) frontend, Node.js + Express backend
 - **AI Models**: Uses Replit AI Integrations (Claude Sonnet as primary, GPT-4o-mini as fallback) - no API keys needed
-- **Storage**: JSON file-based storage for translation history, local file storage for generated PDFs, localStorage for saved prompts
+- **Storage**: JSON file-based storage for translation history and saved prompts, local file storage for generated PDFs
 
 ## Project Structure
 ```
@@ -22,10 +22,12 @@ A personal-use full-stack app for translating and transforming literary texts us
 ├── server/
 │   └── index.js           # Express server (port 3001)
 ├── fonts/                  # Roboto TTF fonts for PDF generation
-├── data/                   # Translation history storage
-│   └── translations.json  # JSON database for history
+├── data/                   # Persistent storage
+│   ├── translations.json  # Translation history
+│   └── prompts.json       # Saved prompts library
 ├── downloads/              # Generated PDFs storage
 ├── package.json           # Backend dependencies
+├── README.md              # Full documentation
 └── start.js               # Combined launcher script
 ```
 
@@ -75,6 +77,8 @@ The frontend proxies API requests to the backend.
 - Save Prompt checkbox enabled by default to save custom prompts
 
 ## Recent Changes (Dec 10, 2025)
+- **Rebranded to "Literator"** with unique SVG logo (purple/indigo book with orange-red pen)
+- Added comprehensive README.md documentation
 - Added Custom Styles text field below Custom Instructions
 - Added Save Prompt checkbox (checked by default)
 - Added right sidebar for saved prompts with delete buttons
@@ -83,12 +87,5 @@ The frontend proxies API requests to the backend.
 - Added scrollbars to both sidebars
 - Fixed event delegation for prompts sidebar (Vite module scope compatibility)
 - History items now restore ALL input fields (original text, title, author, instructions, styles, story mode)
-- Enhanced translation prompts to better respect "keep original language" instructions:
-  - Detects keywords like "do not translate", "keep original language", "same language"
-  - Modifies system prompt to explicitly prevent translation when detected
-  - Custom styles are now properly passed to the AI models
-- **Moved saved prompts to server-side storage** (like translation history):
-  - Prompts stored in `data/prompts.json`
-  - New API endpoints: GET/POST /api/prompts, DELETE /api/prompts/:index
-  - Automatic migration of existing localStorage prompts to server
-  - Works consistently across all browsers (Firefox compatibility fixed)
+- Enhanced translation prompts to better respect "keep original language" instructions
+- **Moved saved prompts to server-side storage** (data/prompts.json) for cross-browser compatibility
