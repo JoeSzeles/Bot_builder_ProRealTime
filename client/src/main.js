@@ -104,23 +104,62 @@ function togglePromptsSidebar(show) {
   elements.overlayRight.classList.toggle('hidden', !isVisible);
 }
 
+function isLocalStorageAvailable() {
+  try {
+    const testKey = '__test__';
+    localStorage.setItem(testKey, testKey);
+    localStorage.removeItem(testKey);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 function loadSavedPrompts() {
+  if (!isLocalStorageAvailable()) {
+    console.warn('localStorage not available - prompts will not persist');
+    savedPrompts = [SUNO_TEMPLATE];
+    renderPrompts();
+    return;
+  }
+  
   try {
     const stored = localStorage.getItem('savedPrompts');
     if (stored) {
-      savedPrompts = JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        savedPrompts = parsed;
+      } else {
+        savedPrompts = [SUNO_TEMPLATE];
+        localStorage.setItem('savedPrompts', JSON.stringify(savedPrompts));
+      }
     } else {
       savedPrompts = [SUNO_TEMPLATE];
       localStorage.setItem('savedPrompts', JSON.stringify(savedPrompts));
     }
   } catch (e) {
+    console.error('Error loading saved prompts:', e);
     savedPrompts = [SUNO_TEMPLATE];
+    try {
+      localStorage.setItem('savedPrompts', JSON.stringify(savedPrompts));
+    } catch (saveError) {
+      console.error('Could not save default prompts:', saveError);
+    }
   }
   renderPrompts();
 }
 
 function savePromptsToStorage() {
-  localStorage.setItem('savedPrompts', JSON.stringify(savedPrompts));
+  if (!isLocalStorageAvailable()) {
+    console.warn('localStorage not available - cannot save prompts');
+    return;
+  }
+  try {
+    localStorage.setItem('savedPrompts', JSON.stringify(savedPrompts));
+  } catch (e) {
+    console.error('Error saving prompts:', e);
+    alert('Could not save prompt - storage may be full or disabled');
+  }
 }
 
 function addPrompt(name, instructions, styles) {

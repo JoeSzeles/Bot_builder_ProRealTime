@@ -221,10 +221,43 @@ function isRateLimitError(error) {
   );
 }
 
-async function translateWithClaude(text, customInstructions) {
-  const systemPrompt = 'You are an expert literary translator. Preserve the author\'s voice, style, and emotional nuance. Maintain paragraph structure and any formatting.';
+function buildTranslationPrompts(customInstructions, customStyles) {
+  const hasNoTranslateInstruction = customInstructions && 
+    (customInstructions.toLowerCase().includes('do not translate') ||
+     customInstructions.toLowerCase().includes('don\'t translate') ||
+     customInstructions.toLowerCase().includes('keep original language') ||
+     customInstructions.toLowerCase().includes('keep the original language') ||
+     customInstructions.toLowerCase().includes('same language') ||
+     customInstructions.toLowerCase().includes('original language'));
+
+  let systemPrompt = 'You are an expert literary translator and text processor. Preserve the author\'s voice, style, and emotional nuance. Maintain paragraph structure and any formatting.';
   
-  const userPrompt = `${customInstructions ? customInstructions + '\n\n' : ''}Translate the following text to beautiful, natural English (or as specified above):\n\n${text}`;
+  if (hasNoTranslateInstruction) {
+    systemPrompt += '\n\nCRITICAL: The user has explicitly requested to keep the original language. DO NOT translate into English or any other language. Process the text according to their instructions while keeping the EXACT same language as the input.';
+  }
+
+  let userPrompt = '';
+  
+  if (customInstructions) {
+    userPrompt += `INSTRUCTIONS (FOLLOW EXACTLY):\n${customInstructions}\n\n`;
+  }
+  
+  if (customStyles) {
+    userPrompt += `STYLE GUIDELINES:\n${customStyles}\n\n`;
+  }
+  
+  if (hasNoTranslateInstruction) {
+    userPrompt += `Process the following text according to the instructions above. IMPORTANT: Keep the text in its ORIGINAL LANGUAGE - do NOT translate:\n\n`;
+  } else {
+    userPrompt += `Translate the following text to beautiful, natural English:\n\n`;
+  }
+  
+  return { systemPrompt, userPromptPrefix: userPrompt };
+}
+
+async function translateWithClaude(text, customInstructions, customStyles) {
+  const { systemPrompt, userPromptPrefix } = buildTranslationPrompts(customInstructions, customStyles);
+  const userPrompt = userPromptPrefix + text;
 
   const message = await anthropic.messages.create({
     model: 'claude-sonnet-4-5',
@@ -240,10 +273,9 @@ async function translateWithClaude(text, customInstructions) {
   throw new Error('Unexpected response type');
 }
 
-async function translateWithOpenAI(text, customInstructions) {
-  const systemPrompt = 'You are an expert literary translator. Preserve the author\'s voice, style, and emotional nuance. Maintain paragraph structure and any formatting.';
-  
-  const userPrompt = `${customInstructions ? customInstructions + '\n\n' : ''}Translate the following text to beautiful, natural English (or as specified above):\n\n${text}`;
+async function translateWithOpenAI(text, customInstructions, customStyles) {
+  const { systemPrompt, userPromptPrefix } = buildTranslationPrompts(customInstructions, customStyles);
+  const userPrompt = userPromptPrefix + text;
 
   const response = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
@@ -257,21 +289,21 @@ async function translateWithOpenAI(text, customInstructions) {
   return response.choices[0]?.message?.content || '';
 }
 
-async function translateChunk(text, customInstructions, useFallback = false) {
+async function translateChunk(text, customInstructions, customStyles, useFallback = false) {
   return pRetry(
     async () => {
       try {
         if (useFallback) {
-          return await translateWithOpenAI(text, customInstructions);
+          return await translateWithOpenAI(text, customInstructions, customStyles);
         }
-        return await translateWithClaude(text, customInstructions);
+        return await translateWithClaude(text, customInstructions, customStyles);
       } catch (error) {
         if (isRateLimitError(error)) {
           throw error;
         }
         if (!useFallback) {
           console.log('Claude failed, falling back to OpenAI');
-          return await translateWithOpenAI(text, customInstructions);
+          return await translateWithOpenAI(text, customInstructions, customStyles);
         }
         throw new pRetry.AbortError(error);
       }
@@ -347,7 +379,7 @@ app.post('/api/translate', async (req, res) => {
 
     const translationPromises = chunks.map((chunk, i) =>
       limit(async () => {
-        const translated = await translateChunk(chunk, customInstructions);
+        const translated = await translateChunk(chunk, customInstructions, customStyles);
         const progress = 5 + ((i + 1) / chunks.length) * 85;
         sendEvent({ progress, status: `Translated chunk ${i + 1}/${chunks.length}` });
         return { index: i, text: translated };

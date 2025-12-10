@@ -81,3 +81,10 @@ The frontend proxies API requests to the backend.
 - Added nested history structure (book → stories)
 - Added Suno song format template as default prompt
 - Added scrollbars to both sidebars
+- Fixed event delegation for prompts sidebar (Vite module scope compatibility)
+- Added localStorage availability detection for Firefox compatibility
+- History items now restore ALL input fields (original text, title, author, instructions, styles, story mode)
+- Enhanced translation prompts to better respect "keep original language" instructions:
+  - Detects keywords like "do not translate", "keep original language", "same language"
+  - Modifies system prompt to explicitly prevent translation when detected
+  - Custom styles are now properly passed to the AI models
