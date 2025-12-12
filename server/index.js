@@ -52,47 +52,11 @@ const fonts = {
 };
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
-const MAX_ENTRIES_PER_FILE = 10;
+const DB_FILE = path.join(DATA_DIR, 'translations.json');
+const PROMPTS_FILE = path.join(DATA_DIR, 'prompts.json');
 
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
-}
-
-// File rotation helpers
-function getActiveFile(baseName) {
-  const files = fs.readdirSync(DATA_DIR)
-    .filter(f => f.startsWith(baseName) && f.endsWith('.json'))
-    .sort()
-    .reverse();
-  
-  if (files.length === 0) {
-    return path.join(DATA_DIR, `${baseName}.json`);
-  }
-  
-  const latestFile = path.join(DATA_DIR, files[0]);
-  try {
-    const data = JSON.parse(fs.readFileSync(latestFile, 'utf-8'));
-    const entryCount = baseName === 'translations' ? Object.keys(data).length : (data.prompts?.length || 0);
-    
-    if (entryCount >= MAX_ENTRIES_PER_FILE) {
-      const timestamp = Date.now();
-      return path.join(DATA_DIR, `${baseName}_${timestamp}.json`);
-    }
-  } catch (e) {
-    // File corrupted or empty, create new
-    const timestamp = Date.now();
-    return path.join(DATA_DIR, `${baseName}_${timestamp}.json`);
-  }
-  
-  return latestFile;
-}
-
-function getAllFiles(baseName) {
-  return fs.readdirSync(DATA_DIR)
-    .filter(f => f.startsWith(baseName) && f.endsWith('.json'))
-    .map(f => path.join(DATA_DIR, f))
-    .sort()
-    .reverse();
 }
 
 const SUNO_TEMPLATE = {
@@ -132,113 +96,35 @@ Keep sections clear and Suno-friendly.`,
   styles: 'Electronic ambient, atmospheric, cinematic'
 };
 
-// Load all translations from all files
-function loadAllTranslations() {
-  const allData = {};
-  const files = getAllFiles('translations');
-  
-  for (const file of files) {
-    try {
-      const data = JSON.parse(fs.readFileSync(file, 'utf-8'));
-      Object.assign(allData, data);
-    } catch (e) {
-      console.error(`Error loading ${file}:`, e);
-    }
-  }
-  
-  return allData;
-}
-
-// Load from active file only for saving
-function loadActiveDB() {
-  const activeFile = getActiveFile('translations');
+function loadDB() {
   try {
-    if (fs.existsSync(activeFile)) {
-      return { file: activeFile, data: JSON.parse(fs.readFileSync(activeFile, 'utf-8')) };
+    if (fs.existsSync(DB_FILE)) {
+      return JSON.parse(fs.readFileSync(DB_FILE, 'utf-8'));
     }
   } catch (e) {}
-  return { file: activeFile, data: {} };
+  return {};
 }
 
-function saveDB(id, entry) {
-  const { file, data } = loadActiveDB();
-  
-  // Check if we need to rotate
-  if (Object.keys(data).length >= MAX_ENTRIES_PER_FILE) {
-    const newFile = path.join(DATA_DIR, `translations_${Date.now()}.json`);
-    fs.writeFileSync(newFile, JSON.stringify({ [id]: entry }, null, 2));
-  } else {
-    data[id] = entry;
-    fs.writeFileSync(file, JSON.stringify(data, null, 2));
-  }
+function saveDB(data) {
+  fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
 }
 
-// Load all prompts from all files
-function loadAllPrompts() {
-  const allPrompts = [];
-  const files = getAllFiles('prompts');
-  
-  if (files.length === 0) {
-    return [SUNO_TEMPLATE];
-  }
-  
-  for (const file of files) {
-    try {
-      const data = JSON.parse(fs.readFileSync(file, 'utf-8'));
-      if (data.prompts && Array.isArray(data.prompts)) {
-        allPrompts.push(...data.prompts);
+function loadPrompts() {
+  try {
+    if (fs.existsSync(PROMPTS_FILE)) {
+      const prompts = JSON.parse(fs.readFileSync(PROMPTS_FILE, 'utf-8'));
+      if (Array.isArray(prompts) && prompts.length > 0) {
+        return prompts;
       }
-    } catch (e) {
-      console.error(`Error loading ${file}:`, e);
     }
+  } catch (e) {
+    console.error('Error loading prompts:', e);
   }
-  
-  if (allPrompts.length === 0) {
-    return [SUNO_TEMPLATE];
-  }
-  
-  return allPrompts;
+  return [SUNO_TEMPLATE];
 }
 
-function loadActivePrompts() {
-  const activeFile = getActiveFile('prompts');
-  try {
-    if (fs.existsSync(activeFile)) {
-      const data = JSON.parse(fs.readFileSync(activeFile, 'utf-8'));
-      return { file: activeFile, prompts: data.prompts || [] };
-    }
-  } catch (e) {}
-  return { file: activeFile, prompts: [] };
-}
-
-function savePrompts(allPrompts) {
-  // Get all existing prompts files
-  const files = getAllFiles('prompts');
-  
-  if (files.length === 0) {
-    // No files exist, create the first one
-    const newFile = path.join(DATA_DIR, 'prompts.json');
-    fs.writeFileSync(newFile, JSON.stringify({ prompts: allPrompts }, null, 2));
-    return;
-  }
-  
-  // Distribute prompts across files, max 10 per file
-  let promptsToSave = [...allPrompts];
-  let fileIndex = 0;
-  
-  while (promptsToSave.length > 0) {
-    const chunk = promptsToSave.splice(0, MAX_ENTRIES_PER_FILE);
-    let targetFile;
-    
-    if (fileIndex < files.length) {
-      targetFile = files[fileIndex];
-    } else {
-      targetFile = path.join(DATA_DIR, `prompts_${Date.now()}.json`);
-    }
-    
-    fs.writeFileSync(targetFile, JSON.stringify({ prompts: chunk }, null, 2));
-    fileIndex++;
-  }
+function savePrompts(prompts) {
+  fs.writeFileSync(PROMPTS_FILE, JSON.stringify(prompts, null, 2));
 }
 
 function generateId() {
@@ -312,7 +198,7 @@ async function detectMetadata(text) {
   
   try {
     const message = await anthropic.messages.create({
-      model: 'gpt-4o',
+      model: 'claude-sonnet-4-5',
       max_tokens: 500,
       system: 'You are a literary expert. Extract the book/collection title and author name from the given text. Respond ONLY with valid JSON: {"title": "...", "author": "..."} or {"title": null, "author": null} if not found.',
       messages: [{ role: 'user', content: `Extract the title and author from this text:\n\n${preview}` }]
@@ -334,7 +220,7 @@ async function detectStories(text) {
   
   try {
     const message = await anthropic.messages.create({
-      model: 'gpt-4o',
+      model: 'claude-sonnet-4-5',
       max_tokens: 2000,
       system: `You are a literary expert. Analyze this text to find individual stories in a collection.
 For each story, identify its title and the exact text that starts it.
@@ -427,52 +313,55 @@ function buildTranslationPrompts(customInstructions, customStyles) {
   return { systemPrompt, userPromptPrefix: userPrompt };
 }
 
-function isClaudeModel(model) {
-  return model.startsWith('claude');
-}
-
-async function callAI(systemPrompt, userPrompt, model) {
-  if (isClaudeModel(model)) {
-    const message = await anthropic.messages.create({
-      model: model,
-      max_tokens: 8192,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userPrompt }]
-    });
-    const content = message.content[0];
-    if (content.type === 'text') {
-      return content.text;
-    }
-    throw new Error('Unexpected response type');
-  } else {
-    const response = await openai.chat.completions.create({
-      model: model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      max_tokens: 8192
-    });
-    return response.choices[0]?.message?.content || '';
-  }
-}
-
-async function translateChunk(text, customInstructions, customStyles, model = 'claude-sonnet-4-5') {
+async function translateWithClaude(text, customInstructions, customStyles) {
   const { systemPrompt, userPromptPrefix } = buildTranslationPrompts(customInstructions, customStyles);
   const userPrompt = userPromptPrefix + text;
 
+  const message = await anthropic.messages.create({
+    model: 'claude-sonnet-4-5',
+    max_tokens: 8192,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: userPrompt }]
+  });
+
+  const content = message.content[0];
+  if (content.type === 'text') {
+    return content.text;
+  }
+  throw new Error('Unexpected response type');
+}
+
+async function translateWithOpenAI(text, customInstructions, customStyles) {
+  const { systemPrompt, userPromptPrefix } = buildTranslationPrompts(customInstructions, customStyles);
+  const userPrompt = userPromptPrefix + text;
+
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt }
+    ],
+    max_tokens: 8192
+  });
+
+  return response.choices[0]?.message?.content || '';
+}
+
+async function translateChunk(text, customInstructions, customStyles, useFallback = false) {
   return pRetry(
     async () => {
       try {
-        return await callAI(systemPrompt, userPrompt, model);
+        if (useFallback) {
+          return await translateWithOpenAI(text, customInstructions, customStyles);
+        }
+        return await translateWithClaude(text, customInstructions, customStyles);
       } catch (error) {
         if (isRateLimitError(error)) {
           throw error;
         }
-        // Fallback to gpt-4o-mini if primary model fails
-        if (isClaudeModel(model)) {
-          console.log(`${model} failed, falling back to gpt-4o-mini`);
-          return await callAI(systemPrompt, userPrompt, 'gpt-4o-mini');
+        if (!useFallback) {
+          console.log('Claude failed, falling back to OpenAI');
+          return await translateWithOpenAI(text, customInstructions, customStyles);
         }
         throw new pRetry.AbortError(error);
       }
@@ -487,7 +376,7 @@ async function translateChunk(text, customInstructions, customStyles, model = 'c
 }
 
 // Content generation mode - research topic and write in requested style
-async function generateContent(topic, customStyles, model = 'claude-sonnet-4-5') {
+async function generateContent(topic, customStyles) {
   const systemPrompt = `You are an expert writer and researcher. Your task is to research and write comprehensive, engaging content about the topic provided by the user. 
 
 Your writing should be:
@@ -507,10 +396,29 @@ If the user specifies a particular style or format, follow it exactly. If they w
   userPrompt += `Please write comprehensive content about this topic in the specified style and format. Be creative, thorough, and engaging.`;
 
   try {
-    return await callAI(systemPrompt, userPrompt, model);
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-5',
+      max_tokens: 8192,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }]
+    });
+
+    const content = message.content[0];
+    if (content.type === 'text') {
+      return content.text;
+    }
+    throw new Error('Unexpected response type');
   } catch (error) {
-    console.log(`${model} generation failed, falling back to gpt-4o-mini`);
-    return await callAI(systemPrompt, userPrompt, 'gpt-4o-mini');
+    console.log('Claude generation failed, falling back to OpenAI');
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      max_tokens: 8192
+    });
+    return response.choices[0]?.message?.content || '';
   }
 }
 
@@ -544,7 +452,7 @@ app.post('/api/detect-metadata', async (req, res) => {
 });
 
 app.post('/api/translate', async (req, res) => {
-  const { text, title, author, customInstructions, customStyles, isStoryCollection, model } = req.body;
+  const { text, title, author, customInstructions, customStyles, isStoryCollection } = req.body;
 
   // Allow either text OR customInstructions for generation mode
   if (!text && !customInstructions) {
@@ -552,7 +460,6 @@ app.post('/api/translate', async (req, res) => {
   }
   
   const isGenerationMode = !text && customInstructions;
-  const selectedModel = model || 'claude-sonnet-4-5';
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -569,8 +476,8 @@ app.post('/api/translate', async (req, res) => {
     
     if (isGenerationMode) {
       // Generation mode: create content from topic
-      sendEvent({ progress: 10, status: `Generating content with ${selectedModel}...` });
-      translatedText = await generateContent(customInstructions, customStyles, selectedModel);
+      sendEvent({ progress: 10, status: 'Researching and generating content...' });
+      translatedText = await generateContent(customInstructions, customStyles);
       sendEvent({ progress: 90, status: 'Content generated successfully' });
       
       // Use provided title or extract from instructions
@@ -595,7 +502,7 @@ app.post('/api/translate', async (req, res) => {
 
       const translationPromises = chunks.map((chunk, i) =>
         limit(async () => {
-          const translated = await translateChunk(chunk, customInstructions, customStyles, selectedModel);
+          const translated = await translateChunk(chunk, customInstructions, customStyles);
           const progress = 5 + ((i + 1) / chunks.length) * 85;
           sendEvent({ progress, status: `Processed chunk ${i + 1}/${chunks.length}` });
           return { index: i, text: translated };
@@ -622,7 +529,8 @@ app.post('/api/translate', async (req, res) => {
 
     const id = generateId();
 
-    const entry = {
+    const db = loadDB();
+    db[id] = {
       id,
       date: new Date().toISOString(),
       title: detectedTitle || translatedText.slice(0, 30),
@@ -636,7 +544,7 @@ app.post('/api/translate', async (req, res) => {
       isStoryCollection: effectiveStoryCollection,
       isGenerationMode
     };
-    saveDB(id, entry);
+    saveDB(db);
 
     sendEvent({
       complete: true,
@@ -661,8 +569,8 @@ app.post('/api/generate-pdf', async (req, res) => {
   const { id, option } = req.body;
 
   try {
-    const allTranslations = loadAllTranslations();
-    const translation = allTranslations[id];
+    const db = loadDB();
+    const translation = db[id];
 
     if (!translation) {
       return res.status(404).json({ error: 'Translation not found' });
@@ -783,8 +691,8 @@ app.post('/api/generate-pdf', async (req, res) => {
 });
 
 app.get('/api/history', (req, res) => {
-  const allTranslations = loadAllTranslations();
-  const items = Object.values(allTranslations)
+  const db = loadDB();
+  const items = Object.values(db)
     .sort((a, b) => new Date(b.date) - new Date(a.date))
     .map(({ id, date, title, author, stories, isStoryCollection }) => ({ 
       id, date, title, author, 
@@ -794,8 +702,8 @@ app.get('/api/history', (req, res) => {
 });
 
 app.get('/api/history/:id', (req, res) => {
-  const allTranslations = loadAllTranslations();
-  const item = allTranslations[req.params.id];
+  const db = loadDB();
+  const item = db[req.params.id];
   if (!item) {
     return res.status(404).json({ error: 'Not found' });
   }
@@ -803,25 +711,15 @@ app.get('/api/history/:id', (req, res) => {
 });
 
 app.delete('/api/history/:id', (req, res) => {
+  const db = loadDB();
   const id = req.params.id;
-  const files = getAllFiles('translations');
-  let found = false;
   
-  for (const file of files) {
-    try {
-      const data = JSON.parse(fs.readFileSync(file, 'utf-8'));
-      if (data[id]) {
-        delete data[id];
-        fs.writeFileSync(file, JSON.stringify(data, null, 2));
-        found = true;
-        break;
-      }
-    } catch (e) {}
-  }
-  
-  if (!found) {
+  if (!db[id]) {
     return res.status(404).json({ error: 'Not found' });
   }
+
+  delete db[id];
+  saveDB(db);
 
   const downloadDir = path.join(DOWNLOADS_DIR, id);
   if (fs.existsSync(downloadDir)) {
@@ -832,7 +730,7 @@ app.delete('/api/history/:id', (req, res) => {
 });
 
 app.get('/api/prompts', (req, res) => {
-  const prompts = loadAllPrompts();
+  const prompts = loadPrompts();
   res.json({ prompts });
 });
 
@@ -840,7 +738,7 @@ app.post('/api/prompts', (req, res) => {
   const { name, instructions, styles, prompts: migratedPrompts } = req.body;
   
   if (migratedPrompts && Array.isArray(migratedPrompts)) {
-    const currentPrompts = loadAllPrompts();
+    const currentPrompts = loadPrompts();
     const promptNames = new Set(currentPrompts.map(p => p.name));
     
     for (const prompt of migratedPrompts) {
@@ -862,7 +760,7 @@ app.post('/api/prompts', (req, res) => {
     return res.status(400).json({ error: 'Prompt name is required' });
   }
   
-  const prompts = loadAllPrompts();
+  const prompts = loadPrompts();
   const existingIndex = prompts.findIndex(p => p.name === name);
   
   if (existingIndex >= 0) {
@@ -877,7 +775,7 @@ app.post('/api/prompts', (req, res) => {
 
 app.delete('/api/prompts/:index', (req, res) => {
   const index = parseInt(req.params.index, 10);
-  const prompts = loadAllPrompts();
+  const prompts = loadPrompts();
   
   if (isNaN(index) || index < 0 || index >= prompts.length) {
     return res.status(400).json({ error: 'Invalid prompt index' });
