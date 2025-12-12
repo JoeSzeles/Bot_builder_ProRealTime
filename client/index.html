@@ -119,6 +119,25 @@
               <textarea id="customStyles" rows="2" class="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y" placeholder="e.g., Victorian prose, minimalist poetry, song lyrics with verse/chorus structure..."></textarea>
             </div>
 
+            <!-- Model Selection -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">AI Model</label>
+              <select id="modelSelect" class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <optgroup label="Anthropic (Claude)">
+                  <option value="claude-sonnet-4-5" selected>Claude Sonnet 4.5 (Best)</option>
+                  <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
+                  <option value="claude-opus-4-20250514">Claude Opus 4</option>
+                  <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
+                  <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (Fast)</option>
+                </optgroup>
+                <optgroup label="OpenAI (GPT)">
+                  <option value="gpt-4o">GPT-4o</option>
+                  <option value="gpt-4o-mini">GPT-4o Mini (Fast)</option>
+                  <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                </optgroup>
+              </select>
+            </div>
+
             <!-- Options Row -->
             <div class="flex flex-wrap items-center gap-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
               <!-- Story Collection Option -->
@@ -162,7 +181,13 @@
             <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
               <div id="progressBar" class="bg-blue-600 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
             </div>
-            <p id="progressStatus" class="text-sm text-gray-600 dark:text-gray-400">Starting translation...</p>
+            <p id="progressStatus" class="text-sm text-gray-600 dark:text-gray-400">Starting...</p>
+            <button id="cancelBtn" class="w-full py-2 px-4 bg-red-500 hover:bg-red-600 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+              Cancel Generation
+            </button>
           </div>
         </section>
 

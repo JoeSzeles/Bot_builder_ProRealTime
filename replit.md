@@ -76,7 +76,12 @@ The frontend proxies API requests to the backend.
 - Auto-save translations without extra clicks
 - Save Prompt checkbox enabled by default to save custom prompts
 
-## Recent Changes (Dec 10, 2025)
+## Recent Changes (Dec 12, 2025)
+- **Cancel Generation Button**: Red cancel button appears during processing to abort generation
+- **Model Selection Dropdown**: Choose between Claude (4.5, 4, Opus, 3.5 Sonnet/Haiku) and GPT (4o, 4o-mini, 4-turbo) models
+- **File Rotation System**: Data files rotate after 10 entries (translations_timestamp.json, prompts_timestamp.json) to prevent data loss
+
+## Earlier Changes (Dec 10, 2025)
 - **Added Content Generation Mode**: Source text is now optional - leave empty and describe a topic to generate original content
 - **Rebranded to "Literator"** with unique SVG logo (purple/indigo book with orange-red pen)
 - Added comprehensive README.md documentation
