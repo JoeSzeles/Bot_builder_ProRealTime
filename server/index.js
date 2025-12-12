@@ -198,7 +198,7 @@ async function detectMetadata(text) {
   
   try {
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5',
+      model: 'gpt-4o',
       max_tokens: 500,
       system: 'You are a literary expert. Extract the book/collection title and author name from the given text. Respond ONLY with valid JSON: {"title": "...", "author": "..."} or {"title": null, "author": null} if not found.',
       messages: [{ role: 'user', content: `Extract the title and author from this text:\n\n${preview}` }]
@@ -220,7 +220,7 @@ async function detectStories(text) {
   
   try {
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5',
+      model: 'gpt-4o',
       max_tokens: 2000,
       system: `You are a literary expert. Analyze this text to find individual stories in a collection.
 For each story, identify its title and the exact text that starts it.
@@ -318,7 +318,7 @@ async function translateWithClaude(text, customInstructions, customStyles) {
   const userPrompt = userPromptPrefix + text;
 
   const message = await anthropic.messages.create({
-    model: 'claude-sonnet-4-5',
+    model: 'gpt-4o',
     max_tokens: 8192,
     system: systemPrompt,
     messages: [{ role: 'user', content: userPrompt }]
@@ -336,7 +336,7 @@ async function translateWithOpenAI(text, customInstructions, customStyles) {
   const userPrompt = userPromptPrefix + text;
 
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
+    model: 'gpt-4o',
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt }
@@ -397,7 +397,7 @@ If the user specifies a particular style or format, follow it exactly. If they w
 
   try {
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5',
+      model: 'gpt-4o',
       max_tokens: 8192,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }]
@@ -411,7 +411,7 @@ If the user specifies a particular style or format, follow it exactly. If they w
   } catch (error) {
     console.log('Claude generation failed, falling back to OpenAI');
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'gpt-4o',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
