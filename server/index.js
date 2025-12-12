@@ -211,15 +211,33 @@ function loadActivePrompts() {
   return { file: activeFile, prompts: [] };
 }
 
-function savePrompts(prompts) {
-  const { file, prompts: currentPrompts } = loadActivePrompts();
+function savePrompts(allPrompts) {
+  // Get all existing prompts files
+  const files = getAllFiles('prompts');
   
-  // Check if we need to rotate
-  if (currentPrompts.length >= MAX_ENTRIES_PER_FILE) {
-    const newFile = path.join(DATA_DIR, `prompts_${Date.now()}.json`);
-    fs.writeFileSync(newFile, JSON.stringify({ prompts }, null, 2));
-  } else {
-    fs.writeFileSync(file, JSON.stringify({ prompts }, null, 2));
+  if (files.length === 0) {
+    // No files exist, create the first one
+    const newFile = path.join(DATA_DIR, 'prompts.json');
+    fs.writeFileSync(newFile, JSON.stringify({ prompts: allPrompts }, null, 2));
+    return;
+  }
+  
+  // Distribute prompts across files, max 10 per file
+  let promptsToSave = [...allPrompts];
+  let fileIndex = 0;
+  
+  while (promptsToSave.length > 0) {
+    const chunk = promptsToSave.splice(0, MAX_ENTRIES_PER_FILE);
+    let targetFile;
+    
+    if (fileIndex < files.length) {
+      targetFile = files[fileIndex];
+    } else {
+      targetFile = path.join(DATA_DIR, `prompts_${Date.now()}.json`);
+    }
+    
+    fs.writeFileSync(targetFile, JSON.stringify({ prompts: chunk }, null, 2));
+    fileIndex++;
   }
 }
 
