@@ -21,11 +21,17 @@ A full-stack AI-powered application for translating, transforming, and generatin
 - **Leave Empty**: Skip to generate content from a topic instead
 - **Auto-detect Metadata**: AI automatically detects book title and author from the text
 
+### AI Model Selection
+Choose your preferred AI model from the dropdown:
+- **Anthropic Claude**: Sonnet 4.5 (Best), Sonnet 4, Opus 4, 3.5 Sonnet, 3.5 Haiku (Fast)
+- **OpenAI GPT**: GPT-4o, GPT-4o Mini (Fast), GPT-4 Turbo
+
 ### Translation & Transformation
-- **AI-Powered Translation**: Uses Claude Sonnet (primary) with GPT-4o-mini fallback
+- **AI-Powered Translation**: Uses your selected model with automatic fallback
 - **Custom Instructions**: Add specific translation guidelines (e.g., "preserve poetic rhythm", "keep honorifics in original language")
 - **Custom Styles**: Specify output style (e.g., "Victorian prose", "minimalist poetry")
 - **Language Preservation**: Supports keeping original language when specified in instructions
+- **Cancel Button**: Stop generation at any time with the cancel button
 
 ### Story Collection Mode
 - **Anthology Support**: Enable for books with multiple stories/chapters

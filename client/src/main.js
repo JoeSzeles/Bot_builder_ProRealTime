@@ -1,6 +1,7 @@
 let currentTranslation = null;
 let historyItems = [];
 let savedPrompts = [];
+let abortController = null;
 
 const elements = {
   menuToggle: document.getElementById('menuToggle'),
@@ -33,7 +34,9 @@ const elements = {
   splitOptionLabel: document.getElementById('splitOptionLabel'),
   downloadBtn: document.getElementById('downloadBtn'),
   historyList: document.getElementById('historyList'),
-  promptsList: document.getElementById('promptsList')
+  promptsList: document.getElementById('promptsList'),
+  modelSelect: document.getElementById('modelSelect'),
+  cancelBtn: document.getElementById('cancelBtn')
 };
 
 function updateSplitOptionLabel(isStoryMode) {
@@ -325,6 +328,10 @@ async function translate() {
   
   updateProgress(0, isGenerationMode ? 'Generating content...' : 'Starting translation...');
 
+  // Setup abort controller for cancellation
+  abortController = new AbortController();
+  const selectedModel = elements.modelSelect.value;
+
   try {
     const response = await fetch('/api/translate', {
       method: 'POST',
@@ -335,8 +342,10 @@ async function translate() {
         author: elements.authorName.value,
         customInstructions: customInstructions,
         customStyles: customStyles,
-        isStoryCollection: elements.storyCollection.checked
-      })
+        isStoryCollection: elements.storyCollection.checked,
+        model: selectedModel
+      }),
+      signal: abortController.signal
     });
 
     const reader = response.body.getReader();
@@ -417,14 +426,29 @@ async function translate() {
       elements.chaptersPreview.classList.add('hidden');
     }
 
-    updateProgress(100, 'Translation complete!');
+    updateProgress(100, 'Complete!');
     loadHistory();
 
   } catch (err) {
-    alert('Translation error: ' + err.message);
-    updateProgress(0, 'Translation failed');
+    if (err.name === 'AbortError') {
+      updateProgress(0, 'Cancelled');
+    } else {
+      alert('Error: ' + err.message);
+      updateProgress(0, 'Failed');
+    }
   } finally {
     elements.translateBtn.disabled = false;
+    abortController = null;
+  }
+}
+
+function cancelGeneration() {
+  if (abortController) {
+    abortController.abort();
+    abortController = null;
+    elements.progressSection.classList.add('hidden');
+    elements.translateBtn.disabled = false;
+    updateProgress(0, 'Cancelled');
   }
 }
 
@@ -664,6 +688,7 @@ document.addEventListener('DOMContentLoaded', () => {
   elements.darkModeToggle.addEventListener('click', toggleDarkMode);
   elements.autoDetectBtn.addEventListener('click', autoDetect);
   elements.translateBtn.addEventListener('click', translate);
+  elements.cancelBtn.addEventListener('click', cancelGeneration);
   elements.copyBtn.addEventListener('click', copyTranslatedText);
   elements.downloadBtn.addEventListener('click', downloadPdf);
 });
