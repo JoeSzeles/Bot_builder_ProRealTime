@@ -1,4 +1,4 @@
-import { createChart, ColorType, LineStyle, CrosshairMode } from 'lightweight-charts';
+import { createChart, ColorType, LineStyle, CrosshairMode, CandlestickSeries, LineSeries } from 'lightweight-charts';
 
 let chart = null;
 let candleSeries = null;
@@ -8,7 +8,8 @@ let drawingPoints = [];
 let generatedBotCode = '';
 let initialized = false;
 let priceLines = [];
-let lineSeries = [];
+let lineSeriesArr = [];
+let markers = [];
 
 const SAMPLE_DATA = {
   silver: generateCandleData(30, 100, 0.02),
@@ -90,7 +91,7 @@ export function initBotBuilder() {
     },
   });
 
-  candleSeries = chart.addCandlestickSeries({
+  candleSeries = chart.addSeries(CandlestickSeries, {
     upColor: '#22c55e',
     downColor: '#ef4444',
     borderDownColor: '#ef4444',
@@ -248,7 +249,6 @@ function handleChartClick(param) {
 }
 
 function addMarker(point, type) {
-  const markers = candleSeries.markers() || [];
   markers.push({
     time: point.time,
     position: type === 'high' ? 'aboveBar' : 'belowBar',
@@ -273,7 +273,7 @@ function addHorizontalLine(price) {
 }
 
 function addTrendLine(start, end) {
-  const line = chart.addLineSeries({
+  const line = chart.addSeries(LineSeries, {
     color: '#8b5cf6',
     lineWidth: 2,
     lineStyle: LineStyle.Solid,
@@ -282,11 +282,11 @@ function addTrendLine(start, end) {
     { time: start.time, value: start.price },
     { time: end.time, value: end.price }
   ]);
-  lineSeries.push(line);
+  lineSeriesArr.push(line);
 }
 
 function addVerticalLine(time, price) {
-  const line = chart.addLineSeries({
+  const line = chart.addSeries(LineSeries, {
     color: '#f59e0b',
     lineWidth: 2,
     lineStyle: LineStyle.Dotted,
@@ -295,12 +295,13 @@ function addVerticalLine(time, price) {
     { time: time, value: price * 0.95 },
     { time: time, value: price * 1.05 }
   ]);
-  lineSeries.push(line);
+  lineSeriesArr.push(line);
 }
 
 function clearAllDrawings() {
   drawings = [];
   drawingPoints = [];
+  markers = [];
   candleSeries.setMarkers([]);
   
   priceLines.forEach(line => {
@@ -310,12 +311,12 @@ function clearAllDrawings() {
   });
   priceLines = [];
   
-  lineSeries.forEach(line => {
+  lineSeriesArr.forEach(line => {
     try {
       chart.removeSeries(line);
     } catch (e) {}
   });
-  lineSeries = [];
+  lineSeriesArr = [];
   
   updateDrawingCount();
 }
