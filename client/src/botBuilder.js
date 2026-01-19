@@ -364,6 +364,14 @@ function setupStrategyIdeasModal() {
   const resultsContainer = document.getElementById('strategyResultsGlobal');
   const loadingEl = document.getElementById('strategyLoadingGlobal');
   const categoryChips = document.querySelectorAll('.strategy-chip');
+  const searchTab = document.getElementById('ideasSearchTab');
+  const historyTab = document.getElementById('ideasHistoryTab');
+  const searchPanel = document.getElementById('ideasSearchPanel');
+  const historyPanel = document.getElementById('ideasHistoryPanel');
+  const historyList = document.getElementById('searchHistoryList');
+  
+  let currentSearchResults = [];
+  let currentSearchQuery = '';
   
   function showModal() {
     if (modal) {
@@ -377,6 +385,145 @@ function setupStrategyIdeasModal() {
       modal.style.display = 'none';
       modal.classList.add('hidden');
     }
+  }
+  
+  function switchToTab(tab) {
+    if (tab === 'search') {
+      searchTab.classList.add('text-amber-600', 'dark:text-amber-400', 'border-amber-500', 'bg-amber-50', 'dark:bg-amber-900/20');
+      searchTab.classList.remove('text-gray-500', 'dark:text-gray-400', 'border-transparent');
+      historyTab.classList.remove('text-amber-600', 'dark:text-amber-400', 'border-amber-500', 'bg-amber-50', 'dark:bg-amber-900/20');
+      historyTab.classList.add('text-gray-500', 'dark:text-gray-400', 'border-transparent');
+      searchPanel.classList.remove('hidden');
+      historyPanel.classList.add('hidden');
+    } else {
+      historyTab.classList.add('text-amber-600', 'dark:text-amber-400', 'border-amber-500', 'bg-amber-50', 'dark:bg-amber-900/20');
+      historyTab.classList.remove('text-gray-500', 'dark:text-gray-400', 'border-transparent');
+      searchTab.classList.remove('text-amber-600', 'dark:text-amber-400', 'border-amber-500', 'bg-amber-50', 'dark:bg-amber-900/20');
+      searchTab.classList.add('text-gray-500', 'dark:text-gray-400', 'border-transparent');
+      historyPanel.classList.remove('hidden');
+      searchPanel.classList.add('hidden');
+      loadSearchHistory();
+    }
+  }
+  
+  if (searchTab) searchTab.addEventListener('click', () => switchToTab('search'));
+  if (historyTab) historyTab.addEventListener('click', () => switchToTab('history'));
+  
+  async function loadSearchHistory() {
+    try {
+      const response = await fetch('/api/search-history');
+      const data = await response.json();
+      displaySearchHistory(data.history || []);
+    } catch (e) {
+      console.error('Failed to load search history:', e);
+    }
+  }
+  
+  function displaySearchHistory(history) {
+    if (history.length === 0) {
+      historyList.innerHTML = `
+        <div class="text-center py-12 text-gray-500 dark:text-gray-400">
+          <svg class="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          <p class="text-lg font-medium mb-2">No search history yet</p>
+          <p class="text-sm">Your searches will appear here</p>
+        </div>
+      `;
+      return;
+    }
+    
+    historyList.innerHTML = history.map(entry => {
+      const date = new Date(entry.createdAt).toLocaleDateString();
+      const time = new Date(entry.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return `
+        <div class="history-entry border border-gray-200 dark:border-gray-600 rounded-xl overflow-hidden">
+          <div class="p-4 bg-gray-50 dark:bg-gray-700/50 flex items-center justify-between cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" data-history-id="${entry.id}">
+            <div class="flex items-center gap-3">
+              <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+              </svg>
+              <div>
+                <p class="font-medium text-gray-900 dark:text-white">${entry.query || entry.category || 'Search'}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">${date} ${time} - ${entry.results.length} results</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button class="delete-history-btn text-gray-400 hover:text-red-500 p-1" data-history-id="${entry.id}" title="Delete">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+              </button>
+              <svg class="w-5 h-5 text-gray-400 expand-icon transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </div>
+          </div>
+          <div class="history-results hidden p-4 space-y-3 max-h-80 overflow-y-auto" data-results='${JSON.stringify(entry.results)}'>
+          </div>
+        </div>
+      `;
+    }).join('');
+    
+    historyList.querySelectorAll('.history-entry > div:first-child').forEach(header => {
+      header.addEventListener('click', (e) => {
+        if (e.target.closest('.delete-history-btn')) return;
+        const resultsDiv = header.nextElementSibling;
+        const icon = header.querySelector('.expand-icon');
+        if (resultsDiv.classList.contains('hidden')) {
+          resultsDiv.classList.remove('hidden');
+          icon.classList.add('rotate-180');
+          const results = JSON.parse(resultsDiv.dataset.results);
+          renderHistoryResults(resultsDiv, results);
+        } else {
+          resultsDiv.classList.add('hidden');
+          icon.classList.remove('rotate-180');
+        }
+      });
+    });
+    
+    historyList.querySelectorAll('.delete-history-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const id = btn.dataset.historyId;
+        try {
+          await fetch(`/api/search-history/${id}`, { method: 'DELETE' });
+          loadSearchHistory();
+        } catch (err) {
+          console.error('Failed to delete history:', err);
+        }
+      });
+    });
+  }
+  
+  function renderHistoryResults(container, results) {
+    container.innerHTML = results.map((r, i) => `
+      <div class="p-3 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700">
+        <div class="flex items-start justify-between gap-2">
+          <div class="flex-1 min-w-0">
+            <h4 class="font-medium text-sm text-gray-900 dark:text-white truncate">${r.title}</h4>
+            <p class="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">${r.description}</p>
+          </div>
+          <div class="flex gap-1 shrink-0">
+            <button class="history-add-btn px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded transition-colors" data-idx="${i}">Add</button>
+            <button class="history-use-btn px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium rounded transition-colors" data-idx="${i}">Use</button>
+          </div>
+        </div>
+      </div>
+    `).join('');
+    
+    container.querySelectorAll('.history-use-btn').forEach((btn, idx) => {
+      btn.addEventListener('click', () => {
+        applyStrategyIdea(results[idx]);
+        hideModal();
+      });
+    });
+    
+    container.querySelectorAll('.history-add-btn').forEach((btn, idx) => {
+      btn.addEventListener('click', async () => {
+        await saveStrategyToDropdown(results[idx]);
+      });
+    });
   }
   
   if (openBtn) {
@@ -402,6 +549,7 @@ function setupStrategyIdeasModal() {
   async function searchStrategies(query) {
     if (!query.trim()) return;
     
+    currentSearchQuery = query;
     resultsContainer.classList.add('hidden');
     loadingEl.classList.remove('hidden');
     
@@ -413,7 +561,16 @@ function setupStrategyIdeasModal() {
       });
       
       const data = await response.json();
-      displayStrategyResults(data.results || []);
+      currentSearchResults = data.results || [];
+      displayStrategyResults(currentSearchResults);
+      
+      if (currentSearchResults.length > 0) {
+        fetch('/api/search-history', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query, results: currentSearchResults })
+        }).catch(e => console.warn('Failed to save search history:', e));
+      }
     } catch (e) {
       console.error('Strategy search failed:', e);
       resultsContainer.innerHTML = '<p class="text-center text-red-500 py-8">Search failed. Please try again.</p>';

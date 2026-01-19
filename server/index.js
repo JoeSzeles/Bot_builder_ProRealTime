@@ -1300,6 +1300,71 @@ app.delete('/api/strategies/:id', (req, res) => {
   res.json({ success: true });
 });
 
+// Strategy search history storage
+const SEARCH_HISTORY_FILE = path.join(DATA_DIR, 'search-history.json');
+
+function loadSearchHistory() {
+  try {
+    if (fs.existsSync(SEARCH_HISTORY_FILE)) {
+      return JSON.parse(fs.readFileSync(SEARCH_HISTORY_FILE, 'utf-8'));
+    }
+  } catch (e) {
+    console.warn('Failed to load search history:', e.message);
+  }
+  return [];
+}
+
+function saveSearchHistory(history) {
+  fs.writeFileSync(SEARCH_HISTORY_FILE, JSON.stringify(history, null, 2));
+}
+
+app.get('/api/search-history', (req, res) => {
+  const history = loadSearchHistory();
+  res.json({ history });
+});
+
+app.post('/api/search-history', (req, res) => {
+  const { query, category, results } = req.body;
+  
+  if (!results || results.length === 0) {
+    return res.status(400).json({ error: 'No results to save' });
+  }
+  
+  const history = loadSearchHistory();
+  
+  const entry = {
+    id: Date.now().toString(),
+    query: query || '',
+    category: category || '',
+    results: results,
+    createdAt: new Date().toISOString()
+  };
+  
+  history.unshift(entry);
+  
+  if (history.length > 50) {
+    history.splice(50);
+  }
+  
+  saveSearchHistory(history);
+  res.json({ success: true, entry });
+});
+
+app.delete('/api/search-history/:id', (req, res) => {
+  const { id } = req.params;
+  let history = loadSearchHistory();
+  
+  const initialLength = history.length;
+  history = history.filter(h => h.id !== id);
+  
+  if (history.length === initialLength) {
+    return res.status(404).json({ error: 'Search not found' });
+  }
+  
+  saveSearchHistory(history);
+  res.json({ success: true });
+});
+
 // Backtest simulation endpoint
 app.post('/api/simulate-bot', async (req, res) => {
   console.log('Simulation request received');

@@ -120,6 +120,14 @@ The frontend proxies API requests to the backend.
 - Save Prompt checkbox enabled by default to save custom prompts
 
 ## Recent Changes (Jan 19, 2026)
+- **Strategy Search History**:
+  - Ideas modal now has Search and History tabs
+  - All searches are auto-saved to history (data/search-history.json)
+  - History shows past searches with date/time and result count
+  - Click to expand and see all results from that search
+  - Add/Use buttons work from history entries
+  - Delete button to remove old searches
+  - Keeps up to 50 most recent searches
 - **Strategy Template Library**:
   - "Add" button saves found strategies to dropdown menu
   - Strategies saved to data/strategies.json with name, description, and code template
