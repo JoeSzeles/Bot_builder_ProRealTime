@@ -961,6 +961,11 @@ function setupSimulator() {
   if (runModBtn) {
     runModBtn.addEventListener('click', runSimulationWithModifiedVars);
   }
+  
+  const runModBtn2 = document.getElementById('runModifiedBtn2');
+  if (runModBtn2) {
+    runModBtn2.addEventListener('click', runSimulationWithModifiedVars);
+  }
 }
 
 async function runSimulationWithModifiedVars() {
@@ -1167,8 +1172,10 @@ function detectAndDisplayVariables() {
   if (panel) panel.classList.remove('hidden');
   
   const runModBtn = document.getElementById('runModifiedBtn');
-  if (runModBtn && detectedVariables.length > 0) {
-    runModBtn.classList.remove('hidden');
+  const runModBtn2 = document.getElementById('runModifiedBtn2');
+  if (detectedVariables.length > 0) {
+    if (runModBtn) runModBtn.classList.remove('hidden');
+    if (runModBtn2) runModBtn2.classList.remove('hidden');
   }
 }
 
