@@ -734,4 +734,6 @@ document.addEventListener('DOMContentLoaded', () => {
   elements.downloadBtn.addEventListener('click', downloadPdf);
   elements.tabText.addEventListener('click', () => switchTab('text'));
   elements.tabBot.addEventListener('click', () => switchTab('bot'));
+  
+  switchTab('bot');
 });

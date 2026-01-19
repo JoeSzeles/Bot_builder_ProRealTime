@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Literator</title>
+  <title>Bot Builder</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Serif:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
@@ -58,26 +58,28 @@
           <div class="flex items-center gap-3 ml-12 lg:ml-0">
             <svg class="w-8 h-8 lg:w-10 lg:h-10" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
               <defs>
-                <linearGradient id="bookGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <linearGradient id="chartGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" style="stop-color:#10b981"/>
+                  <stop offset="100%" style="stop-color:#059669"/>
+                </linearGradient>
+                <linearGradient id="botGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                   <stop offset="0%" style="stop-color:#6366f1"/>
                   <stop offset="100%" style="stop-color:#8b5cf6"/>
                 </linearGradient>
-                <linearGradient id="penGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" style="stop-color:#f59e0b"/>
-                  <stop offset="100%" style="stop-color:#ef4444"/>
-                </linearGradient>
               </defs>
-              <path d="M8 12C8 9.79 9.79 8 12 8H32C34.21 8 36 9.79 36 12V40L22 34L8 40V12Z" fill="url(#bookGrad)" opacity="0.9"/>
-              <path d="M12 12H32V8H12C9.79 8 8 9.79 8 12V14C8 11.79 9.79 10 12 10V12Z" fill="white" opacity="0.3"/>
-              <path d="M40 8L28 36L26 32L36 8H40Z" fill="url(#penGrad)"/>
-              <path d="M28 36L26 32L24 38L28 36Z" fill="#1f2937"/>
-              <circle cx="38" cy="10" r="2" fill="#fbbf24"/>
+              <rect x="4" y="8" width="40" height="32" rx="4" fill="url(#botGrad)" opacity="0.9"/>
+              <rect x="8" y="12" width="32" height="24" rx="2" fill="#1f2937"/>
+              <path d="M12 30L18 24L24 28L32 18L36 22" stroke="url(#chartGrad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <rect x="14" y="20" width="3" height="10" fill="#ef4444" opacity="0.8"/>
+              <rect x="20" y="16" width="3" height="14" fill="#10b981" opacity="0.8"/>
+              <rect x="26" y="22" width="3" height="8" fill="#ef4444" opacity="0.8"/>
+              <rect x="32" y="14" width="3" height="16" fill="#10b981" opacity="0.8"/>
             </svg>
-            <h1 class="text-xl lg:text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">Literator</h1>
+            <h1 class="text-xl lg:text-2xl font-bold bg-gradient-to-r from-emerald-600 to-indigo-600 dark:from-emerald-400 dark:to-indigo-400 bg-clip-text text-transparent">Bot Builder</h1>
           </div>
           <div class="flex items-center gap-2">
-            <button id="tabText" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300">Text</button>
-            <button id="tabBot" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium transition-colors text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700">Bot Builder</button>
+            <button id="tabBot" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300">Bot Builder</button>
+            <button id="tabText" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium transition-colors text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700">Text</button>
           </div>
           <button id="darkModeToggle" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors mr-12 lg:mr-0">
             <svg id="sunIcon" class="w-6 h-6 text-gray-600 dark:text-gray-300 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">

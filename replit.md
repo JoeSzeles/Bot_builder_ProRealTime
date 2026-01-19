@@ -1,11 +1,11 @@
-# Literator
+# Bot Builder
 
-A personal-use full-stack app for translating/transforming literary texts AND generating ProRealTime trading bots using AI.
+A personal-use full-stack app for generating ProRealTime trading bots using AI, with an additional Text tab for translating/transforming literary texts.
 
 ## Overview
 - **Purpose**: Two main features:
-  1. **Text Tab**: Translate texts (books, documents) from any language to English using AI, with support for custom translation instructions
-  2. **Bot Builder Tab**: Generate ProRealTime/ProBuilder trading bot code with interactive charts and AI
+  1. **Bot Builder Tab** (default): Generate ProRealTime/ProBuilder trading bot code with interactive charts and AI
+  2. **Text Tab**: Translate texts (books, documents) from any language to English using AI, with support for custom translation instructions
 - **Tech Stack**: Vite (Vanilla JS + Tailwind CSS) frontend with Lightweight Charts, Node.js + Express backend
 - **AI Models**: Uses Replit AI Integrations (Claude Sonnet as primary, GPT-4o-mini as fallback) - no API keys needed
 - **Storage**: JSON file-based storage for translation history and saved prompts, local file storage for generated PDFs
