@@ -74,7 +74,7 @@ A personal-use full-stack app for generating ProRealTime trading bots using AI, 
    - Compiles chart annotations + settings into bot description
    - Sends to AI with ProRealTime syntax rules
    - Outputs ready-to-use ProBuilder code
-4. **Error Correction**:
+5. **Error Correction**:
    - Paste ProRealTime error messages
    - AI fixes code and regenerates
 
