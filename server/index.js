@@ -1232,6 +1232,74 @@ Focus on strategies that:
   }
 });
 
+// Strategy templates storage
+const STRATEGIES_FILE = path.join(DATA_DIR, 'strategies.json');
+
+function loadStrategies() {
+  try {
+    if (fs.existsSync(STRATEGIES_FILE)) {
+      return JSON.parse(fs.readFileSync(STRATEGIES_FILE, 'utf-8'));
+    }
+  } catch (e) {
+    console.warn('Failed to load strategies:', e.message);
+  }
+  return [];
+}
+
+function saveStrategies(strategies) {
+  fs.writeFileSync(STRATEGIES_FILE, JSON.stringify(strategies, null, 2));
+}
+
+app.get('/api/strategies', (req, res) => {
+  const strategies = loadStrategies();
+  res.json({ strategies });
+});
+
+app.post('/api/strategies', (req, res) => {
+  const { name, description, keyPoints, codeTemplate, url } = req.body;
+  
+  if (!name) {
+    return res.status(400).json({ error: 'Strategy name is required' });
+  }
+  
+  const strategies = loadStrategies();
+  
+  const existingIndex = strategies.findIndex(s => s.name.toLowerCase() === name.toLowerCase());
+  if (existingIndex >= 0) {
+    return res.status(400).json({ error: 'A strategy with this name already exists' });
+  }
+  
+  const strategy = {
+    id: Date.now().toString(),
+    name,
+    description: description || '',
+    keyPoints: keyPoints || '',
+    codeTemplate: codeTemplate || '',
+    url: url || '',
+    createdAt: new Date().toISOString()
+  };
+  
+  strategies.push(strategy);
+  saveStrategies(strategies);
+  
+  res.json({ success: true, strategy });
+});
+
+app.delete('/api/strategies/:id', (req, res) => {
+  const { id } = req.params;
+  let strategies = loadStrategies();
+  
+  const initialLength = strategies.length;
+  strategies = strategies.filter(s => s.id !== id);
+  
+  if (strategies.length === initialLength) {
+    return res.status(404).json({ error: 'Strategy not found' });
+  }
+  
+  saveStrategies(strategies);
+  res.json({ success: true });
+});
+
 // Backtest simulation endpoint
 app.post('/api/simulate-bot', async (req, res) => {
   console.log('Simulation request received');

@@ -120,12 +120,19 @@ The frontend proxies API requests to the backend.
 - Save Prompt checkbox enabled by default to save custom prompts
 
 ## Recent Changes (Jan 19, 2026)
+- **Strategy Template Library**:
+  - "Add" button saves found strategies to dropdown menu
+  - Strategies saved to data/strategies.json with name, description, and code template
+  - Auto-loads saved strategies into dropdown on page load
+  - Selecting saved strategy fills Custom Instructions with template
+  - Delete endpoint available at DELETE /api/strategies/:id
 - **Get Strategy Ideas Feature**:
   - New "Get Strategy Ideas" button next to strategy dropdown in Bot Settings
   - Modal with category chips (Breakout, Trend Following, Mean Reversion, RSI, MACD, Scalping, etc.)
   - AI-powered search generates ProRealCode forum-style strategy ideas
-  - Each result shows title, description, code preview, and "Use This" button
-  - Clicking "Use This" populates Custom Instructions with strategy details
+  - Each result shows title, description, code preview, "Add" and "Use" buttons
+  - Clicking "Use" populates Custom Instructions with strategy details
+  - Clicking "Add" saves strategy to dropdown for reuse
 - **ProRealCode Forum Conventions**:
   - PRC_STYLE_CONSTRAINTS enforced in both generate-bot and fix-bot prompts
   - Ensures code follows forum conventions: flat structure, verbose IF/ENDIF, no underscores

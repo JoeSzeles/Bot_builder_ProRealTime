@@ -139,6 +139,54 @@ function generateCandleData(basePrice, numBars, volatility) {
   return data;
 }
 
+async function loadSavedStrategies() {
+  try {
+    const response = await fetch('/api/strategies');
+    const data = await response.json();
+    const strategies = data.strategies || [];
+    
+    const select = document.getElementById('strategyType');
+    if (!select) return;
+    
+    const customOption = select.querySelector('option[value="custom"]');
+    
+    strategies.forEach(strategy => {
+      const existingOption = select.querySelector(`option[value="saved_${strategy.id}"]`);
+      if (existingOption) return;
+      
+      const option = document.createElement('option');
+      option.value = `saved_${strategy.id}`;
+      option.textContent = strategy.name;
+      option.dataset.strategyId = strategy.id;
+      option.dataset.description = strategy.description;
+      option.dataset.keyPoints = strategy.keyPoints;
+      option.dataset.codeTemplate = strategy.codeTemplate;
+      
+      if (customOption) {
+        select.insertBefore(option, customOption);
+      } else {
+        select.appendChild(option);
+      }
+    });
+    
+    select.addEventListener('change', (e) => {
+      const selectedOption = e.target.selectedOptions[0];
+      if (selectedOption && selectedOption.value.startsWith('saved_')) {
+        const customInstructions = document.getElementById('botCustomInstructions');
+        if (customInstructions) {
+          const parts = [];
+          if (selectedOption.dataset.description) parts.push(selectedOption.dataset.description);
+          if (selectedOption.dataset.keyPoints) parts.push(selectedOption.dataset.keyPoints);
+          if (selectedOption.dataset.codeTemplate) parts.push(`Code Template:\n${selectedOption.dataset.codeTemplate}`);
+          customInstructions.value = parts.join('\n\n');
+        }
+      }
+    });
+  } catch (e) {
+    console.warn('Failed to load saved strategies:', e);
+  }
+}
+
 export async function initBotBuilder() {
   if (initialized && chart) {
     return;
@@ -146,6 +194,8 @@ export async function initBotBuilder() {
   
   const container = document.getElementById('chartContainer');
   if (!container) return;
+  
+  await loadSavedStrategies();
 
   if (chart) {
     chart.remove();
@@ -393,9 +443,17 @@ function setupStrategyIdeasModal() {
               View on ProRealCode
             </a>` : ''}
           </div>
-          <button class="use-strategy-btn px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap" data-strategy-index="${i}">
-            Use This
-          </button>
+          <div class="flex gap-2">
+            <button class="add-strategy-btn px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap flex items-center gap-1" data-strategy-index="${i}" title="Add to dropdown menu">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+              </svg>
+              Add
+            </button>
+            <button class="use-strategy-btn px-3 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap" data-strategy-index="${i}">
+              Use
+            </button>
+          </div>
         </div>
         ${r.codeSnippet ? `
           <details class="mt-3">
@@ -414,7 +472,59 @@ function setupStrategyIdeasModal() {
       });
     });
     
+    resultsContainer.querySelectorAll('.add-strategy-btn').forEach((btn, idx) => {
+      btn.addEventListener('click', async () => {
+        const result = results[idx];
+        await saveStrategyToDropdown(result);
+      });
+    });
+    
     resultsContainer.classList.remove('hidden');
+  }
+  
+  async function saveStrategyToDropdown(strategy) {
+    try {
+      const response = await fetch('/api/strategies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: strategy.title,
+          description: strategy.description,
+          keyPoints: strategy.keyPoints || '',
+          codeTemplate: strategy.codeSnippet || '',
+          url: strategy.url || ''
+        })
+      });
+      
+      if (!response.ok) throw new Error('Failed to save strategy');
+      
+      const data = await response.json();
+      addStrategyToDropdown(data.strategy);
+      alert(`Strategy "${strategy.title}" added to dropdown!`);
+    } catch (e) {
+      console.error('Failed to save strategy:', e);
+      alert('Failed to save strategy. Please try again.');
+    }
+  }
+  
+  function addStrategyToDropdown(strategy) {
+    const select = document.getElementById('strategyType');
+    if (!select) return;
+    
+    const existingOption = select.querySelector(`option[value="saved_${strategy.id}"]`);
+    if (existingOption) return;
+    
+    const customOption = select.querySelector('option[value="custom"]');
+    const option = document.createElement('option');
+    option.value = `saved_${strategy.id}`;
+    option.textContent = strategy.name;
+    option.dataset.strategyId = strategy.id;
+    
+    if (customOption) {
+      select.insertBefore(option, customOption);
+    } else {
+      select.appendChild(option);
+    }
   }
   
   function applyStrategyIdea(strategy) {
