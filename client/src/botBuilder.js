@@ -349,12 +349,28 @@ function setupBotBuilderEvents() {
 
   const strategyTypeSelect = document.getElementById('strategyType');
   const baseCodeInputContainer = document.getElementById('baseCodeInputContainer');
+  const strategyCodePreview = document.getElementById('strategyCodePreview');
+  const strategyCodePreviewContent = document.getElementById('strategyCodePreviewContent');
+  
   if (strategyTypeSelect && baseCodeInputContainer) {
     strategyTypeSelect.addEventListener('change', () => {
+      const selectedOption = strategyTypeSelect.selectedOptions[0];
+      
       if (strategyTypeSelect.value === 'paste') {
         baseCodeInputContainer.classList.remove('hidden');
+        if (strategyCodePreview) strategyCodePreview.classList.add('hidden');
       } else {
         baseCodeInputContainer.classList.add('hidden');
+        
+        // Show code preview for saved strategies
+        if (selectedOption && selectedOption.value.startsWith('saved_') && selectedOption.dataset.codeTemplate) {
+          if (strategyCodePreview && strategyCodePreviewContent) {
+            strategyCodePreviewContent.textContent = selectedOption.dataset.codeTemplate;
+            strategyCodePreview.classList.remove('hidden');
+          }
+        } else {
+          if (strategyCodePreview) strategyCodePreview.classList.add('hidden');
+        }
       }
     });
   }
