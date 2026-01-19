@@ -120,6 +120,18 @@ The frontend proxies API requests to the backend.
 - Save Prompt checkbox enabled by default to save custom prompts
 
 ## Recent Changes (Jan 19, 2026)
+- **Time Filters Master Toggle**:
+  - "Enable Filters" checkbox to turn off all TIME & SESSION FILTERS at once
+  - When unchecked, time filter content is dimmed and all time-based restrictions disabled
+  - Properly syncs UI state on page load
+- **Paste Base Code Strategy**:
+  - New "Paste Base Code" option in strategy dropdown
+  - Shows textarea for pasting existing ProRealTime code
+  - AI uses pasted code as base and applies configured settings/modifications
+- **Variable Optimization Checkboxes**:
+  - Each detected variable now has checkbox to include/exclude from auto-optimization
+  - Time/session related variables (PreLoadBars, StartHour, etc.) unchecked by default
+  - Generic numeric variables checked by default for optimization
 - **Strategy Search History**:
   - Ideas modal now has Search and History tabs
   - All searches are auto-saved to history (data/search-history.json)

@@ -347,6 +347,32 @@ function setupBotBuilderEvents() {
     fixBotError.addEventListener('click', fixBotErrorAndRegenerate);
   }
 
+  const strategyTypeSelect = document.getElementById('strategyType');
+  const baseCodeInputContainer = document.getElementById('baseCodeInputContainer');
+  if (strategyTypeSelect && baseCodeInputContainer) {
+    strategyTypeSelect.addEventListener('change', () => {
+      if (strategyTypeSelect.value === 'paste') {
+        baseCodeInputContainer.classList.remove('hidden');
+      } else {
+        baseCodeInputContainer.classList.add('hidden');
+      }
+    });
+  }
+
+  const enableTimeFilters = document.getElementById('enableTimeFilters');
+  const timeFiltersContent = document.getElementById('timeFiltersContent');
+  if (enableTimeFilters && timeFiltersContent) {
+    const syncTimeFiltersState = () => {
+      if (enableTimeFilters.checked) {
+        timeFiltersContent.classList.remove('opacity-50', 'pointer-events-none');
+      } else {
+        timeFiltersContent.classList.add('opacity-50', 'pointer-events-none');
+      }
+    };
+    syncTimeFiltersState();
+    enableTimeFilters.addEventListener('change', syncTimeFiltersState);
+  }
+
   setupStrategyIdeasModal();
 
   const chartContainer = document.getElementById('chartContainer');
@@ -847,6 +873,9 @@ function updateDrawingCount() {
 }
 
 function getSettings() {
+  const enableTimeFilters = document.getElementById('enableTimeFilters')?.checked ?? true;
+  const strategyType = document.getElementById('strategyType')?.value || '13thwarrior';
+  
   return {
     asset: document.getElementById('assetSelect')?.value || 'silver',
     timeframe: document.getElementById('timeframeSelect')?.value || '1h',
@@ -867,20 +896,22 @@ function getSettings() {
     useOBV: document.getElementById('useOBV')?.checked || true,
     obvPeriod: parseInt(document.getElementById('obvPeriod')?.value) || 5,
     useHeikinAshi: document.getElementById('useHeikinAshi')?.checked || true,
-    strategyType: document.getElementById('strategyType')?.value || '13thwarrior',
+    strategyType: strategyType,
+    baseCode: strategyType === 'paste' ? (document.getElementById('baseCodeInput')?.value || '') : '',
     extraInstructions: document.getElementById('botExtraInstructions')?.value || '',
     drawings: drawings,
+    enableTimeFilters: enableTimeFilters,
     timezone: document.getElementById('timezone')?.value || 'Australia/Brisbane',
-    excludeWeekends: document.getElementById('excludeWeekends')?.checked ?? true,
-    excludeHolidays: document.getElementById('excludeHolidays')?.checked ?? true,
-    useTimeFilter: document.getElementById('useTimeFilter')?.checked ?? true,
+    excludeWeekends: enableTimeFilters && (document.getElementById('excludeWeekends')?.checked ?? true),
+    excludeHolidays: enableTimeFilters && (document.getElementById('excludeHolidays')?.checked ?? true),
+    useTimeFilter: enableTimeFilters && (document.getElementById('useTimeFilter')?.checked ?? true),
     tradingStartTime: document.getElementById('tradingStartTime')?.value || '09:00',
     tradingEndTime: document.getElementById('tradingEndTime')?.value || '17:00',
-    excludeOpenPeriod: document.getElementById('excludeOpenPeriod')?.checked ?? true,
+    excludeOpenPeriod: enableTimeFilters && (document.getElementById('excludeOpenPeriod')?.checked ?? true),
     openPeriodMinutes: parseInt(document.getElementById('openPeriodMinutes')?.value) || 30,
-    excludeClosePeriod: document.getElementById('excludeClosePeriod')?.checked ?? true,
+    excludeClosePeriod: enableTimeFilters && (document.getElementById('excludeClosePeriod')?.checked ?? true),
     closePeriodMinutes: parseInt(document.getElementById('closePeriodMinutes')?.value) || 30,
-    closeBeforeEnd: document.getElementById('closeBeforeEnd')?.checked || false,
+    closeBeforeEnd: enableTimeFilters && (document.getElementById('closeBeforeEnd')?.checked || false),
     closeBeforeMinutes: parseInt(document.getElementById('closeBeforeMinutes')?.value) || 15,
     tradeDays: {
       mon: document.getElementById('tradeMon')?.checked ?? true,
@@ -934,38 +965,48 @@ function buildBotDescription(settings) {
   }
   desc += `\n`;
   
-  desc += `STRATEGY: ${settings.strategyType}\n\n`;
-  
-  desc += `TIME & SESSION FILTERS:\n`;
-  desc += `- Timezone: ${settings.timezone}\n`;
-  if (settings.excludeWeekends) {
-    desc += `- Exclude weekends (Saturday & Sunday)\n`;
-  }
-  if (settings.excludeHolidays) {
-    desc += `- Exclude major market holidays\n`;
-  }
-  if (settings.useTimeFilter) {
-    desc += `- Trading hours: ${settings.tradingStartTime} to ${settings.tradingEndTime}\n`;
-  }
-  if (settings.excludeOpenPeriod) {
-    desc += `- Exclude first ${settings.openPeriodMinutes} minutes of session (avoid opening volatility)\n`;
-  }
-  if (settings.excludeClosePeriod) {
-    desc += `- Exclude last ${settings.closePeriodMinutes} minutes of session (avoid closing volatility)\n`;
-  }
-  if (settings.closeBeforeEnd) {
-    desc += `- Force close all positions ${settings.closeBeforeMinutes} minutes before session end\n`;
+  desc += `STRATEGY: ${settings.strategyType}\n`;
+  if (settings.strategyType === 'paste' && settings.baseCode) {
+    desc += `\nBASE CODE TO MODIFY/IMPROVE:\n\`\`\`\n${settings.baseCode}\n\`\`\`\n`;
+    desc += `Use this code as a starting point and apply the settings/modifications specified.\n\n`;
+  } else {
+    desc += `\n`;
   }
   
-  const tradeDayNames = [];
-  if (settings.tradeDays.mon) tradeDayNames.push('Mon');
-  if (settings.tradeDays.tue) tradeDayNames.push('Tue');
-  if (settings.tradeDays.wed) tradeDayNames.push('Wed');
-  if (settings.tradeDays.thu) tradeDayNames.push('Thu');
-  if (settings.tradeDays.fri) tradeDayNames.push('Fri');
-  if (settings.tradeDays.sat) tradeDayNames.push('Sat');
-  if (settings.tradeDays.sun) tradeDayNames.push('Sun');
-  desc += `- Active trading days: ${tradeDayNames.join(', ')}\n`;
+  if (!settings.enableTimeFilters) {
+    desc += `TIME & SESSION FILTERS: DISABLED (no time-based restrictions)\n\n`;
+  } else {
+    desc += `TIME & SESSION FILTERS:\n`;
+    desc += `- Timezone: ${settings.timezone}\n`;
+    if (settings.excludeWeekends) {
+      desc += `- Exclude weekends (Saturday & Sunday)\n`;
+    }
+    if (settings.excludeHolidays) {
+      desc += `- Exclude major market holidays\n`;
+    }
+    if (settings.useTimeFilter) {
+      desc += `- Trading hours: ${settings.tradingStartTime} to ${settings.tradingEndTime}\n`;
+    }
+    if (settings.excludeOpenPeriod) {
+      desc += `- Exclude first ${settings.openPeriodMinutes} minutes of session (avoid opening volatility)\n`;
+    }
+    if (settings.excludeClosePeriod) {
+      desc += `- Exclude last ${settings.closePeriodMinutes} minutes of session (avoid closing volatility)\n`;
+    }
+    if (settings.closeBeforeEnd) {
+      desc += `- Force close all positions ${settings.closeBeforeMinutes} minutes before session end\n`;
+    }
+    
+    const tradeDayNames = [];
+    if (settings.tradeDays.mon) tradeDayNames.push('Mon');
+    if (settings.tradeDays.tue) tradeDayNames.push('Tue');
+    if (settings.tradeDays.wed) tradeDayNames.push('Wed');
+    if (settings.tradeDays.thu) tradeDayNames.push('Thu');
+    if (settings.tradeDays.fri) tradeDayNames.push('Fri');
+    if (settings.tradeDays.sat) tradeDayNames.push('Sat');
+    if (settings.tradeDays.sun) tradeDayNames.push('Sun');
+    desc += `- Active trading days: ${tradeDayNames.join(', ')}\n`;
+  }
   
   if (settings.drawings.length > 0) {
     desc += `\nCHART ANNOTATIONS:\n`;
@@ -1786,9 +1827,21 @@ function detectAndDisplayVariables() {
     return;
   }
   
+  const excludeFromOptimizationPatterns = /^(preloadbars|preload|starttime|endtime|starthour|endhour|startminute|endminute|tradestarttime|tradeendtime|tradestarthour|tradeendhour|tradestartminute|tradeendminute|dayofweek|sessionstart|sessionend|openhour|closehour|openminute|closeminute|tradingstart|tradingend|marketopen|marketclose|sessionopen|sessionclose)$/i;
+  
+  detectedVariables.forEach(v => {
+    v.includeInOptimization = !excludeFromOptimizationPatterns.test(v.name);
+  });
+  
   container.innerHTML = detectedVariables.map((v, i) => `
     <div class="flex items-center gap-3 bg-white dark:bg-gray-700 rounded-lg p-2 border border-gray-200 dark:border-gray-600">
-      <span class="text-xs font-mono text-indigo-600 dark:text-indigo-400 w-24 truncate" title="${v.name}">${v.name}</span>
+      <input type="checkbox" 
+        id="varOptCheck_${i}" 
+        data-var-index="${i}"
+        ${v.includeInOptimization ? 'checked' : ''}
+        class="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-purple-600 focus:ring-purple-500"
+        title="Include in auto-optimization">
+      <span class="text-xs font-mono text-indigo-600 dark:text-indigo-400 w-20 truncate" title="${v.name}">${v.name}</span>
       <input type="range" 
         id="varSlider_${i}" 
         data-var-index="${i}"
@@ -1804,7 +1857,7 @@ function detectAndDisplayVariables() {
         max="${v.max}" 
         step="${v.step}" 
         value="${v.currentValue}"
-        class="w-20 px-2 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
+        class="w-16 px-2 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
       <span class="text-xs text-gray-400">(${v.originalValue})</span>
     </div>
   `).join('');
@@ -1812,6 +1865,7 @@ function detectAndDisplayVariables() {
   detectedVariables.forEach((v, i) => {
     const slider = document.getElementById(`varSlider_${i}`);
     const input = document.getElementById(`varInput_${i}`);
+    const checkbox = document.getElementById(`varOptCheck_${i}`);
     
     slider?.addEventListener('input', (e) => {
       const val = parseFloat(e.target.value);
@@ -1823,6 +1877,10 @@ function detectAndDisplayVariables() {
       const val = parseFloat(e.target.value);
       detectedVariables[i].currentValue = val;
       if (slider) slider.value = val;
+    });
+    
+    checkbox?.addEventListener('change', (e) => {
+      detectedVariables[i].includeInOptimization = e.target.checked;
     });
   });
   
@@ -1896,11 +1954,15 @@ async function runAutoOptimization() {
     for (let i = 0; i < iterations; i++) {
       const testVars = detectedVariables.map(v => ({
         ...v,
-        currentValue: v.min + Math.random() * (v.max - v.min)
+        currentValue: v.includeInOptimization 
+          ? v.min + Math.random() * (v.max - v.min)
+          : v.currentValue
       }));
       
       testVars.forEach(v => {
-        v.currentValue = Math.round(v.currentValue / v.step) * v.step;
+        if (v.includeInOptimization) {
+          v.currentValue = Math.round(v.currentValue / v.step) * v.step;
+        }
       });
       
       const progress = ((i + 1) / iterations) * 100;
