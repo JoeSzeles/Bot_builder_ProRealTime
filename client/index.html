@@ -548,6 +548,42 @@
 
             <!-- Results Dashboard -->
             <div id="simulatorResults" class="hidden space-y-6">
+              <!-- Equity Curve Chart -->
+              <div class="bg-white dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600">
+                <div class="flex items-center justify-between mb-3">
+                  <h4 class="text-sm font-medium text-gray-600 dark:text-gray-400">Equity Curve</h4>
+                  <div class="flex items-center gap-4 text-xs">
+                    <div class="flex items-center gap-1">
+                      <div class="w-3 h-0.5 bg-cyan-400"></div>
+                      <span class="text-gray-500 dark:text-gray-400">Equity</span>
+                    </div>
+                  </div>
+                </div>
+                <div id="equityCurveChart" class="h-32 w-full"></div>
+              </div>
+
+              <!-- Price Chart with Trade Markers -->
+              <div class="bg-white dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600">
+                <div class="flex items-center justify-between mb-3">
+                  <h4 class="text-sm font-medium text-gray-600 dark:text-gray-400">Trade Analysis</h4>
+                  <div class="flex items-center gap-4 text-xs">
+                    <div class="flex items-center gap-1">
+                      <svg class="w-3 h-3 text-green-500" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4l-8 8h6v8h4v-8h6z"/></svg>
+                      <span class="text-gray-500 dark:text-gray-400">Buy</span>
+                    </div>
+                    <div class="flex items-center gap-1">
+                      <svg class="w-3 h-3 text-red-500" fill="currentColor" viewBox="0 0 24 24"><path d="M12 20l8-8h-6V4h-4v8H4z"/></svg>
+                      <span class="text-gray-500 dark:text-gray-400">Sell</span>
+                    </div>
+                    <div class="flex items-center gap-1">
+                      <div class="w-2 h-2 rounded-full bg-yellow-400"></div>
+                      <span class="text-gray-500 dark:text-gray-400">Exit</span>
+                    </div>
+                  </div>
+                </div>
+                <div id="tradeAnalysisChart" class="h-64 w-full"></div>
+              </div>
+
               <!-- Top Stats Row -->
               <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <!-- Total Gain -->

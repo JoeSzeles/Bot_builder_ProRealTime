@@ -11,6 +11,9 @@ let priceLines = [];
 let lineSeriesArr = [];
 let markers = [];
 let screenshotBase64 = null;
+let equityChart = null;
+let tradeChart = null;
+let tradeCandleSeries = null;
 
 const FALLBACK_DATA = {
   silver: generateCandleData(32, 100, 0.02),
@@ -950,6 +953,9 @@ function displaySimulationResults(r) {
     return `${sign}$${Math.abs(v).toFixed(2)}`;
   };
   
+  createEquityCurveChart(r.equity || []);
+  createTradeAnalysisChart(r.trades || [], currentCandles);
+  
   document.getElementById('simTotalGain').textContent = formatMoney(r.totalGain);
   document.getElementById('simTotalGain').className = `text-2xl font-bold ${r.totalGain >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`;
   
@@ -998,4 +1004,145 @@ function displaySimulationResults(r) {
       chartContainer.appendChild(bar);
     });
   }
+}
+
+function createEquityCurveChart(equityData) {
+  const container = document.getElementById('equityCurveChart');
+  if (!container) return;
+  
+  if (equityChart) {
+    equityChart.remove();
+    equityChart = null;
+  }
+  
+  const isDark = document.documentElement.classList.contains('dark');
+  
+  equityChart = createChart(container, {
+    width: container.clientWidth,
+    height: 128,
+    layout: {
+      background: { type: ColorType.Solid, color: 'transparent' },
+      textColor: isDark ? '#9ca3af' : '#6b7280',
+    },
+    grid: {
+      vertLines: { visible: false },
+      horzLines: { color: isDark ? '#374151' : '#e5e7eb' },
+    },
+    rightPriceScale: {
+      borderVisible: false,
+    },
+    timeScale: {
+      borderVisible: false,
+      timeVisible: false,
+    },
+    handleScroll: false,
+    handleScale: false,
+  });
+  
+  const areaSeries = equityChart.addSeries(LineSeries, {
+    color: '#22d3ee',
+    lineWidth: 2,
+    priceLineVisible: false,
+    lastValueVisible: true,
+    crosshairMarkerVisible: false,
+  });
+  
+  if (equityData && equityData.length > 0) {
+    const now = Math.floor(Date.now() / 1000);
+    const interval = 60;
+    const chartData = equityData.map((val, i) => ({
+      time: now - (equityData.length - i) * interval,
+      value: val
+    }));
+    areaSeries.setData(chartData);
+  }
+  
+  equityChart.timeScale().fitContent();
+  
+  new ResizeObserver(() => {
+    if (equityChart) {
+      equityChart.applyOptions({ width: container.clientWidth });
+    }
+  }).observe(container);
+}
+
+function createTradeAnalysisChart(trades, candles) {
+  const container = document.getElementById('tradeAnalysisChart');
+  if (!container || !candles || candles.length === 0) return;
+  
+  if (tradeChart) {
+    tradeChart.remove();
+    tradeChart = null;
+  }
+  
+  const isDark = document.documentElement.classList.contains('dark');
+  
+  tradeChart = createChart(container, {
+    width: container.clientWidth,
+    height: 256,
+    layout: {
+      background: { type: ColorType.Solid, color: isDark ? '#1f2937' : '#111827' },
+      textColor: isDark ? '#9ca3af' : '#d1d5db',
+    },
+    grid: {
+      vertLines: { color: isDark ? '#374151' : '#374151' },
+      horzLines: { color: isDark ? '#374151' : '#374151' },
+    },
+    crosshair: {
+      mode: CrosshairMode.Normal,
+    },
+    rightPriceScale: {
+      borderColor: '#374151',
+    },
+    timeScale: {
+      borderColor: '#374151',
+      timeVisible: true,
+    },
+  });
+  
+  tradeCandleSeries = tradeChart.addSeries(CandlestickSeries, {
+    upColor: '#22c55e',
+    downColor: '#ef4444',
+    borderUpColor: '#22c55e',
+    borderDownColor: '#ef4444',
+    wickUpColor: '#22c55e',
+    wickDownColor: '#ef4444',
+  });
+  
+  tradeCandleSeries.setData(candles);
+  
+  const tradeMarkers = [];
+  
+  if (trades && trades.length > 0) {
+    trades.forEach(trade => {
+      tradeMarkers.push({
+        time: trade.entryTime,
+        position: trade.type === 'long' ? 'belowBar' : 'aboveBar',
+        color: trade.type === 'long' ? '#22c55e' : '#ef4444',
+        shape: trade.type === 'long' ? 'arrowUp' : 'arrowDown',
+        text: trade.type === 'long' ? 'BUY' : 'SELL',
+        size: 1,
+      });
+      
+      tradeMarkers.push({
+        time: trade.exitTime,
+        position: 'inBar',
+        color: '#facc15',
+        shape: 'circle',
+        text: trade.pnl >= 0 ? `+$${trade.pnl.toFixed(0)}` : `-$${Math.abs(trade.pnl).toFixed(0)}`,
+        size: 1,
+      });
+    });
+    
+    tradeMarkers.sort((a, b) => a.time - b.time);
+    tradeCandleSeries.setMarkers(tradeMarkers);
+  }
+  
+  tradeChart.timeScale().fitContent();
+  
+  new ResizeObserver(() => {
+    if (tradeChart) {
+      tradeChart.applyOptions({ width: container.clientWidth });
+    }
+  }).observe(container);
 }

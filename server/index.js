@@ -1401,7 +1401,8 @@ function runBacktest(code, candles, settings) {
     timeInMarket,
     avgOrdersPerDay,
     dailyPerformance,
-    equity
+    equity,
+    trades
   };
 }
 
