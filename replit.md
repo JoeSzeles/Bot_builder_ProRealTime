@@ -120,6 +120,13 @@ The frontend proxies API requests to the backend.
 - Save Prompt checkbox enabled by default to save custom prompts
 
 ## Recent Changes (Jan 19, 2026)
+- **Enhanced Optimization Results Panel**:
+  - Bigger, expandable panel (350px collapsed, 700px expanded)
+  - Comparison bar chart showing top 10 results (green=gain, blue=win rate)
+  - Each result card has copy code button (copies code with that result's variables applied)
+  - View details button opens full modal with all stats, variables, and copyable code
+  - Top performer has special gold gradient styling
+  - Apply button to instantly use any result's configuration
 - **Variable Persistence**: Slider adjustments now auto-save to bot history and restore when reopening saved bots
   - Debounced 500ms auto-save when variables change
   - PATCH endpoint updates variableOverrides and modifiedCode
