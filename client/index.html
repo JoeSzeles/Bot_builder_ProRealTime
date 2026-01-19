@@ -707,14 +707,120 @@
 
             <!-- Best Results Panel -->
             <div id="bestResultsPanel" class="hidden mb-6 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl border border-green-200 dark:border-green-700 p-4">
-              <h4 class="text-sm font-semibold text-green-700 dark:text-green-300 mb-3 flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/>
-                </svg>
-                Top Optimization Results
-              </h4>
-              <div id="bestResultsList" class="space-y-2 max-h-48 overflow-y-auto">
-                <!-- Results will be populated by JS -->
+              <div class="flex items-center justify-between mb-4">
+                <h4 class="text-lg font-semibold text-green-700 dark:text-green-300 flex items-center gap-2">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/>
+                  </svg>
+                  Optimization Results
+                  <span id="resultsCount" class="text-sm font-normal text-gray-500 dark:text-gray-400"></span>
+                </h4>
+                <button id="toggleResultsExpand" class="text-sm text-green-600 dark:text-green-400 hover:underline flex items-center gap-1">
+                  <span id="expandBtnText">Expand</span>
+                  <svg id="expandBtnIcon" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                  </svg>
+                </button>
+              </div>
+              
+              <!-- Comparison Chart -->
+              <div id="resultsComparisonChart" class="mb-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600 p-3">
+                <div class="flex gap-1 items-end justify-center h-32" id="comparisonBars"></div>
+                <div class="flex justify-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  <span class="flex items-center gap-1"><span class="w-3 h-3 bg-green-500 rounded"></span> Gain</span>
+                  <span class="flex items-center gap-1"><span class="w-3 h-3 bg-blue-500 rounded"></span> Win Rate</span>
+                </div>
+              </div>
+              
+              <!-- Results List -->
+              <div id="bestResultsList" class="space-y-3 overflow-y-auto transition-all duration-300" style="max-height: 350px;" data-expanded="false">
+              </div>
+            </div>
+            
+            <!-- Detail Modal -->
+            <div id="resultDetailModal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
+              <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+                <div class="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                  <h3 class="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <span id="modalRankBadge" class="w-8 h-8 flex items-center justify-center rounded-full bg-green-500 text-white font-bold">#1</span>
+                    Result Details
+                  </h3>
+                  <button id="closeDetailModal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                  </button>
+                </div>
+                <div class="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
+                  <!-- Performance Summary -->
+                  <div class="grid grid-cols-3 gap-4 mb-6">
+                    <div class="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/30 rounded-xl p-4 text-center">
+                      <div id="modalTotalGain" class="text-2xl font-bold text-green-600 dark:text-green-400">+$0.00</div>
+                      <div class="text-xs text-gray-500 dark:text-gray-400">Total Gain</div>
+                    </div>
+                    <div class="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-xl p-4 text-center">
+                      <div id="modalWinRate" class="text-2xl font-bold text-blue-600 dark:text-blue-400">0%</div>
+                      <div class="text-xs text-gray-500 dark:text-gray-400">Win Rate</div>
+                    </div>
+                    <div class="bg-gradient-to-br from-purple-50 to-violet-50 dark:from-purple-900/30 dark:to-violet-900/30 rounded-xl p-4 text-center">
+                      <div id="modalTrades" class="text-2xl font-bold text-purple-600 dark:text-purple-400">0</div>
+                      <div class="text-xs text-gray-500 dark:text-gray-400">Total Trades</div>
+                    </div>
+                  </div>
+                  
+                  <!-- Variables Used -->
+                  <div class="mb-6">
+                    <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Variables</h4>
+                    <div id="modalVariables" class="flex flex-wrap gap-2"></div>
+                  </div>
+                  
+                  <!-- Additional Stats -->
+                  <div class="mb-6 grid grid-cols-2 gap-4 text-sm">
+                    <div class="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                      <span class="text-gray-500">Max Drawdown</span>
+                      <span id="modalDrawdown" class="font-medium text-red-600 dark:text-red-400">-$0.00</span>
+                    </div>
+                    <div class="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                      <span class="text-gray-500">Max Runup</span>
+                      <span id="modalRunup" class="font-medium text-green-600 dark:text-green-400">+$0.00</span>
+                    </div>
+                    <div class="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                      <span class="text-gray-500">Gain/Loss Ratio</span>
+                      <span id="modalGainLoss" class="font-medium text-gray-900 dark:text-white">0.00</span>
+                    </div>
+                    <div class="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                      <span class="text-gray-500">Best Trade</span>
+                      <span id="modalBestTrade" class="font-medium text-green-600 dark:text-green-400">+$0.00</span>
+                    </div>
+                    <div class="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                      <span class="text-gray-500">Worst Trade</span>
+                      <span id="modalWorstTrade" class="font-medium text-red-600 dark:text-red-400">-$0.00</span>
+                    </div>
+                    <div class="flex justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                      <span class="text-gray-500">Avg Gain/Trade</span>
+                      <span id="modalAvgGain" class="font-medium text-gray-900 dark:text-white">$0.00</span>
+                    </div>
+                  </div>
+                  
+                  <!-- Code with Variables Applied -->
+                  <div>
+                    <div class="flex items-center justify-between mb-2">
+                      <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Code with Variables Applied</h4>
+                      <button id="modalCopyCode" class="px-3 py-1 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors flex items-center gap-1">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                        </svg>
+                        Copy Code
+                      </button>
+                    </div>
+                    <pre id="modalCode" class="bg-gray-900 text-gray-100 p-4 rounded-lg text-xs font-mono overflow-x-auto max-h-60 overflow-y-auto"></pre>
+                  </div>
+                </div>
+                <div class="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
+                  <button id="modalApplyBtn" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium">
+                    Apply This Configuration
+                  </button>
+                </div>
               </div>
             </div>
 

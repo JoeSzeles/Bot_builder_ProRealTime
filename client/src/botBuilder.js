@@ -1533,50 +1533,251 @@ async function runAutoOptimization() {
 function displayOptimizationResults() {
   const panel = document.getElementById('bestResultsPanel');
   const list = document.getElementById('bestResultsList');
+  const countEl = document.getElementById('resultsCount');
   
   if (!panel || !list) return;
   
-  const top5 = optimizationResults.slice(0, 5);
+  const allResults = optimizationResults;
   
-  if (top5.length === 0) {
+  if (allResults.length === 0) {
     list.innerHTML = '<p class="text-sm text-gray-500">No valid results found.</p>';
     panel.classList.remove('hidden');
     return;
   }
+  
+  if (countEl) countEl.textContent = `(${allResults.length} results)`;
   
   const formatMoney = (v) => {
     const sign = v >= 0 ? '+' : '';
     return `${sign}$${v.toFixed(2)}`;
   };
   
-  list.innerHTML = top5.map((r, i) => `
-    <div class="flex items-center gap-3 p-2 rounded-lg ${i === 0 ? 'bg-green-100 dark:bg-green-800/30 border border-green-300 dark:border-green-600' : 'bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600'} cursor-pointer hover:shadow-md transition-shadow" data-result-index="${i}">
-      <span class="w-6 h-6 flex items-center justify-center rounded-full ${i === 0 ? 'bg-green-500 text-white' : 'bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300'} text-xs font-bold">${i + 1}</span>
-      <div class="flex-1">
-        <div class="flex items-center gap-2 text-sm">
-          <span class="${r.result.totalGain >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'} font-medium">${formatMoney(r.result.totalGain)}</span>
-          <span class="text-gray-400">|</span>
-          <span class="text-blue-600 dark:text-blue-400">${r.result.winRate?.toFixed(1)}% win</span>
-          <span class="text-gray-400">|</span>
-          <span class="text-purple-600 dark:text-purple-400">${r.result.totalTrades} trades</span>
+  renderComparisonChart(allResults.slice(0, 10));
+  
+  list.innerHTML = allResults.map((r, i) => `
+    <div class="result-card p-3 rounded-lg ${i === 0 ? 'bg-green-100 dark:bg-green-800/30 border-2 border-green-400 dark:border-green-500' : 'bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600'} cursor-pointer hover:shadow-lg transition-all" data-result-index="${i}">
+      <div class="flex items-center gap-3">
+        <span class="w-8 h-8 flex items-center justify-center rounded-full ${i === 0 ? 'bg-gradient-to-br from-yellow-400 to-orange-500 text-white shadow-lg' : i < 3 ? 'bg-green-500 text-white' : 'bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300'} text-sm font-bold flex-shrink-0">${i + 1}</span>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 text-sm flex-wrap">
+            <span class="${r.result.totalGain >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'} font-bold text-base">${formatMoney(r.result.totalGain)}</span>
+            <span class="text-gray-300 dark:text-gray-500">|</span>
+            <span class="text-blue-600 dark:text-blue-400 font-medium">${r.result.winRate?.toFixed(1)}%</span>
+            <span class="text-gray-300 dark:text-gray-500">|</span>
+            <span class="text-purple-600 dark:text-purple-400">${r.result.totalTrades} trades</span>
+          </div>
+          <div class="text-xs text-gray-500 dark:text-gray-400 mt-1.5 truncate font-mono">
+            ${r.variables.map(v => `${v.name}=${typeof v.value === 'number' ? v.value.toFixed(2) : v.value}`).join(', ')}
+          </div>
         </div>
-        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">
-          ${r.variables.map(v => `${v.name}=${v.value.toFixed(2)}`).join(', ')}
+        <div class="flex gap-2 flex-shrink-0">
+          <button class="copy-result-btn p-1.5 text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-gray-100 dark:hover:bg-gray-600 rounded transition-colors" data-result-index="${i}" title="Copy code">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+            </svg>
+          </button>
+          <button class="view-result-btn p-1.5 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-600 rounded transition-colors" data-result-index="${i}" title="View details">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+            </svg>
+          </button>
+          <button class="apply-result-btn px-2 py-1 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded transition-colors font-medium" data-result-index="${i}">Apply</button>
         </div>
       </div>
-      <button class="apply-result-btn px-2 py-1 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded transition-colors" data-result-index="${i}">Apply</button>
     </div>
   `).join('');
   
   list.querySelectorAll('.apply-result-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      const idx = parseInt(btn.dataset.resultIndex);
-      applyOptimizationResult(idx);
+      applyOptimizationResult(parseInt(btn.dataset.resultIndex));
     });
   });
   
+  list.querySelectorAll('.copy-result-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      copyResultCode(parseInt(btn.dataset.resultIndex));
+    });
+  });
+  
+  list.querySelectorAll('.view-result-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showResultDetailModal(parseInt(btn.dataset.resultIndex));
+    });
+  });
+  
+  list.querySelectorAll('.result-card').forEach(card => {
+    card.addEventListener('click', () => {
+      showResultDetailModal(parseInt(card.dataset.resultIndex));
+    });
+  });
+  
+  setupExpandToggle();
+  setupDetailModal();
+  
   panel.classList.remove('hidden');
+}
+
+function renderComparisonChart(results) {
+  const container = document.getElementById('comparisonBars');
+  if (!container || results.length === 0) return;
+  
+  const maxGain = Math.max(...results.map(r => Math.abs(r.result.totalGain)), 1);
+  
+  container.innerHTML = results.map((r, i) => {
+    const gainHeight = Math.max(5, Math.abs(r.result.totalGain) / maxGain * 100);
+    const winHeight = Math.max(5, (r.result.winRate || 0));
+    const isPositive = r.result.totalGain >= 0;
+    
+    return `
+      <div class="flex flex-col items-center gap-1" style="width: ${100 / results.length}%;">
+        <div class="flex gap-0.5 items-end h-24">
+          <div class="w-3 rounded-t transition-all ${isPositive ? 'bg-green-500' : 'bg-red-500'}" style="height: ${gainHeight}%;" title="Gain: $${r.result.totalGain.toFixed(2)}"></div>
+          <div class="w-3 bg-blue-500 rounded-t transition-all" style="height: ${winHeight}%;" title="Win Rate: ${r.result.winRate?.toFixed(1)}%"></div>
+        </div>
+        <span class="text-xs font-bold ${i === 0 ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-500 dark:text-gray-400'}">#${i + 1}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+function setupExpandToggle() {
+  const btn = document.getElementById('toggleResultsExpand');
+  const list = document.getElementById('bestResultsList');
+  const btnText = document.getElementById('expandBtnText');
+  const btnIcon = document.getElementById('expandBtnIcon');
+  
+  if (!btn || !list) return;
+  
+  btn.onclick = () => {
+    const expanded = list.dataset.expanded === 'true';
+    if (expanded) {
+      list.style.maxHeight = '350px';
+      list.dataset.expanded = 'false';
+      if (btnText) btnText.textContent = 'Expand';
+      if (btnIcon) btnIcon.classList.remove('rotate-180');
+    } else {
+      list.style.maxHeight = '700px';
+      list.dataset.expanded = 'true';
+      if (btnText) btnText.textContent = 'Collapse';
+      if (btnIcon) btnIcon.classList.add('rotate-180');
+    }
+  };
+}
+
+function copyResultCode(index) {
+  const result = optimizationResults[index];
+  if (!result) return;
+  
+  const code = applyVariablesToCodeFromResult(result.variables);
+  navigator.clipboard.writeText(code).then(() => {
+    const btn = document.querySelector(`.copy-result-btn[data-result-index="${index}"]`);
+    if (btn) {
+      btn.innerHTML = '<svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
+      setTimeout(() => {
+        btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>';
+      }, 2000);
+    }
+  });
+}
+
+function applyVariablesToCodeFromResult(variables) {
+  let code = generatedBotCode;
+  variables.forEach(v => {
+    const regex = new RegExp(`(${v.name}\\s*=\\s*)([\\d.]+)`, 'g');
+    code = code.replace(regex, `$1${v.value}`);
+  });
+  return code;
+}
+
+let currentModalResultIndex = null;
+
+function showResultDetailModal(index) {
+  const modal = document.getElementById('resultDetailModal');
+  const result = optimizationResults[index];
+  if (!modal || !result) return;
+  
+  currentModalResultIndex = index;
+  
+  const formatMoney = (v) => {
+    if (v === undefined || v === null) return '$0.00';
+    const sign = v >= 0 ? '+' : '';
+    return `${sign}$${v.toFixed(2)}`;
+  };
+  
+  document.getElementById('modalRankBadge').textContent = `#${index + 1}`;
+  document.getElementById('modalRankBadge').className = `w-8 h-8 flex items-center justify-center rounded-full ${index === 0 ? 'bg-gradient-to-br from-yellow-400 to-orange-500' : 'bg-green-500'} text-white font-bold`;
+  
+  document.getElementById('modalTotalGain').textContent = formatMoney(result.result.totalGain);
+  document.getElementById('modalTotalGain').className = `text-2xl font-bold ${result.result.totalGain >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`;
+  
+  document.getElementById('modalWinRate').textContent = `${result.result.winRate?.toFixed(1) || 0}%`;
+  document.getElementById('modalTrades').textContent = result.result.totalTrades || 0;
+  
+  document.getElementById('modalVariables').innerHTML = result.variables.map(v => 
+    `<span class="px-2 py-1 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 rounded-lg text-xs font-mono">${v.name} = ${typeof v.value === 'number' ? v.value.toFixed(2) : v.value}</span>`
+  ).join('');
+  
+  document.getElementById('modalDrawdown').textContent = formatMoney(-(result.result.maxDrawdown || 0));
+  document.getElementById('modalRunup').textContent = formatMoney(result.result.maxRunup || 0);
+  document.getElementById('modalGainLoss').textContent = (result.result.gainLossRatio || 0).toFixed(2);
+  document.getElementById('modalBestTrade').textContent = formatMoney(result.result.bestTrade || 0);
+  document.getElementById('modalWorstTrade').textContent = formatMoney(result.result.worstTrade || 0);
+  document.getElementById('modalAvgGain').textContent = formatMoney(result.result.avgGainPerTrade || 0);
+  
+  const code = applyVariablesToCodeFromResult(result.variables);
+  document.getElementById('modalCode').textContent = code;
+  
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+}
+
+function setupDetailModal() {
+  const modal = document.getElementById('resultDetailModal');
+  const closeBtn = document.getElementById('closeDetailModal');
+  const copyBtn = document.getElementById('modalCopyCode');
+  const applyBtn = document.getElementById('modalApplyBtn');
+  
+  if (closeBtn) {
+    closeBtn.onclick = () => {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    };
+  }
+  
+  if (modal) {
+    modal.onclick = (e) => {
+      if (e.target === modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+    };
+  }
+  
+  if (copyBtn) {
+    copyBtn.onclick = () => {
+      const code = document.getElementById('modalCode').textContent;
+      navigator.clipboard.writeText(code).then(() => {
+        copyBtn.innerHTML = '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Copied!';
+        setTimeout(() => {
+          copyBtn.innerHTML = '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg> Copy Code';
+        }, 2000);
+      });
+    };
+  }
+  
+  if (applyBtn) {
+    applyBtn.onclick = () => {
+      if (currentModalResultIndex !== null) {
+        applyOptimizationResult(currentModalResultIndex);
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+    };
+  }
 }
 
 function applyOptimizationResult(index) {
