@@ -14,6 +14,8 @@ let screenshotBase64 = null;
 let equityChart = null;
 let tradeChart = null;
 let tradeCandleSeries = null;
+let currentBotId = null;
+let detectedVariables = [];
 
 const FALLBACK_DATA = {
   silver: generateCandleData(32, 100, 0.02),
@@ -31,14 +33,65 @@ const FALLBACK_DATA = {
 
 let cachedData = {};
 
-async function fetchMarketData(asset, timeframe = '1h') {
+const CACHE_TTL_MS = {
+  '1m': 60 * 1000,
+  '5m': 5 * 60 * 1000,
+  '15m': 15 * 60 * 1000,
+  '30m': 30 * 60 * 1000,
+  '1h': 60 * 60 * 1000,
+  '4h': 4 * 60 * 60 * 1000,
+  '1d': 24 * 60 * 60 * 1000
+};
+
+function getLocalStorageCache(key) {
+  try {
+    const cached = localStorage.getItem(`market_${key}`);
+    if (!cached) return null;
+    const { data, timestamp, timeframe } = JSON.parse(cached);
+    const ttl = CACHE_TTL_MS[timeframe] || 60 * 60 * 1000;
+    if (Date.now() - timestamp > ttl) {
+      localStorage.removeItem(`market_${key}`);
+      return null;
+    }
+    return data;
+  } catch (e) {
+    return null;
+  }
+}
+
+function setLocalStorageCache(key, data, timeframe) {
+  try {
+    localStorage.setItem(`market_${key}`, JSON.stringify({
+      data,
+      timestamp: Date.now(),
+      timeframe
+    }));
+  } catch (e) {
+    console.warn('Failed to cache to localStorage:', e);
+  }
+}
+
+async function fetchMarketData(asset, timeframe = '1h', forceRefresh = false) {
   const cacheKey = `${asset}_${timeframe}`;
-  if (cachedData[cacheKey]) {
-    return cachedData[cacheKey];
+  
+  if (!forceRefresh) {
+    if (cachedData[cacheKey]) {
+      return cachedData[cacheKey];
+    }
+    
+    const localCached = getLocalStorageCache(cacheKey);
+    if (localCached) {
+      cachedData[cacheKey] = localCached;
+      console.log(`Using localStorage cache for ${cacheKey}`);
+      return localCached;
+    }
   }
   
   try {
-    const response = await fetch(`/api/market-data/${asset}/${timeframe}`);
+    const url = forceRefresh 
+      ? `/api/market-data/${asset}/${timeframe}?refresh=true`
+      : `/api/market-data/${asset}/${timeframe}`;
+    const response = await fetch(url);
     const data = await response.json();
     
     if (data.error) {
@@ -48,6 +101,7 @@ async function fetchMarketData(asset, timeframe = '1h') {
     
     if (data.candles && data.candles.length > 0) {
       cachedData[cacheKey] = data.candles;
+      setLocalStorageCache(cacheKey, data.candles, timeframe);
       return data.candles;
     }
   } catch (e) {
@@ -600,6 +654,7 @@ async function generateBot() {
     if (data.error) throw new Error(data.error);
 
     generatedBotCode = data.code;
+    currentBotId = data.entryId;
     botCodeOutput.textContent = generatedBotCode;
     botOutputSection.classList.remove('hidden');
     
@@ -675,6 +730,7 @@ function showCodeVariableSliders() {
       const modifiedCode = applyVariablesToCode(generatedBotCode, detectedVariables);
       const botCodeOutput = document.getElementById('botCodeOutput');
       if (botCodeOutput) botCodeOutput.textContent = modifiedCode;
+      debouncedSaveVariables();
     };
     
     slider?.addEventListener('input', (e) => {
@@ -706,6 +762,93 @@ function resetVariablesToOriginal() {
   
   const botCodeOutput = document.getElementById('botCodeOutput');
   if (botCodeOutput) botCodeOutput.textContent = generatedBotCode;
+  
+  saveVariableOverrides();
+}
+
+function showCodeVariableSlidersFromData(variables) {
+  const panel = document.getElementById('codeVariablePanel');
+  const container = document.getElementById('codeVariableSlidersContainer');
+  
+  if (!panel || !container || variables.length === 0) {
+    if (panel) panel.classList.add('hidden');
+    return;
+  }
+  
+  container.innerHTML = variables.map((v, i) => `
+    <div class="flex items-center gap-2 bg-white dark:bg-gray-700 rounded-lg p-2 border border-gray-200 dark:border-gray-600">
+      <span class="text-xs font-mono text-indigo-600 dark:text-indigo-400 w-20 truncate" title="${v.name}">${v.name}</span>
+      <input type="range" 
+        id="codeVarSlider_${i}" 
+        data-var-index="${i}"
+        min="${v.min}" 
+        max="${v.max}" 
+        step="${v.step}" 
+        value="${v.currentValue}"
+        class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-600 accent-indigo-600">
+      <input type="number" 
+        id="codeVarInput_${i}"
+        data-var-index="${i}"
+        min="${v.min}" 
+        max="${v.max}" 
+        step="${v.step}" 
+        value="${v.currentValue}"
+        class="w-16 px-1 py-0.5 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
+      <span class="text-xs text-gray-400">(${v.originalValue})</span>
+    </div>
+  `).join('');
+  
+  variables.forEach((v, i) => {
+    const slider = document.getElementById(`codeVarSlider_${i}`);
+    const input = document.getElementById(`codeVarInput_${i}`);
+    
+    const updateCode = () => {
+      const modifiedCode = applyVariablesToCode(generatedBotCode, detectedVariables);
+      const botCodeOutput = document.getElementById('botCodeOutput');
+      if (botCodeOutput) botCodeOutput.textContent = modifiedCode;
+      debouncedSaveVariables();
+    };
+    
+    slider?.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      detectedVariables[i].currentValue = val;
+      if (input) input.value = val;
+      updateCode();
+    });
+    
+    input?.addEventListener('change', (e) => {
+      const val = parseFloat(e.target.value);
+      detectedVariables[i].currentValue = val;
+      if (slider) slider.value = val;
+      updateCode();
+    });
+  });
+  
+  panel.classList.remove('hidden');
+}
+
+let saveVariablesTimeout = null;
+function debouncedSaveVariables() {
+  if (saveVariablesTimeout) clearTimeout(saveVariablesTimeout);
+  saveVariablesTimeout = setTimeout(saveVariableOverrides, 500);
+}
+
+async function saveVariableOverrides() {
+  if (!currentBotId || detectedVariables.length === 0) return;
+  
+  try {
+    const modifiedCode = applyVariablesToCode(generatedBotCode, detectedVariables);
+    await fetch(`/api/bot-history/${currentBotId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        variableOverrides: detectedVariables,
+        modifiedCode: modifiedCode
+      })
+    });
+  } catch (e) {
+    console.warn('Failed to save variable overrides:', e);
+  }
 }
 
 function saveBotCodeToFile() {
@@ -876,12 +1019,10 @@ async function loadBotEntry(id) {
     
     if (data.error) return;
     
+    currentBotId = id;
     generatedBotCode = data.code;
     const botOutputSection = document.getElementById('botOutputSection');
     const botCodeOutput = document.getElementById('botCodeOutput');
-    
-    if (botCodeOutput) botCodeOutput.textContent = data.code;
-    if (botOutputSection) botOutputSection.classList.remove('hidden');
     
     if (data.asset) {
       const assetSelect = document.getElementById('assetSelect');
@@ -891,6 +1032,18 @@ async function loadBotEntry(id) {
       const strategyType = document.getElementById('strategyType');
       if (strategyType) strategyType.value = data.strategy;
     }
+    
+    if (data.variableOverrides && data.variableOverrides.length > 0) {
+      detectedVariables = data.variableOverrides;
+      const modifiedCode = applyVariablesToCode(generatedBotCode, detectedVariables);
+      if (botCodeOutput) botCodeOutput.textContent = modifiedCode;
+      showCodeVariableSlidersFromData(detectedVariables);
+    } else {
+      if (botCodeOutput) botCodeOutput.textContent = data.code;
+      showCodeVariableSliders();
+    }
+    
+    if (botOutputSection) botOutputSection.classList.remove('hidden');
     
   } catch (e) {
     console.warn('Failed to load bot entry:', e);
@@ -1008,7 +1161,6 @@ function setupBotSubTabs() {
 
 let currentCandles = [];
 let lastSimulationResults = null;
-let detectedVariables = [];
 let optimizationResults = [];
 
 function setupSimulator() {
