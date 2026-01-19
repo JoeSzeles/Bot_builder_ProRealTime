@@ -397,7 +397,28 @@ function getSettings() {
     useHeikinAshi: document.getElementById('useHeikinAshi')?.checked || true,
     strategyType: document.getElementById('strategyType')?.value || '13thwarrior',
     extraInstructions: document.getElementById('botExtraInstructions')?.value || '',
-    drawings: drawings
+    drawings: drawings,
+    timezone: document.getElementById('timezone')?.value || 'Australia/Brisbane',
+    excludeWeekends: document.getElementById('excludeWeekends')?.checked ?? true,
+    excludeHolidays: document.getElementById('excludeHolidays')?.checked ?? true,
+    useTimeFilter: document.getElementById('useTimeFilter')?.checked ?? true,
+    tradingStartTime: document.getElementById('tradingStartTime')?.value || '09:00',
+    tradingEndTime: document.getElementById('tradingEndTime')?.value || '17:00',
+    excludeOpenPeriod: document.getElementById('excludeOpenPeriod')?.checked ?? true,
+    openPeriodMinutes: parseInt(document.getElementById('openPeriodMinutes')?.value) || 30,
+    excludeClosePeriod: document.getElementById('excludeClosePeriod')?.checked ?? true,
+    closePeriodMinutes: parseInt(document.getElementById('closePeriodMinutes')?.value) || 30,
+    closeBeforeEnd: document.getElementById('closeBeforeEnd')?.checked || false,
+    closeBeforeMinutes: parseInt(document.getElementById('closeBeforeMinutes')?.value) || 15,
+    tradeDays: {
+      mon: document.getElementById('tradeMon')?.checked ?? true,
+      tue: document.getElementById('tradeTue')?.checked ?? true,
+      wed: document.getElementById('tradeWed')?.checked ?? true,
+      thu: document.getElementById('tradeThu')?.checked ?? true,
+      fri: document.getElementById('tradeFri')?.checked ?? true,
+      sat: document.getElementById('tradeSat')?.checked || false,
+      sun: document.getElementById('tradeSun')?.checked || false
+    }
   };
 }
 
@@ -441,7 +462,38 @@ function buildBotDescription(settings) {
   }
   desc += `\n`;
   
-  desc += `STRATEGY: ${settings.strategyType}\n`;
+  desc += `STRATEGY: ${settings.strategyType}\n\n`;
+  
+  desc += `TIME & SESSION FILTERS:\n`;
+  desc += `- Timezone: ${settings.timezone}\n`;
+  if (settings.excludeWeekends) {
+    desc += `- Exclude weekends (Saturday & Sunday)\n`;
+  }
+  if (settings.excludeHolidays) {
+    desc += `- Exclude major market holidays\n`;
+  }
+  if (settings.useTimeFilter) {
+    desc += `- Trading hours: ${settings.tradingStartTime} to ${settings.tradingEndTime}\n`;
+  }
+  if (settings.excludeOpenPeriod) {
+    desc += `- Exclude first ${settings.openPeriodMinutes} minutes of session (avoid opening volatility)\n`;
+  }
+  if (settings.excludeClosePeriod) {
+    desc += `- Exclude last ${settings.closePeriodMinutes} minutes of session (avoid closing volatility)\n`;
+  }
+  if (settings.closeBeforeEnd) {
+    desc += `- Force close all positions ${settings.closeBeforeMinutes} minutes before session end\n`;
+  }
+  
+  const tradeDayNames = [];
+  if (settings.tradeDays.mon) tradeDayNames.push('Mon');
+  if (settings.tradeDays.tue) tradeDayNames.push('Tue');
+  if (settings.tradeDays.wed) tradeDayNames.push('Wed');
+  if (settings.tradeDays.thu) tradeDayNames.push('Thu');
+  if (settings.tradeDays.fri) tradeDayNames.push('Fri');
+  if (settings.tradeDays.sat) tradeDayNames.push('Sat');
+  if (settings.tradeDays.sun) tradeDayNames.push('Sun');
+  desc += `- Active trading days: ${tradeDayNames.join(', ')}\n`;
   
   if (settings.drawings.length > 0) {
     desc += `\nCHART ANNOTATIONS:\n`;
