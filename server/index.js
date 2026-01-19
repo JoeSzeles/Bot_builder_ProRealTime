@@ -1118,14 +1118,21 @@ Generate the fixed, ready-to-use ProBuilder code now:`;
 
 // Backtest simulation endpoint
 app.post('/api/simulate-bot', async (req, res) => {
+  console.log('Simulation request received');
   const { code, candles, settings } = req.body;
   
+  console.log('Code length:', code?.length || 0);
+  console.log('Candles length:', candles?.length || 0);
+  console.log('Settings:', settings?.asset, settings?.timeframe);
+  
   if (!code || !candles || candles.length === 0) {
+    console.log('Missing code or candles');
     return res.status(400).json({ error: 'Bot code and candle data are required' });
   }
   
   try {
     const results = runBacktest(code, candles, settings);
+    console.log('Simulation completed, trades:', results.totalTrades);
     res.json(results);
   } catch (error) {
     console.error('Simulation error:', error);
