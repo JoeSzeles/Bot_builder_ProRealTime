@@ -1065,9 +1065,27 @@ function detectBotVariables(code) {
           const reserved = ['Open', 'High', 'Low', 'Close', 'Volume', 'BarIndex', 'Date', 'Time'];
           if (!reserved.includes(name)) {
             seen.add(name);
-            let min = Math.max(1, Math.floor(value * 0.2));
-            let max = Math.ceil(value * 3);
-            let step = value >= 100 ? 10 : value >= 10 ? 1 : 0.1;
+            const decimals = (String(value).split('.')[1] || '').length;
+            const precision = Math.pow(10, -decimals);
+            let min, max, step;
+            
+            if (value < 1) {
+              min = Math.max(precision, value * 0.1);
+              max = value * 5;
+              step = precision;
+            } else if (value < 10) {
+              min = Math.max(0.1, value * 0.2);
+              max = value * 3;
+              step = decimals > 0 ? precision : 0.1;
+            } else if (value < 100) {
+              min = Math.max(1, Math.floor(value * 0.2));
+              max = Math.ceil(value * 3);
+              step = 1;
+            } else {
+              min = Math.max(10, Math.floor(value * 0.2));
+              max = Math.ceil(value * 3);
+              step = 10;
+            }
             
             variables.push({
               name,

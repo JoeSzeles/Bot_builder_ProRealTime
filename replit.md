@@ -145,6 +145,15 @@ The frontend proxies API requests to the backend.
     - Max drawdown, max runup, time in market %, avg orders/day
     - Average gain per trade with best/worst trade stats
     - Daily performance bar chart
+  - **Variable Optimization**: Detect and adjust bot parameters for backtesting
+    - Auto-detects numeric variables from generated bot code (assignments, indicators, stop loss, take profit)
+    - Interactive sliders with bidirectional sync to number inputs
+    - Proper handling of decimal values (sub-unit parameters like 0.5, 0.018)
+    - "Run Modified" button to re-run simulation with adjusted values
+    - **Auto-Optimization Mode**: Run X iterations (5-100) with randomized parameter values
+    - Multiple optimization metrics: Total Gain, Win Rate, Gain/Loss Ratio, Sharpe-like
+    - Top 5 results panel with one-click apply to restore best configurations
+    - Progress tracking with percentage completion during optimization runs
 
 ## Earlier Changes (Dec 12, 2025)
 - **Cancel Generation Button**: Red cancel button appears during processing to abort generation
