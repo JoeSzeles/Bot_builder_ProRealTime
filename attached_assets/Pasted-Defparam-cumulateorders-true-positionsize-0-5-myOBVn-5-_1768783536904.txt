@@ -1,0 +1,98 @@
+Defparam cumulateorders = true
+
+positionsize=0.5
+
+myOBVn = 5
+
+myCandle = 1
+
+//the 13th warrior
+
+//Heikin Ashi
+ONCE haOpen = OPEN
+ONCE haClose = CLOSE
+N = 0
+IF BARINDEX = 0 THEN
+haOpen = OPEN
+haClose = CLOSE
+ELSIF N = 0 THEN
+haClose =(OPEN+HIGH+LOW+CLOSE)/4
+haOpen =(haOpen[1]+haClose[1])/2
+ENDIF
+
+once positionsize     = 1
+once tradetype        = 1 // [1]long&short;[2]long;[3]short
+ 
+//========= STRATEGY ===================================
+ 
+//long
+c10=low<lowest[2](low[1])
+c11=close<low[1]
+tradelong = c10 and c11
+ 
+//short
+c20=high>highest[2](high[1])
+c21=close>high[1]
+tradeshort = c20 and c21
+
+
+
+
+//Candle-Colour from OBV and HA
+IF myCandle = 1 THEN
+myOBV = OBV(CLOSE)
+myAV = Average[myOBVn](myOBV)
+IF  myOBV > myAV AND haClose > haOpen and (tradetype=1 or tradetype=2) and tradelong THEN
+if not onmarket then
+buy positionsize contract at market
+endif
+if myOBV < myAV AND haClose < haOpen and (tradetype=1 or tradetype=3) and tradeshort THEN
+if not onmarket then
+sellshort positionsize contract at market
+endif
+endif
+ENDIF
+//%trailing stop function
+trailingPercent = .46//org .26
+stepPercent = .018 //org .014
+if onmarket then
+trailingstart = tradeprice(1)*(trailingpercent/100) //trailing will start @trailinstart points profit
+trailingstep = tradeprice(1)*(stepPercent/100) //% step to move the stop
+endif
+IF NOT ONMARKET THEN
+newSL=0
+ENDIF
+ 
+//manage long positions
+IF LONGONMARKET THEN
+//first move (breakeven)
+IF newSL=0 AND close-tradeprice(1)>=trailingstart THEN
+newSL = tradeprice(1)+trailingstep
+ENDIF
+//next moves
+IF newSL>0 AND close-newSL>trailingstep THEN
+newSL = newSL+trailingstep
+ENDIF
+ENDIF
+ 
+//manage short positions
+IF SHORTONMARKET THEN
+//first move (breakeven)
+IF newSL=0 AND tradeprice(1)-close>=trailingstart THEN
+newSL = tradeprice(1)-trailingstep
+ENDIF
+//next moves
+IF newSL>0 AND newSL-close>trailingstep THEN
+newSL = newSL-trailingstep
+ENDIF
+ENDIF
+ 
+//stop order to exit the positions
+IF newSL>0 THEN
+SELL AT newSL STOP
+EXITSHORT AT newSL STOP
+ENDIF
+endif
+
+set stop ploss 7000
+set target profit 300
