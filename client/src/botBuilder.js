@@ -12,17 +12,17 @@ let lineSeriesArr = [];
 let markers = [];
 
 const SAMPLE_DATA = {
-  silver: generateCandleData(30, 100, 0.02),
-  gold: generateCandleData(1950, 100, 0.01),
-  copper: generateCandleData(4.2, 100, 0.025),
-  oil: generateCandleData(75, 100, 0.03),
-  natgas: generateCandleData(2.8, 100, 0.04),
-  eurusd: generateCandleData(1.08, 100, 0.005),
-  gbpusd: generateCandleData(1.27, 100, 0.006),
-  usdjpy: generateCandleData(148, 100, 0.004),
-  spx500: generateCandleData(5000, 100, 0.012),
-  dax: generateCandleData(17500, 100, 0.015),
-  ftse: generateCandleData(7600, 100, 0.01)
+  silver: generateCandleData(32, 100, 0.02),
+  gold: generateCandleData(2650, 100, 0.01),
+  copper: generateCandleData(4.5, 100, 0.025),
+  oil: generateCandleData(78, 100, 0.03),
+  natgas: generateCandleData(3.2, 100, 0.04),
+  eurusd: generateCandleData(1.03, 100, 0.005),
+  gbpusd: generateCandleData(1.22, 100, 0.006),
+  usdjpy: generateCandleData(156, 100, 0.004),
+  spx500: generateCandleData(5900, 100, 0.012),
+  dax: generateCandleData(20500, 100, 0.015),
+  ftse: generateCandleData(8200, 100, 0.01)
 };
 
 function generateCandleData(basePrice, numBars, volatility) {
