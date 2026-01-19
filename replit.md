@@ -93,8 +93,11 @@ A personal-use full-stack app for translating/transforming literary texts AND ge
 - `DELETE /api/history/:id` - Delete translation
 
 ### Bot Builder Tab
-- `POST /api/generate-bot` - Generate ProRealTime bot code from description
+- `POST /api/generate-bot` - Generate ProRealTime bot code (accepts optional screenshotBase64)
 - `POST /api/fix-bot` - Fix bot code based on error message
+- `GET /api/bot-history` - List all saved bot generations
+- `GET /api/bot-history/:id` - Get specific bot entry with full code
+- `DELETE /api/bot-history/:id` - Delete bot entry
 
 ## Running the App
 The app runs with two workflows:
@@ -122,6 +125,9 @@ The frontend proxies API requests to the backend.
   - Bot settings panel with position, risk, indicator, and strategy options
   - AI-powered code generation with ProRealTime syntax rules
   - Error correction feature to fix code based on error messages
+  - **Screenshot upload**: Upload or paste (Ctrl+V) chart screenshots for AI analysis
+  - **Bot History sidebar**: Left sidebar shows saved bots when on Bot Builder tab
+  - **Auto-save**: Each generated bot is saved to its own JSON file in data/bots/
 
 ## Earlier Changes (Dec 12, 2025)
 - **Cancel Generation Button**: Red cancel button appears during processing to abort generation

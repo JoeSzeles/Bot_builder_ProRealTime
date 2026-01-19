@@ -10,6 +10,7 @@ let initialized = false;
 let priceLines = [];
 let lineSeriesArr = [];
 let markers = [];
+let screenshotBase64 = null;
 
 const FALLBACK_DATA = {
   silver: generateCandleData(32, 100, 0.02),
@@ -501,6 +502,8 @@ async function generateBot() {
   const generateBotBtn = document.getElementById('generateBotBtn');
   const botOutputSection = document.getElementById('botOutputSection');
   const botCodeOutput = document.getElementById('botCodeOutput');
+  const assetSelect = document.getElementById('assetSelect');
+  const strategyType = document.getElementById('strategyType');
   
   generateBotBtn.disabled = true;
   generateBotBtn.innerHTML = '<svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Generating...';
@@ -512,7 +515,10 @@ async function generateBot() {
       body: JSON.stringify({
         description,
         syntaxRules: PROREALTIME_SYNTAX_RULES,
-        settings
+        settings,
+        screenshotBase64: screenshotBase64,
+        asset: assetSelect?.value || 'unknown',
+        strategy: strategyType?.value || 'custom'
       })
     });
 
@@ -522,6 +528,8 @@ async function generateBot() {
     generatedBotCode = data.code;
     botCodeOutput.textContent = generatedBotCode;
     botOutputSection.classList.remove('hidden');
+    
+    loadBotHistory();
 
   } catch (err) {
     alert('Error generating bot: ' + err.message);
@@ -621,5 +629,195 @@ export function updateChartTheme() {
     });
   } catch (e) {
     console.warn('Could not update chart theme:', e);
+  }
+}
+
+function handleScreenshotFile(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    screenshotBase64 = e.target.result;
+    showScreenshotPreview(screenshotBase64);
+  };
+  reader.readAsDataURL(file);
+}
+
+function showScreenshotPreview(dataUrl) {
+  const placeholder = document.getElementById('screenshotPlaceholder');
+  const preview = document.getElementById('screenshotPreview');
+  const image = document.getElementById('screenshotImage');
+  const clearBtn = document.getElementById('clearScreenshot');
+  
+  if (placeholder) placeholder.classList.add('hidden');
+  if (preview) {
+    preview.classList.remove('hidden');
+    image.src = dataUrl;
+  }
+  if (clearBtn) clearBtn.classList.remove('hidden');
+}
+
+function clearScreenshot() {
+  screenshotBase64 = null;
+  const placeholder = document.getElementById('screenshotPlaceholder');
+  const preview = document.getElementById('screenshotPreview');
+  const clearBtn = document.getElementById('clearScreenshot');
+  const input = document.getElementById('screenshotInput');
+  
+  if (placeholder) placeholder.classList.remove('hidden');
+  if (preview) preview.classList.add('hidden');
+  if (clearBtn) clearBtn.classList.add('hidden');
+  if (input) input.value = '';
+}
+
+export async function loadBotHistory() {
+  try {
+    const response = await fetch('/api/bot-history');
+    const data = await response.json();
+    
+    const historyList = document.getElementById('botHistoryList');
+    if (!historyList) return;
+    
+    if (!data.entries || data.entries.length === 0) {
+      historyList.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400 p-2">No bots generated yet</p>';
+      return;
+    }
+    
+    historyList.innerHTML = data.entries.map(entry => {
+      const date = new Date(entry.createdAt).toLocaleDateString();
+      const assetLabel = entry.asset?.toUpperCase() || 'Unknown';
+      const strategyLabel = entry.strategy || 'custom';
+      
+      return `
+        <div class="history-item group p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition-colors border border-transparent hover:border-gray-200 dark:hover:border-gray-600" data-id="${entry.id}">
+          <div class="flex items-center justify-between">
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">${assetLabel} - ${strategyLabel}</p>
+              <p class="text-xs text-gray-500 dark:text-gray-400">${date}</p>
+            </div>
+            ${entry.hasScreenshot ? '<svg class="w-4 h-4 text-blue-500 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>' : ''}
+            <button class="delete-bot-btn opacity-0 group-hover:opacity-100 ml-2 p-1 text-red-500 hover:text-red-600 transition-all" data-id="${entry.id}">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+    
+  } catch (e) {
+    console.warn('Failed to load bot history:', e);
+  }
+}
+
+async function loadBotEntry(id) {
+  try {
+    const response = await fetch(`/api/bot-history/${id}`);
+    const data = await response.json();
+    
+    if (data.error) return;
+    
+    generatedBotCode = data.code;
+    const botOutputSection = document.getElementById('botOutputSection');
+    const botCodeOutput = document.getElementById('botCodeOutput');
+    
+    if (botCodeOutput) botCodeOutput.textContent = data.code;
+    if (botOutputSection) botOutputSection.classList.remove('hidden');
+    
+    if (data.asset) {
+      const assetSelect = document.getElementById('assetSelect');
+      if (assetSelect) assetSelect.value = data.asset;
+    }
+    if (data.strategy) {
+      const strategyType = document.getElementById('strategyType');
+      if (strategyType) strategyType.value = data.strategy;
+    }
+    
+  } catch (e) {
+    console.warn('Failed to load bot entry:', e);
+  }
+}
+
+async function deleteBotEntry(id) {
+  if (!confirm('Delete this bot?')) return;
+  
+  try {
+    await fetch(`/api/bot-history/${id}`, { method: 'DELETE' });
+    loadBotHistory();
+  } catch (e) {
+    console.warn('Failed to delete bot entry:', e);
+  }
+}
+
+export function initScreenshotHandlers() {
+  const dropZone = document.getElementById('screenshotDropZone');
+  const input = document.getElementById('screenshotInput');
+  const clearBtn = document.getElementById('clearScreenshot');
+  
+  if (dropZone) {
+    dropZone.addEventListener('click', () => input?.click());
+    
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('border-blue-400', 'dark:border-blue-500');
+    });
+    
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('border-blue-400', 'dark:border-blue-500');
+    });
+    
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('border-blue-400', 'dark:border-blue-500');
+      const file = e.dataTransfer.files[0];
+      handleScreenshotFile(file);
+    });
+  }
+  
+  if (input) {
+    input.addEventListener('change', (e) => {
+      handleScreenshotFile(e.target.files[0]);
+    });
+  }
+  
+  if (clearBtn) {
+    clearBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      clearScreenshot();
+    });
+  }
+  
+  document.addEventListener('paste', (e) => {
+    const botTabContent = document.getElementById('botTabContent');
+    if (botTabContent?.classList.contains('hidden')) return;
+    
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        handleScreenshotFile(file);
+        break;
+      }
+    }
+  });
+  
+  const historyList = document.getElementById('botHistoryList');
+  if (historyList) {
+    historyList.addEventListener('click', (e) => {
+      const deleteBtn = e.target.closest('.delete-bot-btn');
+      if (deleteBtn) {
+        e.stopPropagation();
+        deleteBotEntry(deleteBtn.dataset.id);
+        return;
+      }
+      
+      const historyItem = e.target.closest('.history-item');
+      if (historyItem) {
+        loadBotEntry(historyItem.dataset.id);
+      }
+    });
   }
 }

@@ -1,4 +1,4 @@
-import { initBotBuilder, updateChartTheme } from './botBuilder.js';
+import { initBotBuilder, updateChartTheme, loadBotHistory, initScreenshotHandlers } from './botBuilder.js';
 
 let currentTranslation = null;
 let historyItems = [];
@@ -49,6 +49,9 @@ const elements = {
 function switchTab(tab) {
   currentTab = tab;
   
+  const translationHistorySidebar = document.getElementById('translationHistorySidebar');
+  const botHistorySidebar = document.getElementById('botHistorySidebar');
+  
   if (tab === 'text') {
     elements.textTabContent.classList.remove('hidden');
     elements.botTabContent.classList.add('hidden');
@@ -56,6 +59,9 @@ function switchTab(tab) {
     elements.tabText.classList.remove('text-gray-600', 'dark:text-gray-400');
     elements.tabBot.classList.remove('bg-indigo-100', 'dark:bg-indigo-900', 'text-indigo-700', 'dark:text-indigo-300');
     elements.tabBot.classList.add('text-gray-600', 'dark:text-gray-400');
+    
+    if (translationHistorySidebar) translationHistorySidebar.classList.remove('hidden');
+    if (botHistorySidebar) botHistorySidebar.classList.add('hidden');
   } else {
     elements.textTabContent.classList.add('hidden');
     elements.botTabContent.classList.remove('hidden');
@@ -63,7 +69,12 @@ function switchTab(tab) {
     elements.tabBot.classList.remove('text-gray-600', 'dark:text-gray-400');
     elements.tabText.classList.remove('bg-indigo-100', 'dark:bg-indigo-900', 'text-indigo-700', 'dark:text-indigo-300');
     elements.tabText.classList.add('text-gray-600', 'dark:text-gray-400');
+    
+    if (translationHistorySidebar) translationHistorySidebar.classList.add('hidden');
+    if (botHistorySidebar) botHistorySidebar.classList.remove('hidden');
+    
     initBotBuilder();
+    loadBotHistory();
   }
 }
 
@@ -709,6 +720,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupPromptsEventDelegation();
   loadHistory();
   loadSavedPrompts();
+  initScreenshotHandlers();
 
   elements.menuToggle.addEventListener('click', () => toggleSidebar());
   elements.promptsToggle.addEventListener('click', () => togglePromptsSidebar());

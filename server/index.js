@@ -52,10 +52,18 @@ const fonts = {
 };
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
+const BOT_DATA_DIR = path.join(__dirname, '..', 'data', 'bots');
+const BOT_SCREENSHOTS_DIR = path.join(__dirname, '..', 'data', 'bots', 'screenshots');
 const MAX_ENTRIES_PER_FILE = 10;
 
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+if (!fs.existsSync(BOT_DATA_DIR)) {
+  fs.mkdirSync(BOT_DATA_DIR, { recursive: true });
+}
+if (!fs.existsSync(BOT_SCREENSHOTS_DIR)) {
+  fs.mkdirSync(BOT_SCREENSHOTS_DIR, { recursive: true });
 }
 
 // File rotation helpers
@@ -893,12 +901,112 @@ app.delete('/api/prompts/:index', (req, res) => {
   res.json({ prompts });
 });
 
-// Bot generation endpoint
+// Bot history helpers
+function saveBotEntry(entry) {
+  const id = `bot_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const filename = `${id}.json`;
+  const filepath = path.join(BOT_DATA_DIR, filename);
+  
+  const botData = {
+    id,
+    ...entry,
+    createdAt: new Date().toISOString()
+  };
+  
+  fs.writeFileSync(filepath, JSON.stringify(botData, null, 2));
+  return botData;
+}
+
+function loadAllBotEntries() {
+  const files = fs.readdirSync(BOT_DATA_DIR)
+    .filter(f => f.endsWith('.json') && f.startsWith('bot_'))
+    .sort()
+    .reverse();
+  
+  return files.map(f => {
+    try {
+      const data = JSON.parse(fs.readFileSync(path.join(BOT_DATA_DIR, f), 'utf-8'));
+      return {
+        id: data.id,
+        asset: data.asset,
+        strategy: data.strategy,
+        createdAt: data.createdAt,
+        hasScreenshot: !!data.screenshotPath
+      };
+    } catch (e) {
+      return null;
+    }
+  }).filter(Boolean);
+}
+
+function loadBotEntry(id) {
+  const filepath = path.join(BOT_DATA_DIR, `${id}.json`);
+  if (!fs.existsSync(filepath)) return null;
+  
+  try {
+    return JSON.parse(fs.readFileSync(filepath, 'utf-8'));
+  } catch (e) {
+    return null;
+  }
+}
+
+function deleteBotEntry(id) {
+  const filepath = path.join(BOT_DATA_DIR, `${id}.json`);
+  if (!fs.existsSync(filepath)) return false;
+  
+  try {
+    const data = JSON.parse(fs.readFileSync(filepath, 'utf-8'));
+    if (data.screenshotPath && fs.existsSync(data.screenshotPath)) {
+      fs.unlinkSync(data.screenshotPath);
+    }
+    fs.unlinkSync(filepath);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+// Bot history endpoints
+app.get('/api/bot-history', (req, res) => {
+  const entries = loadAllBotEntries();
+  res.json({ entries });
+});
+
+app.get('/api/bot-history/:id', (req, res) => {
+  const entry = loadBotEntry(req.params.id);
+  if (!entry) {
+    return res.status(404).json({ error: 'Bot entry not found' });
+  }
+  res.json(entry);
+});
+
+app.delete('/api/bot-history/:id', (req, res) => {
+  const success = deleteBotEntry(req.params.id);
+  if (!success) {
+    return res.status(404).json({ error: 'Bot entry not found' });
+  }
+  res.json({ success: true });
+});
+
+// Bot generation endpoint with screenshot support
 app.post('/api/generate-bot', async (req, res) => {
-  const { description, syntaxRules, settings } = req.body;
+  const { description, syntaxRules, settings, screenshotBase64, asset, strategy } = req.body;
   
   if (!description) {
     return res.status(400).json({ error: 'Bot description is required' });
+  }
+  
+  let screenshotPath = null;
+  if (screenshotBase64) {
+    try {
+      const base64Data = screenshotBase64.replace(/^data:image\/\w+;base64,/, '');
+      const buffer = Buffer.from(base64Data, 'base64');
+      const filename = `screenshot_${Date.now()}.png`;
+      screenshotPath = path.join(BOT_SCREENSHOTS_DIR, filename);
+      fs.writeFileSync(screenshotPath, buffer);
+    } catch (e) {
+      console.warn('Failed to save screenshot:', e.message);
+    }
   }
   
   const systemPrompt = `You are an expert ProRealTime/ProBuilder trading bot developer. Generate ONLY valid ProBuilder code based on the user's requirements.
@@ -912,15 +1020,58 @@ IMPORTANT OUTPUT RULES:
 4. Include helpful comments using //
 5. Structure the code properly with clear sections`;
 
-  const userPrompt = `Create a ProRealTime trading bot with these specifications:
+  let userPrompt = `Create a ProRealTime trading bot with these specifications:
 
-${description}
+${description}`;
 
-Generate the complete, ready-to-use ProBuilder code now:`;
+  if (screenshotBase64) {
+    userPrompt += `\n\nNote: A chart screenshot has been provided showing the trading setup. Analyze the chart patterns and incorporate them into the bot logic.`;
+  }
+
+  userPrompt += `\n\nGenerate the complete, ready-to-use ProBuilder code now:`;
 
   try {
-    const code = await callAI(systemPrompt, userPrompt, 'claude-sonnet-4-5');
-    res.json({ code });
+    let code;
+    
+    if (screenshotBase64) {
+      const response = await anthropic.messages.create({
+        model: 'claude-sonnet-4-5-20250514',
+        max_tokens: 4096,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: {
+                  type: 'base64',
+                  media_type: 'image/png',
+                  data: screenshotBase64.replace(/^data:image\/\w+;base64,/, '')
+                }
+              },
+              {
+                type: 'text',
+                text: systemPrompt + '\n\n' + userPrompt
+              }
+            ]
+          }
+        ]
+      });
+      code = response.content[0].text;
+    } else {
+      code = await callAI(systemPrompt, userPrompt, 'claude-sonnet-4-5');
+    }
+    
+    const savedEntry = saveBotEntry({
+      asset: asset || 'unknown',
+      strategy: strategy || 'custom',
+      description,
+      settings: settings || {},
+      code,
+      screenshotPath
+    });
+    
+    res.json({ code, entryId: savedEntry.id });
   } catch (error) {
     console.error('Bot generation error:', error);
     res.status(500).json({ error: 'Failed to generate bot code' });
