@@ -625,6 +625,12 @@
                   </svg>
                   Download JSON
                 </button>
+                <button id="runModifiedBtn" class="hidden px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 text-sm">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+                  </svg>
+                  Run Modified
+                </button>
                 <button id="runSimulatorBtn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
@@ -632,6 +638,75 @@
                   </svg>
                   Run Backtest
                 </button>
+              </div>
+            </div>
+
+            <!-- Variable Optimization Panel -->
+            <div id="variableOptPanel" class="hidden mb-6 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-xl border border-indigo-200 dark:border-indigo-700 p-4">
+              <div class="flex items-center justify-between mb-4">
+                <h4 class="text-sm font-semibold text-indigo-700 dark:text-indigo-300 flex items-center gap-2">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+                  </svg>
+                  Variable Optimization
+                </h4>
+                <button id="detectVariablesBtn" class="px-3 py-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors">
+                  Detect Variables
+                </button>
+              </div>
+              
+              <!-- Detected Variables with Sliders -->
+              <div id="variableSlidersContainer" class="space-y-3 mb-4">
+                <p class="text-sm text-gray-500 dark:text-gray-400 italic">Generate a bot first, then click "Detect Variables" to adjust parameters.</p>
+              </div>
+              
+              <!-- Auto-Optimize Section -->
+              <div class="mt-4 pt-4 border-t border-indigo-200 dark:border-indigo-600">
+                <div class="flex flex-wrap items-center gap-3">
+                  <div class="flex items-center gap-2">
+                    <label class="text-sm text-gray-700 dark:text-gray-300">Iterations:</label>
+                    <input type="number" id="optimizeIterations" value="20" min="5" max="100" step="5" class="w-16 px-2 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <label class="text-sm text-gray-700 dark:text-gray-300">Optimize for:</label>
+                    <select id="optimizeMetric" class="px-2 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+                      <option value="totalGain">Total Gain</option>
+                      <option value="winRate">Win Rate</option>
+                      <option value="gainLossRatio">Gain/Loss Ratio</option>
+                      <option value="sharpe">Sharpe-like</option>
+                    </select>
+                  </div>
+                  <button id="autoOptimizeBtn" class="px-4 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                    Auto-Optimize
+                  </button>
+                </div>
+                
+                <!-- Optimization Progress -->
+                <div id="optimizeProgress" class="hidden mt-3">
+                  <div class="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">
+                    <span id="optimizeProgressText">Running iteration 0 of 20...</span>
+                    <span id="optimizeProgressPercent">0%</span>
+                  </div>
+                  <div class="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2">
+                    <div id="optimizeProgressBar" class="bg-gradient-to-r from-purple-500 to-indigo-500 h-2 rounded-full transition-all" style="width: 0%"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Best Results Panel -->
+            <div id="bestResultsPanel" class="hidden mb-6 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl border border-green-200 dark:border-green-700 p-4">
+              <h4 class="text-sm font-semibold text-green-700 dark:text-green-300 mb-3 flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/>
+                </svg>
+                Top Optimization Results
+              </h4>
+              <div id="bestResultsList" class="space-y-2 max-h-48 overflow-y-auto">
+                <!-- Results will be populated by JS -->
               </div>
             </div>
 

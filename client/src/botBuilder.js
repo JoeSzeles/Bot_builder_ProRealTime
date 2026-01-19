@@ -604,6 +604,10 @@ async function generateBot() {
     botOutputSection.classList.remove('hidden');
     
     loadBotHistory();
+    
+    const optPanel = document.getElementById('variableOptPanel');
+    if (optPanel) optPanel.classList.remove('hidden');
+    detectAndDisplayVariables();
 
   } catch (err) {
     alert('Error generating bot: ' + err.message);
@@ -924,6 +928,8 @@ function setupBotSubTabs() {
 
 let currentCandles = [];
 let lastSimulationResults = null;
+let detectedVariables = [];
+let optimizationResults = [];
 
 function setupSimulator() {
   const runBtn = document.getElementById('runSimulatorBtn');
@@ -940,6 +946,397 @@ function setupSimulator() {
   if (toggleRawBtn) {
     toggleRawBtn.addEventListener('click', toggleRawDataPanel);
   }
+  
+  const detectVarsBtn = document.getElementById('detectVariablesBtn');
+  if (detectVarsBtn) {
+    detectVarsBtn.addEventListener('click', detectAndDisplayVariables);
+  }
+  
+  const autoOptBtn = document.getElementById('autoOptimizeBtn');
+  if (autoOptBtn) {
+    autoOptBtn.addEventListener('click', runAutoOptimization);
+  }
+  
+  const runModBtn = document.getElementById('runModifiedBtn');
+  if (runModBtn) {
+    runModBtn.addEventListener('click', runSimulationWithModifiedVars);
+  }
+}
+
+async function runSimulationWithModifiedVars() {
+  const runBtn = document.getElementById('runModifiedBtn');
+  const statusEl = document.getElementById('simulatorStatus');
+  const noResultsEl = document.getElementById('simulatorNoResults');
+  const resultsEl = document.getElementById('simulatorResults');
+  
+  if (!generatedBotCode) {
+    alert('Please generate a bot first.');
+    return;
+  }
+  
+  if (detectedVariables.length === 0) {
+    alert('No variables detected. Click "Detect Variables" first.');
+    return;
+  }
+  
+  runBtn.disabled = true;
+  runBtn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
+  
+  if (statusEl) {
+    statusEl.classList.remove('hidden');
+    statusEl.textContent = 'Running simulation with modified variables...';
+    statusEl.className = 'mb-4 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-sm';
+  }
+  
+  try {
+    const settings = getSettings();
+    const asset = document.getElementById('assetSelect')?.value || 'silver';
+    const timeframe = document.getElementById('timeframeSelect')?.value || '1m';
+    
+    const candles = await fetchMarketData(asset, timeframe);
+    currentCandles = candles;
+    
+    const results = await runSimulationWithVariables(detectedVariables, candles, settings);
+    
+    if (results.error) {
+      if (statusEl) {
+        statusEl.textContent = `Error: ${results.error}`;
+        statusEl.className = 'mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-sm';
+      }
+      return;
+    }
+    
+    displaySimulationResults(results);
+    
+    if (statusEl) statusEl.classList.add('hidden');
+    if (noResultsEl) noResultsEl.classList.add('hidden');
+    if (resultsEl) resultsEl.classList.remove('hidden');
+    
+  } catch (e) {
+    console.error('Simulation error:', e);
+    if (statusEl) {
+      statusEl.textContent = `Error: ${e.message}`;
+      statusEl.className = 'mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-sm';
+    }
+  } finally {
+    runBtn.disabled = false;
+    runBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+    </svg> Run Modified`;
+  }
+}
+
+function detectBotVariables(code) {
+  const variables = [];
+  const lines = code.split('\n');
+  
+  const patterns = [
+    { regex: /(\w+)\s*=\s*(\d+\.?\d*)\s*(?:\/\/.*)?$/i, type: 'assignment' },
+    { regex: /ONCE\s+(\w+)\s*=\s*(\d+\.?\d*)/i, type: 'once' },
+    { regex: /SET\s+STOP\s+(?:P)?LOSS\s+(\d+\.?\d*)/i, name: 'StopLoss', type: 'stopLoss' },
+    { regex: /SET\s+TARGET\s+(?:P)?PROFIT\s+(\d+\.?\d*)/i, name: 'TakeProfit', type: 'takeProfit' },
+    { regex: /Average\[(\d+)\]/gi, name: 'AvgPeriod', type: 'indicator' },
+    { regex: /ExponentialAverage\[(\d+)\]/gi, name: 'EMAPeriod', type: 'indicator' },
+    { regex: /RSI\[(\d+)\]/gi, name: 'RSIPeriod', type: 'indicator' },
+    { regex: /Summation\[.*?,\s*(\d+)\]/gi, name: 'SumPeriod', type: 'indicator' }
+  ];
+  
+  const seen = new Set();
+  
+  lines.forEach((line, idx) => {
+    if (line.trim().startsWith('//')) return;
+    
+    patterns.forEach(p => {
+      const matches = [...line.matchAll(new RegExp(p.regex.source, 'gi'))];
+      matches.forEach(match => {
+        let name, value;
+        if (p.type === 'assignment' || p.type === 'once') {
+          name = match[1];
+          value = parseFloat(match[2]);
+        } else if (p.type === 'stopLoss' || p.type === 'takeProfit') {
+          name = p.name;
+          value = parseFloat(match[1]);
+        } else {
+          name = `${p.name}_${idx}`;
+          value = parseFloat(match[1]);
+        }
+        
+        if (!seen.has(name) && !isNaN(value) && value > 0) {
+          const reserved = ['Open', 'High', 'Low', 'Close', 'Volume', 'BarIndex', 'Date', 'Time'];
+          if (!reserved.includes(name)) {
+            seen.add(name);
+            let min = Math.max(1, Math.floor(value * 0.2));
+            let max = Math.ceil(value * 3);
+            let step = value >= 100 ? 10 : value >= 10 ? 1 : 0.1;
+            
+            variables.push({
+              name,
+              originalValue: value,
+              currentValue: value,
+              min,
+              max,
+              step,
+              lineIndex: idx,
+              pattern: match[0]
+            });
+          }
+        }
+      });
+    });
+  });
+  
+  return variables;
+}
+
+function detectAndDisplayVariables() {
+  const panel = document.getElementById('variableOptPanel');
+  const container = document.getElementById('variableSlidersContainer');
+  
+  if (!generatedBotCode) {
+    container.innerHTML = '<p class="text-sm text-red-500">Please generate a bot first.</p>';
+    if (panel) panel.classList.remove('hidden');
+    return;
+  }
+  
+  detectedVariables = detectBotVariables(generatedBotCode);
+  
+  if (detectedVariables.length === 0) {
+    container.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400 italic">No adjustable variables detected in the bot code.</p>';
+    if (panel) panel.classList.remove('hidden');
+    return;
+  }
+  
+  container.innerHTML = detectedVariables.map((v, i) => `
+    <div class="flex items-center gap-3 bg-white dark:bg-gray-700 rounded-lg p-2 border border-gray-200 dark:border-gray-600">
+      <span class="text-xs font-mono text-indigo-600 dark:text-indigo-400 w-24 truncate" title="${v.name}">${v.name}</span>
+      <input type="range" 
+        id="varSlider_${i}" 
+        data-var-index="${i}"
+        min="${v.min}" 
+        max="${v.max}" 
+        step="${v.step}" 
+        value="${v.currentValue}"
+        class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-600 accent-indigo-600">
+      <input type="number" 
+        id="varInput_${i}"
+        data-var-index="${i}"
+        min="${v.min}" 
+        max="${v.max}" 
+        step="${v.step}" 
+        value="${v.currentValue}"
+        class="w-20 px-2 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
+      <span class="text-xs text-gray-400">(${v.originalValue})</span>
+    </div>
+  `).join('');
+  
+  detectedVariables.forEach((v, i) => {
+    const slider = document.getElementById(`varSlider_${i}`);
+    const input = document.getElementById(`varInput_${i}`);
+    
+    slider?.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      detectedVariables[i].currentValue = val;
+      if (input) input.value = val;
+    });
+    
+    input?.addEventListener('change', (e) => {
+      const val = parseFloat(e.target.value);
+      detectedVariables[i].currentValue = val;
+      if (slider) slider.value = val;
+    });
+  });
+  
+  if (panel) panel.classList.remove('hidden');
+  
+  const runModBtn = document.getElementById('runModifiedBtn');
+  if (runModBtn && detectedVariables.length > 0) {
+    runModBtn.classList.remove('hidden');
+  }
+}
+
+function applyVariablesToCode(code, variables) {
+  let modifiedCode = code;
+  
+  variables.forEach(v => {
+    const escapedPattern = v.pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const newPattern = v.pattern.replace(String(v.originalValue), String(v.currentValue));
+    modifiedCode = modifiedCode.replace(new RegExp(escapedPattern), newPattern);
+  });
+  
+  return modifiedCode;
+}
+
+async function runSimulationWithVariables(variables, candles, settings) {
+  const modifiedCode = applyVariablesToCode(generatedBotCode, variables);
+  
+  const response = await fetch('/api/simulate-bot', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      code: modifiedCode,
+      candles,
+      settings
+    })
+  });
+  
+  return await response.json();
+}
+
+async function runAutoOptimization() {
+  const btn = document.getElementById('autoOptimizeBtn');
+  const progressDiv = document.getElementById('optimizeProgress');
+  const progressBar = document.getElementById('optimizeProgressBar');
+  const progressText = document.getElementById('optimizeProgressText');
+  const progressPercent = document.getElementById('optimizeProgressPercent');
+  const resultsPanel = document.getElementById('bestResultsPanel');
+  const resultsList = document.getElementById('bestResultsList');
+  
+  if (!generatedBotCode || detectedVariables.length === 0) {
+    alert('Please generate a bot and detect variables first.');
+    return;
+  }
+  
+  const iterations = parseInt(document.getElementById('optimizeIterations')?.value) || 20;
+  const metric = document.getElementById('optimizeMetric')?.value || 'totalGain';
+  
+  btn.disabled = true;
+  progressDiv?.classList.remove('hidden');
+  optimizationResults = [];
+  
+  const settings = getSettings();
+  const asset = document.getElementById('assetSelect')?.value || 'silver';
+  const timeframe = document.getElementById('timeframeSelect')?.value || '1m';
+  
+  try {
+    const candles = await fetchMarketData(asset, timeframe);
+    currentCandles = candles;
+    
+    for (let i = 0; i < iterations; i++) {
+      const testVars = detectedVariables.map(v => ({
+        ...v,
+        currentValue: v.min + Math.random() * (v.max - v.min)
+      }));
+      
+      testVars.forEach(v => {
+        v.currentValue = Math.round(v.currentValue / v.step) * v.step;
+      });
+      
+      const progress = ((i + 1) / iterations) * 100;
+      if (progressBar) progressBar.style.width = `${progress}%`;
+      if (progressText) progressText.textContent = `Running iteration ${i + 1} of ${iterations}...`;
+      if (progressPercent) progressPercent.textContent = `${Math.round(progress)}%`;
+      
+      try {
+        const result = await runSimulationWithVariables(testVars, candles, settings);
+        
+        if (!result.error) {
+          let score;
+          switch (metric) {
+            case 'winRate': score = result.winRate || 0; break;
+            case 'gainLossRatio': score = result.gainLossRatio || 0; break;
+            case 'sharpe': score = (result.totalGain || 0) / Math.max(1, Math.abs(result.maxDrawdown || 1)); break;
+            default: score = result.totalGain || 0;
+          }
+          
+          optimizationResults.push({
+            variables: testVars.map(v => ({ name: v.name, value: v.currentValue })),
+            result,
+            score,
+            metric
+          });
+        }
+      } catch (e) {
+        console.warn(`Iteration ${i + 1} failed:`, e);
+      }
+      
+      await new Promise(r => setTimeout(r, 50));
+    }
+    
+    optimizationResults.sort((a, b) => b.score - a.score);
+    
+    displayOptimizationResults();
+    
+    if (progressText) progressText.textContent = `Completed ${iterations} iterations!`;
+    
+  } catch (e) {
+    console.error('Optimization error:', e);
+    alert('Optimization failed: ' + e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function displayOptimizationResults() {
+  const panel = document.getElementById('bestResultsPanel');
+  const list = document.getElementById('bestResultsList');
+  
+  if (!panel || !list) return;
+  
+  const top5 = optimizationResults.slice(0, 5);
+  
+  if (top5.length === 0) {
+    list.innerHTML = '<p class="text-sm text-gray-500">No valid results found.</p>';
+    panel.classList.remove('hidden');
+    return;
+  }
+  
+  const formatMoney = (v) => {
+    const sign = v >= 0 ? '+' : '';
+    return `${sign}$${v.toFixed(2)}`;
+  };
+  
+  list.innerHTML = top5.map((r, i) => `
+    <div class="flex items-center gap-3 p-2 rounded-lg ${i === 0 ? 'bg-green-100 dark:bg-green-800/30 border border-green-300 dark:border-green-600' : 'bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600'} cursor-pointer hover:shadow-md transition-shadow" data-result-index="${i}">
+      <span class="w-6 h-6 flex items-center justify-center rounded-full ${i === 0 ? 'bg-green-500 text-white' : 'bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300'} text-xs font-bold">${i + 1}</span>
+      <div class="flex-1">
+        <div class="flex items-center gap-2 text-sm">
+          <span class="${r.result.totalGain >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'} font-medium">${formatMoney(r.result.totalGain)}</span>
+          <span class="text-gray-400">|</span>
+          <span class="text-blue-600 dark:text-blue-400">${r.result.winRate?.toFixed(1)}% win</span>
+          <span class="text-gray-400">|</span>
+          <span class="text-purple-600 dark:text-purple-400">${r.result.totalTrades} trades</span>
+        </div>
+        <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">
+          ${r.variables.map(v => `${v.name}=${v.value.toFixed(2)}`).join(', ')}
+        </div>
+      </div>
+      <button class="apply-result-btn px-2 py-1 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded transition-colors" data-result-index="${i}">Apply</button>
+    </div>
+  `).join('');
+  
+  list.querySelectorAll('.apply-result-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const idx = parseInt(btn.dataset.resultIndex);
+      applyOptimizationResult(idx);
+    });
+  });
+  
+  panel.classList.remove('hidden');
+}
+
+function applyOptimizationResult(index) {
+  const result = optimizationResults[index];
+  if (!result) return;
+  
+  result.variables.forEach(v => {
+    const varIdx = detectedVariables.findIndex(dv => dv.name === v.name);
+    if (varIdx >= 0) {
+      detectedVariables[varIdx].currentValue = v.value;
+      
+      const slider = document.getElementById(`varSlider_${varIdx}`);
+      const input = document.getElementById(`varInput_${varIdx}`);
+      if (slider) slider.value = v.value;
+      if (input) input.value = v.value;
+    }
+  });
+  
+  displaySimulationResults(result.result);
+  
+  const noResultsEl = document.getElementById('simulatorNoResults');
+  const resultsEl = document.getElementById('simulatorResults');
+  if (noResultsEl) noResultsEl.classList.add('hidden');
+  if (resultsEl) resultsEl.classList.remove('hidden');
 }
 
 function toggleRawDataPanel() {
