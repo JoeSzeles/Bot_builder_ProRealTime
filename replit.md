@@ -120,6 +120,15 @@ The frontend proxies API requests to the backend.
 - Save Prompt checkbox enabled by default to save custom prompts
 
 ## Recent Changes (Jan 19, 2026)
+- **Variable Persistence**: Slider adjustments now auto-save to bot history and restore when reopening saved bots
+  - Debounced 500ms auto-save when variables change
+  - PATCH endpoint updates variableOverrides and modifiedCode
+  - currentBotId tracks which bot is being edited
+- **Market Data Caching**: 
+  - Server-side cache with TTL per timeframe (1m-1d)
+  - Client-side localStorage cache mirrors server cache
+  - forceRefresh parameter bypasses both cache layers
+  - Reduces API calls significantly
 - **Real-time Market Data**: 
   - Silver & Gold: MetalPriceAPI (METALS_API_KEY secret) - real spot prices with generated candles
   - Forex pairs: Twelve Data API for live candlestick data
