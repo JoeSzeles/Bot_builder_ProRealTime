@@ -1040,6 +1040,8 @@ async function loadBotEntry(id) {
       showCodeVariableSlidersFromData(detectedVariables);
     } else {
       if (botCodeOutput) botCodeOutput.textContent = data.code;
+      detectedVariables = [];
+      detectAndDisplayVariables();
       showCodeVariableSliders();
     }
     
