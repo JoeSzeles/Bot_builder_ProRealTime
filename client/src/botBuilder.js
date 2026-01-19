@@ -1503,7 +1503,12 @@ async function runAutoOptimization() {
           }
           
           optimizationResults.push({
-            variables: testVars.map(v => ({ name: v.name, value: v.currentValue })),
+            variables: testVars.map(v => ({ 
+              name: v.name, 
+              value: v.currentValue,
+              pattern: v.pattern,
+              originalValue: v.originalValue
+            })),
             result,
             score,
             metric
@@ -1684,12 +1689,28 @@ function copyResultCode(index) {
   });
 }
 
-function applyVariablesToCodeFromResult(variables) {
+function applyVariablesToCodeFromResult(resultVariables) {
   let code = generatedBotCode;
-  variables.forEach(v => {
-    const regex = new RegExp(`(${v.name}\\s*=\\s*)([\\d.]+)`, 'g');
-    code = code.replace(regex, `$1${v.value}`);
+  
+  resultVariables.forEach(rv => {
+    if (rv.pattern && rv.originalValue !== undefined) {
+      const escapedPattern = rv.pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const newPattern = rv.pattern.replace(String(rv.originalValue), String(rv.value));
+      code = code.replace(new RegExp(escapedPattern), newPattern);
+    } else {
+      const detected = detectedVariables.find(dv => dv.name === rv.name);
+      if (detected && detected.pattern) {
+        const escapedPattern = detected.pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const newPattern = detected.pattern.replace(String(detected.originalValue), String(rv.value));
+        code = code.replace(new RegExp(escapedPattern), newPattern);
+      } else {
+        const escapedName = rv.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`(${escapedName}\\s*=\\s*)([\\d.]+)`, 'g');
+        code = code.replace(regex, `$1${rv.value}`);
+      }
+    }
   });
+  
   return code;
 }
 
