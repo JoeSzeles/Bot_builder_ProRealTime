@@ -297,10 +297,151 @@ function setupBotBuilderEvents() {
     fixBotError.addEventListener('click', fixBotErrorAndRegenerate);
   }
 
+  setupStrategyIdeasModal();
+
   const chartContainer = document.getElementById('chartContainer');
   if (chartContainer) {
     chart.subscribeClick(handleChartClick);
   }
+}
+
+function setupStrategyIdeasModal() {
+  const openBtn = document.getElementById('getStrategyIdeasBtn');
+  const modal = document.getElementById('strategyIdeasModal');
+  const closeBtn = document.getElementById('closeStrategyModal');
+  const searchBtn = document.getElementById('searchStrategiesBtn');
+  const searchInput = document.getElementById('strategySearchInput');
+  const resultsContainer = document.getElementById('strategySearchResults');
+  const loadingEl = document.getElementById('strategySearchLoading');
+  const categoryChips = document.querySelectorAll('.strategy-category-chip');
+  
+  if (openBtn && modal) {
+    openBtn.addEventListener('click', () => {
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    });
+  }
+  
+  if (closeBtn && modal) {
+    closeBtn.addEventListener('click', () => {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    });
+  }
+  
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+    });
+  }
+  
+  async function searchStrategies(query) {
+    if (!query.trim()) return;
+    
+    resultsContainer.classList.add('hidden');
+    loadingEl.classList.remove('hidden');
+    
+    try {
+      const response = await fetch('/api/search-strategies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query })
+      });
+      
+      const data = await response.json();
+      displayStrategyResults(data.results || []);
+    } catch (e) {
+      console.error('Strategy search failed:', e);
+      resultsContainer.innerHTML = '<p class="text-center text-red-500 py-8">Search failed. Please try again.</p>';
+      resultsContainer.classList.remove('hidden');
+    } finally {
+      loadingEl.classList.add('hidden');
+    }
+  }
+  
+  function displayStrategyResults(results) {
+    if (results.length === 0) {
+      resultsContainer.innerHTML = '<p class="text-center text-gray-500 dark:text-gray-400 py-8">No strategies found. Try a different search term.</p>';
+      resultsContainer.classList.remove('hidden');
+      return;
+    }
+    
+    resultsContainer.innerHTML = results.map((r, i) => `
+      <div class="strategy-result p-4 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:shadow-lg transition-shadow">
+        <div class="flex items-start justify-between gap-4">
+          <div class="flex-1">
+            <h4 class="font-semibold text-gray-900 dark:text-white mb-1">${r.title}</h4>
+            <p class="text-sm text-gray-600 dark:text-gray-300 mb-2">${r.description}</p>
+            ${r.url ? `<a href="${r.url}" target="_blank" class="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+              </svg>
+              View on ProRealCode
+            </a>` : ''}
+          </div>
+          <button class="use-strategy-btn px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap" data-strategy-index="${i}">
+            Use This
+          </button>
+        </div>
+        ${r.codeSnippet ? `
+          <details class="mt-3">
+            <summary class="text-xs text-gray-500 dark:text-gray-400 cursor-pointer hover:text-gray-700 dark:hover:text-gray-200">Show code preview</summary>
+            <pre class="mt-2 p-3 bg-gray-900 text-gray-100 rounded-lg text-xs font-mono overflow-x-auto max-h-40">${r.codeSnippet}</pre>
+          </details>
+        ` : ''}
+      </div>
+    `).join('');
+    
+    resultsContainer.querySelectorAll('.use-strategy-btn').forEach((btn, idx) => {
+      btn.addEventListener('click', () => {
+        const result = results[idx];
+        applyStrategyIdea(result);
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      });
+    });
+    
+    resultsContainer.classList.remove('hidden');
+  }
+  
+  function applyStrategyIdea(strategy) {
+    const strategySelect = document.getElementById('strategyType');
+    if (strategySelect) {
+      strategySelect.value = 'custom';
+    }
+    
+    const customInstructions = document.getElementById('botCustomInstructions');
+    if (customInstructions) {
+      customInstructions.value = `Strategy: ${strategy.title}\n\n${strategy.description}\n\n${strategy.keyPoints || ''}`;
+    }
+    
+    alert(`Strategy "${strategy.title}" applied! The AI will use this as the base for code generation.`);
+  }
+  
+  if (searchBtn) {
+    searchBtn.addEventListener('click', () => {
+      searchStrategies(searchInput?.value || '');
+    });
+  }
+  
+  if (searchInput) {
+    searchInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        searchStrategies(searchInput.value);
+      }
+    });
+  }
+  
+  categoryChips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      const category = chip.dataset.category;
+      if (searchInput) searchInput.value = category;
+      searchStrategies(category);
+    });
+  });
 }
 
 function setDrawingMode(mode) {

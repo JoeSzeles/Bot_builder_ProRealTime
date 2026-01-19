@@ -1033,16 +1033,18 @@ app.post('/api/generate-bot', async (req, res) => {
     }
   }
   
-  const systemPrompt = `You are an expert ProRealTime/ProBuilder trading bot developer. Generate ONLY valid ProBuilder code based on the user's requirements.
+  const systemPrompt = `You are an experienced ProRealCode forum contributor and expert ProRealTime/ProBuilder trading bot developer. Generate ONLY valid ProBuilder code based on the user's requirements.
+
+${PRC_STYLE_CONSTRAINTS}
 
 ${syntaxRules}
 
 IMPORTANT OUTPUT RULES:
 1. Output ONLY the code - no explanations, no markdown, no code blocks
 2. Start directly with Defparam or comments
-3. Follow all syntax rules strictly - especially NO underscores in variable names
-4. Include helpful comments using //
-5. Structure the code properly with clear sections`;
+3. Follow all ProRealCode forum conventions - flat structure, verbose IF/ENDIF, no underscores
+4. Include helpful comments using // like a forum post explaining logic
+5. Structure the code with clear sections: parameters, variables, conditions, orders`;
 
   let userPrompt = `Create a ProRealTime trading bot with these specifications:
 
@@ -1052,7 +1054,7 @@ ${description}`;
     userPrompt += `\n\nNote: A chart screenshot has been provided showing the trading setup. Analyze the chart patterns and incorporate them into the bot logic.`;
   }
 
-  userPrompt += `\n\nGenerate the complete, ready-to-use ProBuilder code now:`;
+  userPrompt += `\n\nGenerate the complete, ready-to-use ProBuilder code following ProRealCode forum conventions:`;
 
   try {
     let code;
@@ -1102,6 +1104,36 @@ ${description}`;
   }
 });
 
+// PRC-style constraints for ProRealCode forum compatibility
+const PRC_STYLE_CONSTRAINTS = `
+SOURCE CONSTRAINT:
+- Use ONLY conventions, syntax, and idioms commonly found in public ProRealCode (prorealcode.com) forum posts for ProRealTime / ProOrder bots.
+- Assume IG Markets + ProRealTime AutoTrading environment.
+- Do NOT invent undocumented functions or syntax.
+
+STYLE CONSTRAINT (ProRealCode forum style):
+- Flat structure with verbose IF / ENDIF blocks
+- Simple, readable variable names (no underscores)
+- Defensive ONMARKET checks
+- DEFPARAM at the top
+- Minimal abstraction
+- Explicit conditions
+- No compact one-liners
+
+EXCLUSIONS:
+- No PineScript syntax
+- No MQL4/5 syntax
+- No TradingView-only functions
+- No arrays unless strictly necessary
+- No undocumented ProRealTime keywords
+
+EXECUTION ENVIRONMENT:
+- Broker: IG Markets
+- Platform: ProRealTime AutoTrading (ProOrder)
+- Instrument: CFD (supports PERPOINT sizing)
+- Timeframes: intraday typical
+`;
+
 // Bot fix endpoint
 app.post('/api/fix-bot', async (req, res) => {
   const { code, error, syntaxRules } = req.body;
@@ -1110,7 +1142,9 @@ app.post('/api/fix-bot', async (req, res) => {
     return res.status(400).json({ error: 'Code and error message are required' });
   }
   
-  const systemPrompt = `You are an expert ProRealTime/ProBuilder trading bot developer and debugger. Fix the provided code based on the error message.
+  const systemPrompt = `You are an experienced ProRealCode forum contributor and ProRealTime/ProBuilder bot debugger. Fix the provided code based on the error message.
+
+${PRC_STYLE_CONSTRAINTS}
 
 ${syntaxRules}
 
@@ -1118,8 +1152,9 @@ IMPORTANT OUTPUT RULES:
 1. Output ONLY the fixed code - no explanations, no markdown, no code blocks
 2. Start directly with Defparam or comments
 3. Identify and fix the specific error mentioned
-4. Ensure all syntax rules are followed
-5. Preserve the original logic while fixing the error`;
+4. Ensure all syntax rules are followed - especially ProRealCode forum conventions
+5. Preserve the original logic while fixing the error
+6. Check for common ProRealTime errors: undefined variables, missing ENDIF, incorrect function names`;
 
   const userPrompt = `Fix this ProRealTime bot code:
 
@@ -1129,7 +1164,7 @@ ${code}
 ERROR MESSAGE:
 ${error}
 
-Generate the fixed, ready-to-use ProBuilder code now:`;
+Generate the fixed, ready-to-use ProBuilder code following ProRealCode forum conventions:`;
 
   try {
     const fixedCode = await callAI(systemPrompt, userPrompt, 'claude-sonnet-4-5');
@@ -1137,6 +1172,63 @@ Generate the fixed, ready-to-use ProBuilder code now:`;
   } catch (error) {
     console.error('Bot fix error:', error);
     res.status(500).json({ error: 'Failed to fix bot code' });
+  }
+});
+
+// Strategy search endpoint - searches ProRealCode forum for strategy ideas
+app.post('/api/search-strategies', async (req, res) => {
+  const { query } = req.body;
+  
+  if (!query) {
+    return res.status(400).json({ error: 'Search query is required' });
+  }
+  
+  try {
+    const searchPrompt = `Search for ProRealTime trading bot strategies related to: "${query}"
+
+You are an expert on the ProRealCode forum (prorealcode.com). Based on common strategies found on the forum, provide 5 relevant strategy ideas.
+
+For each strategy, provide:
+1. title: A clear strategy name
+2. description: 2-3 sentences explaining the strategy logic
+3. keyPoints: Key implementation details (entry/exit conditions, indicators used)
+4. codeSnippet: A brief ProBuilder code example showing the core logic (10-20 lines max)
+5. url: If this is a known strategy from the forum, provide a plausible URL, otherwise null
+
+Return as JSON array with exactly these fields: title, description, keyPoints, codeSnippet, url
+
+Focus on strategies that:
+- Are commonly discussed on ProRealCode forum
+- Work well for intraday CFD trading on IG Markets
+- Use standard ProRealTime indicators and functions
+- Are suitable for automated trading (ProOrder)`;
+
+    const response = await callAI(
+      'You are a ProRealCode forum expert. Return ONLY valid JSON array, no markdown, no explanation.',
+      searchPrompt,
+      'claude-sonnet-4-5'
+    );
+    
+    let results = [];
+    try {
+      const cleaned = response.replace(/```json\n?|\n?```/g, '').trim();
+      results = JSON.parse(cleaned);
+    } catch (e) {
+      console.warn('Failed to parse strategy search response:', e.message);
+      const jsonMatch = response.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        try {
+          results = JSON.parse(jsonMatch[0]);
+        } catch (e2) {
+          console.error('Could not extract JSON from response');
+        }
+      }
+    }
+    
+    res.json({ results: Array.isArray(results) ? results : [] });
+  } catch (error) {
+    console.error('Strategy search error:', error);
+    res.status(500).json({ error: 'Failed to search strategies' });
   }
 });
 

@@ -488,12 +488,20 @@
               
               <div>
                 <label class="block text-sm text-gray-700 dark:text-gray-300 mb-1">Base Strategy</label>
-                <select id="strategyType" class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm">
-                  <option value="13thwarrior">13th Warrior (OBV + HA)</option>
-                  <option value="sniper">Sniper (Immediate Entry)</option>
-                  <option value="breakout">Breakout</option>
-                  <option value="custom">Custom (from chart)</option>
-                </select>
+                <div class="flex gap-2">
+                  <select id="strategyType" class="flex-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm">
+                    <option value="13thwarrior">13th Warrior (OBV + HA)</option>
+                    <option value="sniper">Sniper (Immediate Entry)</option>
+                    <option value="breakout">Breakout</option>
+                    <option value="custom">Custom (from chart)</option>
+                  </select>
+                  <button id="getStrategyIdeasBtn" type="button" class="px-3 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap" title="Find strategies from ProRealCode forum">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                    </svg>
+                    Ideas
+                  </button>
+                </div>
               </div>
             </div>
             </div>
@@ -820,6 +828,69 @@
                   <button id="modalApplyBtn" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium">
                     Apply This Configuration
                   </button>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Strategy Ideas Modal -->
+            <div id="strategyIdeasModal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
+              <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+                <div class="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                  <h3 class="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <svg class="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                    </svg>
+                    Strategy Ideas from ProRealCode
+                  </h3>
+                  <button id="closeStrategyModal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                  </button>
+                </div>
+                
+                <div class="p-6">
+                  <!-- Search Bar -->
+                  <div class="mb-6 flex gap-3">
+                    <input type="text" id="strategySearchInput" placeholder="Search for strategies (e.g., breakout, RSI, moving average)..." class="flex-1 px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+                    <button id="searchStrategiesBtn" class="px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-medium rounded-xl transition-colors flex items-center gap-2">
+                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                      </svg>
+                      Search ProRealCode
+                    </button>
+                  </div>
+                  
+                  <!-- Category Chips -->
+                  <div class="mb-6 flex flex-wrap gap-2">
+                    <button class="strategy-category-chip px-3 py-1.5 rounded-full text-sm font-medium bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-800 transition-colors" data-category="breakout">Breakout</button>
+                    <button class="strategy-category-chip px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800 transition-colors" data-category="trend following">Trend Following</button>
+                    <button class="strategy-category-chip px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-800 transition-colors" data-category="mean reversion">Mean Reversion</button>
+                    <button class="strategy-category-chip px-3 py-1.5 rounded-full text-sm font-medium bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800 transition-colors" data-category="scalping">Scalping</button>
+                    <button class="strategy-category-chip px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors" data-category="RSI">RSI</button>
+                    <button class="strategy-category-chip px-3 py-1.5 rounded-full text-sm font-medium bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-300 hover:bg-yellow-200 dark:hover:bg-yellow-800 transition-colors" data-category="MACD">MACD</button>
+                    <button class="strategy-category-chip px-3 py-1.5 rounded-full text-sm font-medium bg-pink-100 dark:bg-pink-900/50 text-pink-700 dark:text-pink-300 hover:bg-pink-200 dark:hover:bg-pink-800 transition-colors" data-category="bollinger bands">Bollinger Bands</button>
+                  </div>
+                  
+                  <!-- Results Area -->
+                  <div id="strategySearchResults" class="max-h-[400px] overflow-y-auto space-y-4">
+                    <div class="text-center py-12 text-gray-500 dark:text-gray-400">
+                      <svg class="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                      </svg>
+                      <p class="text-lg font-medium mb-2">Search for strategy ideas</p>
+                      <p class="text-sm">Click a category or enter a search term to find strategies from the ProRealCode forum</p>
+                    </div>
+                  </div>
+                  
+                  <!-- Loading State -->
+                  <div id="strategySearchLoading" class="hidden text-center py-12">
+                    <svg class="w-12 h-12 mx-auto mb-4 animate-spin text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                    </svg>
+                    <p class="text-gray-600 dark:text-gray-400">Searching ProRealCode forum...</p>
+                  </div>
                 </div>
               </div>
             </div>
