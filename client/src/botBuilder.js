@@ -608,6 +608,7 @@ async function generateBot() {
     const optPanel = document.getElementById('variableOptPanel');
     if (optPanel) optPanel.classList.remove('hidden');
     detectAndDisplayVariables();
+    showCodeVariableSliders();
 
   } catch (err) {
     alert('Error generating bot: ' + err.message);
@@ -618,14 +619,93 @@ async function generateBot() {
 }
 
 async function copyBotCodeToClipboard() {
-  if (!generatedBotCode) return;
+  const botCodeOutput = document.getElementById('botCodeOutput');
+  const codeText = botCodeOutput?.textContent || generatedBotCode;
+  if (!codeText) return;
   
-  await navigator.clipboard.writeText(generatedBotCode);
+  await navigator.clipboard.writeText(codeText);
   
   const btn = document.getElementById('copyBotCode');
   const originalText = btn.innerHTML;
   btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Copied!';
   setTimeout(() => btn.innerHTML = originalText, 2000);
+}
+
+function showCodeVariableSliders() {
+  const panel = document.getElementById('codeVariablePanel');
+  const container = document.getElementById('codeVariableSlidersContainer');
+  
+  if (!generatedBotCode || !panel || !container) return;
+  
+  detectedVariables = detectBotVariables(generatedBotCode);
+  
+  if (detectedVariables.length === 0) {
+    panel.classList.add('hidden');
+    return;
+  }
+  
+  container.innerHTML = detectedVariables.map((v, i) => `
+    <div class="flex items-center gap-2 bg-white dark:bg-gray-700 rounded-lg p-2 border border-gray-200 dark:border-gray-600">
+      <span class="text-xs font-mono text-indigo-600 dark:text-indigo-400 w-20 truncate" title="${v.name}">${v.name}</span>
+      <input type="range" 
+        id="codeVarSlider_${i}" 
+        data-var-index="${i}"
+        min="${v.min}" 
+        max="${v.max}" 
+        step="${v.step}" 
+        value="${v.currentValue}"
+        class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-600 accent-indigo-600">
+      <input type="number" 
+        id="codeVarInput_${i}"
+        data-var-index="${i}"
+        min="${v.min}" 
+        max="${v.max}" 
+        step="${v.step}" 
+        value="${v.currentValue}"
+        class="w-16 px-1 py-0.5 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
+      <span class="text-xs text-gray-400">(${v.originalValue})</span>
+    </div>
+  `).join('');
+  
+  detectedVariables.forEach((v, i) => {
+    const slider = document.getElementById(`codeVarSlider_${i}`);
+    const input = document.getElementById(`codeVarInput_${i}`);
+    
+    const updateCode = () => {
+      const modifiedCode = applyVariablesToCode(generatedBotCode, detectedVariables);
+      const botCodeOutput = document.getElementById('botCodeOutput');
+      if (botCodeOutput) botCodeOutput.textContent = modifiedCode;
+    };
+    
+    slider?.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      detectedVariables[i].currentValue = val;
+      if (input) input.value = val;
+      updateCode();
+    });
+    
+    input?.addEventListener('change', (e) => {
+      const val = parseFloat(e.target.value);
+      detectedVariables[i].currentValue = val;
+      if (slider) slider.value = val;
+      updateCode();
+    });
+  });
+  
+  panel.classList.remove('hidden');
+}
+
+function resetVariablesToOriginal() {
+  detectedVariables.forEach((v, i) => {
+    v.currentValue = v.originalValue;
+    const slider = document.getElementById(`codeVarSlider_${i}`);
+    const input = document.getElementById(`codeVarInput_${i}`);
+    if (slider) slider.value = v.originalValue;
+    if (input) input.value = v.originalValue;
+  });
+  
+  const botCodeOutput = document.getElementById('botCodeOutput');
+  if (botCodeOutput) botCodeOutput.textContent = generatedBotCode;
 }
 
 function saveBotCodeToFile() {
@@ -965,6 +1045,11 @@ function setupSimulator() {
   const runModBtn2 = document.getElementById('runModifiedBtn2');
   if (runModBtn2) {
     runModBtn2.addEventListener('click', runSimulationWithModifiedVars);
+  }
+  
+  const resetVarsBtn = document.getElementById('resetVariablesBtn');
+  if (resetVarsBtn) {
+    resetVarsBtn.addEventListener('click', resetVariablesToOriginal);
   }
 }
 
