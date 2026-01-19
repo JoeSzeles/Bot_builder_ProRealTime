@@ -63,7 +63,14 @@ A personal-use full-stack app for generating ProRealTime trading bots using AI, 
    - Trailing stop with configurable % and step
    - Indicator toggles (OBV, Heikin Ashi) with periods
    - Strategy type selection (13th Warrior, Sniper, Breakout, Custom)
-3. **AI Code Generation**:
+3. **Time & Session Filters**:
+   - Timezone selector (Brisbane AEST UTC+10 default, plus major trading zones)
+   - Exclude weekends and major holidays
+   - Custom trading hours (start/end time)
+   - Session avoidance: exclude first/last X minutes of session
+   - Force close positions before session end
+   - Day of week selectors (Mon-Sun)
+4. **AI Code Generation**:
    - Compiles chart annotations + settings into bot description
    - Sends to AI with ProRealTime syntax rules
    - Outputs ready-to-use ProBuilder code
