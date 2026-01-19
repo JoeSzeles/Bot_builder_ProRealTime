@@ -10,6 +10,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import pLimit from 'p-limit';
 import pRetry from 'p-retry';
+import * as cheerio from 'cheerio';
 
 const require = createRequire(import.meta.url);
 const pdf = require('pdf-parse');
@@ -1175,14 +1176,201 @@ Generate the fixed, ready-to-use ProBuilder code following ProRealCode forum con
   }
 });
 
+// ProRealCode forum scraper with caching
+const PRC_CACHE = new Map();
+const PRC_CACHE_TTL = 60 * 60 * 1000; // 1 hour cache
+
+async function fetchWithRetry(url, retries = 2) {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5'
+        }
+      });
+      if (response.ok) return await response.text();
+      if (response.status === 429) {
+        await new Promise(r => setTimeout(r, 2000 * (i + 1)));
+        continue;
+      }
+      throw new Error(`HTTP ${response.status}`);
+    } catch (e) {
+      if (i === retries) throw e;
+      await new Promise(r => setTimeout(r, 1000 * (i + 1)));
+    }
+  }
+}
+
+async function searchProRealCode(query) {
+  const cacheKey = `search:${query.toLowerCase()}`;
+  const cached = PRC_CACHE.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < PRC_CACHE_TTL) {
+    console.log('Using cached ProRealCode search results');
+    return cached.data;
+  }
+  
+  const searchUrl = `https://www.prorealcode.com/?s=${encodeURIComponent(query)}`;
+  console.log('Searching ProRealCode:', searchUrl);
+  
+  const html = await fetchWithRetry(searchUrl);
+  const $ = cheerio.load(html);
+  
+  const results = [];
+  $('article.post, .entry-content article, .search-result, h2.entry-title').each((i, el) => {
+    if (results.length >= 8) return false;
+    
+    let title, url, excerpt;
+    const $el = $(el);
+    
+    const $titleLink = $el.find('h2.entry-title a, .entry-title a, h2 a, h3 a').first();
+    if ($titleLink.length) {
+      title = $titleLink.text().trim();
+      url = $titleLink.attr('href');
+    } else if ($el.is('h2.entry-title')) {
+      const $link = $el.find('a').first();
+      title = $link.text().trim();
+      url = $link.attr('href');
+    }
+    
+    excerpt = $el.find('.entry-summary, .entry-excerpt, .excerpt, p').first().text().trim().slice(0, 200);
+    
+    if (title && url && url.includes('prorealcode.com')) {
+      results.push({ title, url, excerpt, codeSnippet: null });
+    }
+  });
+  
+  if (results.length === 0) {
+    $('a[href*="prorealcode.com"]').each((i, el) => {
+      if (results.length >= 8) return false;
+      const $a = $(el);
+      const href = $a.attr('href');
+      const text = $a.text().trim();
+      if (href && text.length > 10 && !href.includes('/tag/') && !href.includes('/category/') && 
+          !href.includes('wp-login') && !href.includes('wp-admin')) {
+        if (!results.some(r => r.url === href)) {
+          results.push({ title: text, url: href, excerpt: '', codeSnippet: null });
+        }
+      }
+    });
+  }
+  
+  PRC_CACHE.set(cacheKey, { data: results, timestamp: Date.now() });
+  return results;
+}
+
+async function fetchPostCode(url) {
+  const cacheKey = `post:${url}`;
+  const cached = PRC_CACHE.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < PRC_CACHE_TTL) {
+    return cached.data;
+  }
+  
+  console.log('Fetching ProRealCode post:', url);
+  const html = await fetchWithRetry(url);
+  const $ = cheerio.load(html);
+  
+  let description = '';
+  let codeSnippet = '';
+  let keyPoints = '';
+  
+  const $content = $('.entry-content, .post-content, article');
+  description = $content.find('p').slice(0, 2).map((i, el) => $(el).text().trim()).get().join(' ').slice(0, 300);
+  
+  // ProRealCode uses crayon-syntax for code blocks
+  $('.crayon-syntax, .crayon-code, .crayon-main, pre.crayon-plain-wrap, .wp-block-code, pre, code').each((i, el) => {
+    const $el = $(el);
+    // For crayon blocks, get inner text from the code lines
+    let code = '';
+    if ($el.hasClass('crayon-syntax') || $el.find('.crayon-code').length) {
+      code = $el.find('.crayon-line, .crayon-code').map((i, line) => $(line).text()).get().join('\n').trim();
+    } else {
+      code = $el.text().trim();
+    }
+    
+    if (code.length > 50 && code.length > codeSnippet.length) {
+      // Check for ProBuilder keywords
+      const hasProBuilderCode = /\b(BUY|SELL|Defparam|DEFPARAM|IF\s|THEN|ENDIF|Average|RSI|MACD|Close|Open|High|Low|Volume|RETURN|ExponentialAverage|CrossOver|CrossUnder)\b/i.test(code);
+      if (hasProBuilderCode) {
+        codeSnippet = code;
+      }
+    }
+  });
+  
+  if (!codeSnippet) {
+    const bodyText = $content.text();
+    const codeMatch = bodyText.match(/(?:Defparam|DEFPARAM|REM )[\s\S]{50,2000}?(?:ENDIF|NEXT|WEND|\n\n)/i);
+    if (codeMatch) {
+      codeSnippet = codeMatch[0].trim();
+    }
+  }
+  
+  const bullets = $content.find('li, ul li').slice(0, 5).map((i, el) => $(el).text().trim()).get();
+  if (bullets.length) keyPoints = bullets.join('; ');
+  
+  const result = { description, codeSnippet, keyPoints };
+  PRC_CACHE.set(cacheKey, { data: result, timestamp: Date.now() });
+  return result;
+}
+
 // Strategy search endpoint - searches ProRealCode forum for strategy ideas
 app.post('/api/search-strategies', async (req, res) => {
-  const { query } = req.body;
+  const { query, useRealForum = true } = req.body;
   
   if (!query) {
     return res.status(400).json({ error: 'Search query is required' });
   }
   
+  // Try real ProRealCode forum search first
+  if (useRealForum) {
+    try {
+      console.log('Attempting real ProRealCode forum search for:', query);
+      const searchResults = await searchProRealCode(query);
+      
+      if (searchResults.length > 0) {
+        // Fetch code from top 5 results (with rate limiting)
+        const enrichedResults = [];
+        for (let i = 0; i < Math.min(5, searchResults.length); i++) {
+          const result = searchResults[i];
+          try {
+            await new Promise(r => setTimeout(r, 300)); // Rate limit: 300ms between requests
+            const postData = await fetchPostCode(result.url);
+            enrichedResults.push({
+              title: result.title,
+              description: postData.description || result.excerpt || 'Strategy from ProRealCode forum',
+              keyPoints: postData.keyPoints || '',
+              codeSnippet: postData.codeSnippet || null,
+              url: result.url,
+              searchUrl: null,
+              isRealPost: true
+            });
+          } catch (e) {
+            console.warn('Failed to fetch post:', result.url, e.message);
+            enrichedResults.push({
+              title: result.title,
+              description: result.excerpt || 'Strategy from ProRealCode forum',
+              keyPoints: '',
+              codeSnippet: null,
+              url: result.url,
+              searchUrl: null,
+              isRealPost: true
+            });
+          }
+        }
+        
+        if (enrichedResults.length > 0) {
+          console.log(`Found ${enrichedResults.length} real strategies from ProRealCode`);
+          return res.json({ results: enrichedResults, source: 'prorealcode' });
+        }
+      }
+    } catch (e) {
+      console.warn('ProRealCode forum search failed:', e.message);
+    }
+  }
+  
+  // Fallback to AI-generated ideas
+  console.log('Falling back to AI-generated strategy ideas');
   try {
     const searchPrompt = `Search for ProRealTime trading bot strategies related to: "${query}"
 
@@ -1228,9 +1416,10 @@ Focus on strategies that:
     const resultsWithSearchLinks = (Array.isArray(results) ? results : []).map(r => ({
       ...r,
       url: null,
-      searchUrl: `https://www.prorealcode.com/?s=${encodeURIComponent(r.title || query)}`
+      searchUrl: `https://www.prorealcode.com/?s=${encodeURIComponent(r.title || query)}`,
+      isRealPost: false
     }));
-    res.json({ results: resultsWithSearchLinks });
+    res.json({ results: resultsWithSearchLinks, source: 'ai' });
   } catch (error) {
     console.error('Strategy search error:', error);
     res.status(500).json({ error: 'Failed to search strategies' });
