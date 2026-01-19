@@ -1,150 +1,159 @@
-# Literator
+# Bot Builder for ProRealTime
 
-A full-stack AI-powered application for translating, transforming, and generating literary content with professional PDF output.
+An AI-powered full-stack application for generating ProRealTime/ProBuilder trading bot code with interactive charts, backtesting simulation, and variable optimization.
+
+![Bot Builder Main Interface](docs/images/Screenshot_2026-01-19_at_16-01-04_Bot_Builder_1768806022121.png)
 
 ## Features
 
-### Two Modes of Operation
+### Interactive Chart with Drawing Tools
+- Candlestick charts powered by Lightweight Charts v5
+- Multiple assets: Silver, Gold, Copper, Oil, Gas, Forex pairs, Indices
+- Timeframes from 1 minute to Daily
+- Drawing tools: trend lines, horizontal/vertical lines, high/low markers
 
-**1. Translation/Transformation Mode**
-- Paste or upload source text
-- AI translates or transforms it according to your instructions
+### AI-Powered Strategy Ideas
+Search for trading strategies from ProRealCode forum patterns. Get instant ideas for breakout, trend following, mean reversion, scalping, RSI, MACD, and Bollinger strategies.
 
-**2. Content Generation Mode**
-- Leave the source text empty
-- Describe a topic in the "Topic or Instructions" field
-- AI researches and writes original content in your requested style
+![Strategy Ideas Search](docs/images/ufyeuife_1768806022120.JPG)
 
-### Text Input (Optional)
-- **Drag & Drop**: Upload .txt, .pdf, or .md files directly
-- **Paste Text**: Copy and paste text into the input area
-- **Leave Empty**: Skip to generate content from a topic instead
-- **Auto-detect Metadata**: AI automatically detects book title and author from the text
+### Bot Settings & Code Generation
+- Position size, trade type (long/short/both), cumulate orders
+- Stop loss and take profit configuration
+- Trailing stop with configurable % and step
+- Indicator toggles (OBV, Heikin Ashi) with periods
+- Time and session filters with timezone support
+- AI generates ready-to-use ProBuilder code
 
-### AI Model Selection
-Choose your preferred AI model from the dropdown:
-- **Anthropic Claude**: Sonnet 4.5 (Best), Sonnet 4, Opus 4, 3.5 Sonnet, 3.5 Haiku (Fast)
-- **OpenAI GPT**: GPT-4o, GPT-4o Mini (Fast), GPT-4 Turbo
+### Backtest Simulator
+Test your generated bots against historical data with detailed performance metrics:
 
-### Translation & Transformation
-- **AI-Powered Translation**: Uses your selected model with automatic fallback
-- **Custom Instructions**: Add specific translation guidelines (e.g., "preserve poetic rhythm", "keep honorifics in original language")
-- **Custom Styles**: Specify output style (e.g., "Victorian prose", "minimalist poetry")
-- **Language Preservation**: Supports keeping original language when specified in instructions
-- **Cancel Button**: Stop generation at any time with the cancel button
+![Backtest Simulator](docs/images/Screenshot_2026-01-19_at_14-41-04_Bot_Builder_1768806022122.png)
 
-### Story Collection Mode
-- **Anthology Support**: Enable for books with multiple stories/chapters
-- **Automatic Story Detection**: AI identifies individual stories within a collection
-- **Nested History View**: Collections display with expandable story lists
-- **Individual Story Access**: Click any story to view just that content
+- Equity curve visualization
+- Trade analysis with buy/sell/exit markers
+- Win rate, gain/loss ratio, max drawdown
+- Daily performance breakdown
+- Fee and spread calculations
 
-### PDF Generation
-- **Single PDF**: Download complete translation as one professional PDF
-- **Chapter ZIP**: Split translation into separate PDFs by chapter
-- **Story ZIP**: For collections, get individual PDFs for each story
-- **Professional Layout**: Book-style formatting with proper typography
+### Variable Optimization
+Fine-tune your bot parameters with interactive sliders and auto-optimization:
 
-### Saved Prompts Library
-- **Save Custom Prompts**: Store frequently used instruction/style combinations
-- **Pre-populated Templates**: Includes Suno Song Format template
-- **One-Click Apply**: Click any saved prompt to fill instruction fields
-- **Server-Side Storage**: Prompts persist across browsers and sessions
+![Variable Optimization](docs/images/dgtrt4y_1768806022121.JPG)
 
-### Translation History
-- **Automatic Saving**: All translations are saved automatically
-- **Full Restoration**: Click any history item to restore all input fields
-- **Nested Display**: Collections show expandable story lists
-- **Delete Option**: Remove unwanted history entries
+- Auto-detect numeric variables from generated code
+- Interactive sliders with bidirectional sync
+- Run multiple optimization iterations (5-300)
+- Multiple metrics: Total Gain, Win Rate, Gain/Loss Ratio, Sharpe-like
 
-### User Interface
-- **Dark Mode**: Toggle between light and dark themes
-- **Mobile Responsive**: Collapsible sidebars with hamburger menus
-- **Two-Sidebar Layout**: History on left, Saved Prompts on right
+### Optimization Results
+Compare and apply the best configurations:
 
-## Running the Application
+![Optimization Results](docs/images/urutrutr_1768806022121.JPG)
 
-### Prerequisites
-- Node.js (v18 or higher recommended)
-- npm
+- Top 10 results comparison chart
+- Detailed result cards with all variables
+- One-click apply to use any configuration
+- Copy code with optimized values
 
-### Installation
+### Result Details Modal
+View comprehensive details for each optimization result:
 
-1. Install backend dependencies:
-```bash
-npm install
-```
+![Result Details](docs/images/Screenshot_2026-01-19_at_16-04-14_Bot_Builder_1768806022120.png)
 
-2. Install frontend dependencies:
-```bash
-cd client && npm install
-```
+- All variable values applied
+- Full performance statistics
+- Copy code button with variables applied
+- Apply configuration instantly
 
-### Starting the Application
+## Tech Stack
 
-Run both servers simultaneously:
-
-**Backend Server** (port 3001):
-```bash
-node server/index.js
-```
-
-**Frontend** (port 5000):
-```bash
-cd client && npm run dev
-```
-
-The application will be available at `http://localhost:5000`
+- **Frontend**: Vite + Vanilla JS + Tailwind CSS
+- **Charts**: Lightweight Charts v5
+- **Backend**: Node.js + Express
+- **AI Models**: Claude Sonnet & GPT-4o via Replit AI Integrations
+- **Storage**: JSON file-based persistence
 
 ## Project Structure
 
 ```
 /
 ├── client/                 # Vite frontend
-│   ├── index.html         # Main HTML with UI layout
+│   ├── index.html         # Main HTML with tabs
 │   ├── src/
-│   │   ├── main.js        # Frontend JavaScript logic
+│   │   ├── main.js        # Main frontend JavaScript
+│   │   ├── botBuilder.js  # Bot Builder logic
 │   │   └── style.css      # Tailwind + custom styles
 │   ├── vite.config.js     # Vite configuration
-│   ├── tailwind.config.js # Tailwind configuration
 │   └── package.json       # Frontend dependencies
 ├── server/
-│   └── index.js           # Express backend server
-├── fonts/                  # Roboto fonts for PDF generation
+│   └── index.js           # Express server
 ├── data/                   # Persistent storage
-│   ├── translations.json  # Translation history
-│   └── prompts.json       # Saved prompts library
-├── downloads/              # Generated PDF storage
-├── package.json           # Backend dependencies
-└── README.md              # This file
+│   ├── bots/              # Saved bot configurations
+│   ├── strategies.json    # Strategy templates
+│   └── search-history.json # Search history
+├── docs/images/           # Screenshots
+└── package.json           # Backend dependencies
 ```
+
+## Running the App
+
+### Development
+
+1. Start the backend server:
+```bash
+node server/index.js
+```
+
+2. Start the frontend (in another terminal):
+```bash
+cd client && npm run dev
+```
+
+The frontend runs on port 5000 and proxies API requests to the backend on port 3001.
+
+## Key Features Detail
+
+### Strategy Template Library
+- Save discovered strategies to dropdown menu
+- Auto-load saved strategies on page load
+- One-click fill of Custom Instructions
+
+### Search History
+- Auto-saves all strategy searches
+- Browse past searches with date/time
+- Expand to see all results from any search
+- Add/Use buttons work from history entries
+
+### ProRealCode Forum Conventions
+- Code follows forum conventions: flat structure, verbose IF/ENDIF
+- Assumes IG Markets + ProRealTime AutoTrading (ProOrder) environment
+- Only documented ProBuilder functions used
+
+### Variable Persistence
+- Slider adjustments auto-save to bot history
+- Restore configurations when reopening saved bots
 
 ## API Endpoints
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/parse-pdf` | POST | Extract text from uploaded PDF |
-| `/api/detect-metadata` | POST | AI detection of title/author from text |
-| `/api/translate` | POST | Translate text (SSE streaming) |
-| `/api/generate-pdf` | POST | Generate PDF from translation |
-| `/api/history` | GET | List all translations |
-| `/api/history/:id` | GET | Get specific translation |
-| `/api/history/:id` | DELETE | Delete translation |
-| `/api/prompts` | GET | List all saved prompts |
-| `/api/prompts` | POST | Save new prompt |
-| `/api/prompts/:index` | DELETE | Delete saved prompt |
+### Bot Builder
+- `POST /api/generate-bot` - Generate ProRealTime bot code
+- `POST /api/fix-bot` - Fix bot code based on error message
+- `GET /api/bot-history` - List all saved bot generations
+- `POST /api/simulate-bot` - Run backtest simulation
+- `GET /api/strategies` - Get saved strategy templates
+- `POST /api/strategies` - Save a strategy template
+- `GET /api/search-history` - Get search history
+- `POST /api/search-strategies` - Search for strategy ideas
 
-## Usage Tips
+## Additional Feature: Text Translation
 
-1. **For best translation results**: Provide clear custom instructions about tone, style, and any terms to preserve
-2. **Story collections**: Enable "Story Collection" checkbox for anthologies to get per-story PDFs
-3. **Language preservation**: Include phrases like "keep original language" or "do not translate" in instructions
-4. **Saved prompts**: Check "Save Prompt" (enabled by default) to save your instruction/style combination for reuse
+The app also includes a **Text tab** for translating/transforming literary texts:
+- AI-powered translation with custom instructions
+- Multiple AI model support (Claude & GPT)
+- PDF generation with professional book layout
+- Translation history and saved prompts
 
-## Tech Stack
+## License
 
-- **Frontend**: Vite, Vanilla JavaScript, Tailwind CSS
-- **Backend**: Node.js, Express
-- **AI Models**: Claude Sonnet (via Replit AI), GPT-4o-mini (fallback)
-- **PDF Generation**: pdfmake with Roboto fonts
-- **Storage**: JSON file-based persistence
+Personal use only. Not for commercial distribution.
