@@ -120,6 +120,17 @@ The frontend proxies API requests to the backend.
 - Save Prompt checkbox enabled by default to save custom prompts
 
 ## Recent Changes (Jan 19, 2026)
+- **Get Strategy Ideas Feature**:
+  - New "Get Strategy Ideas" button next to strategy dropdown in Bot Settings
+  - Modal with category chips (Breakout, Trend Following, Mean Reversion, RSI, MACD, Scalping, etc.)
+  - AI-powered search generates ProRealCode forum-style strategy ideas
+  - Each result shows title, description, code preview, and "Use This" button
+  - Clicking "Use This" populates Custom Instructions with strategy details
+- **ProRealCode Forum Conventions**:
+  - PRC_STYLE_CONSTRAINTS enforced in both generate-bot and fix-bot prompts
+  - Ensures code follows forum conventions: flat structure, verbose IF/ENDIF, no underscores
+  - Assumes IG Markets + ProRealTime AutoTrading (ProOrder) environment
+  - No TradingView/PineScript/MQL syntax - only documented ProBuilder functions
 - **Enhanced Optimization Results Panel**:
   - Bigger, expandable panel (350px collapsed, 700px expanded)
   - Comparison bar chart showing top 10 results (green=gain, blue=win rate)
