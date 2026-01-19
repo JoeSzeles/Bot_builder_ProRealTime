@@ -1116,6 +1116,295 @@ Generate the fixed, ready-to-use ProBuilder code now:`;
   }
 });
 
+// Backtest simulation endpoint
+app.post('/api/simulate-bot', async (req, res) => {
+  const { code, candles, settings } = req.body;
+  
+  if (!code || !candles || candles.length === 0) {
+    return res.status(400).json({ error: 'Bot code and candle data are required' });
+  }
+  
+  try {
+    const results = runBacktest(code, candles, settings);
+    res.json(results);
+  } catch (error) {
+    console.error('Simulation error:', error);
+    res.status(500).json({ error: error.message || 'Simulation failed' });
+  }
+});
+
+function runBacktest(code, candles, settings) {
+  const initialCapital = settings?.initialCapital || 2000;
+  const maxPositionSize = settings?.maxPositionSize || 1;
+  const useOrderFee = settings?.useOrderFee ?? true;
+  const orderFee = settings?.orderFee || 7;
+  const useSpread = settings?.useSpread ?? true;
+  const spreadPips = settings?.spreadPips || 2;
+  const positionSize = Math.min(settings?.positionSize || 0.5, maxPositionSize);
+  const stopLoss = settings?.stopLoss || 7000;
+  const takeProfit = settings?.takeProfit || 300;
+  const tradeType = settings?.tradeType || 'both';
+  const asset = settings?.asset || 'silver';
+  
+  let capital = initialCapital;
+  let position = null;
+  let trades = [];
+  let equity = [initialCapital];
+  let dailyGains = {};
+  let barsInPosition = 0;
+  let totalBars = candles.length;
+  
+  const POINT_VALUES = {
+    silver: 0.01,
+    gold: 0.1,
+    copper: 0.0001,
+    oil: 0.01,
+    natgas: 0.001,
+    eurusd: 0.0001,
+    gbpusd: 0.0001,
+    usdjpy: 0.01,
+    spx500: 0.25,
+    dax: 0.5,
+    ftse: 0.5
+  };
+  
+  const CONTRACT_VALUES = {
+    silver: 5000,
+    gold: 100,
+    copper: 25000,
+    oil: 1000,
+    natgas: 10000,
+    eurusd: 100000,
+    gbpusd: 100000,
+    usdjpy: 100000,
+    spx500: 50,
+    dax: 25,
+    ftse: 10
+  };
+  
+  const pointValue = POINT_VALUES[asset] || 0.01;
+  const contractValue = CONTRACT_VALUES[asset] || 1000;
+  const spreadCost = useSpread ? spreadPips * pointValue : 0;
+  const feePerTrade = useOrderFee ? orderFee : 0;
+  
+  const canLong = tradeType === 'both' || tradeType === 'long';
+  const canShort = tradeType === 'both' || tradeType === 'short';
+  
+  const useOBV = settings?.useOBV ?? true;
+  const useHeikinAshi = settings?.useHeikinAshi ?? true;
+  const obvPeriod = settings?.obvPeriod || 5;
+  
+  let obvValues = [];
+  let prevClose = candles[0]?.close || 0;
+  let cumulativeOBV = 0;
+  
+  function calculateHeikinAshi(candle, prevHA) {
+    const haClose = (candle.open + candle.high + candle.low + candle.close) / 4;
+    const haOpen = prevHA ? (prevHA.open + prevHA.close) / 2 : (candle.open + candle.close) / 2;
+    const haHigh = Math.max(candle.high, haOpen, haClose);
+    const haLow = Math.min(candle.low, haOpen, haClose);
+    return { open: haOpen, high: haHigh, low: haLow, close: haClose };
+  }
+  
+  function getOBVSignal(obvArr, period) {
+    if (obvArr.length < period + 1) return 0;
+    const recent = obvArr.slice(-period);
+    const older = obvArr.slice(-(period * 2), -period);
+    if (older.length === 0) return recent[recent.length - 1] > 0 ? 1 : -1;
+    const recentAvg = recent.reduce((a, b) => a + b, 0) / recent.length;
+    const olderAvg = older.reduce((a, b) => a + b, 0) / older.length;
+    return recentAvg > olderAvg ? 1 : recentAvg < olderAvg ? -1 : 0;
+  }
+  
+  let prevHA = null;
+  const stopLossPoints = stopLoss * pointValue;
+  const takeProfitPoints = takeProfit * pointValue;
+  
+  for (let i = 1; i < candles.length; i++) {
+    const candle = candles[i];
+    const prevCandle = candles[i - 1];
+    
+    if (candle.close > prevClose) {
+      cumulativeOBV += (candle.close - prevClose);
+    } else if (candle.close < prevClose) {
+      cumulativeOBV -= (prevClose - candle.close);
+    }
+    obvValues.push(cumulativeOBV);
+    prevClose = candle.close;
+    
+    const ha = calculateHeikinAshi(candle, prevHA);
+    prevHA = ha;
+    
+    const bullishHA = ha.close > ha.open;
+    const obvSignal = getOBVSignal(obvValues, obvPeriod);
+    
+    const date = new Date(candle.time * 1000).toISOString().split('T')[0];
+    
+    if (position) {
+      barsInPosition++;
+      
+      const priceDiff = position.type === 'long' 
+        ? candle.close - position.entryPrice
+        : position.entryPrice - candle.close;
+      
+      const pnl = priceDiff * positionSize * contractValue;
+      
+      const stopHit = priceDiff <= -stopLossPoints;
+      const targetHit = priceDiff >= takeProfitPoints;
+      
+      let signalExit = false;
+      if (useHeikinAshi) {
+        if (position.type === 'long' && !bullishHA) signalExit = true;
+        if (position.type === 'short' && bullishHA) signalExit = true;
+      }
+      
+      let exitReason = null;
+      if (stopHit) exitReason = 'stop';
+      else if (targetHit) exitReason = 'target';
+      else if (signalExit) exitReason = 'signal';
+      
+      if (exitReason) {
+        const grossPnl = pnl - (spreadCost * positionSize * contractValue);
+        const netPnl = grossPnl - feePerTrade;
+        
+        capital += netPnl;
+        
+        trades.push({
+          type: position.type,
+          entryPrice: position.entryPrice,
+          exitPrice: candle.close,
+          entryTime: position.entryTime,
+          exitTime: candle.time,
+          pnl: netPnl,
+          exitReason
+        });
+        
+        if (!dailyGains[date]) dailyGains[date] = 0;
+        dailyGains[date] += netPnl;
+        
+        position = null;
+      }
+    } else {
+      let shouldBuy = false;
+      let shouldSell = false;
+      
+      if (useHeikinAshi && useOBV) {
+        shouldBuy = bullishHA && obvSignal > 0;
+        shouldSell = !bullishHA && obvSignal < 0;
+      } else if (useHeikinAshi) {
+        shouldBuy = bullishHA && !prevHA?.close || (prevHA && ha.close > prevHA.close);
+        shouldSell = !bullishHA && prevHA && ha.close < prevHA.close;
+      } else if (useOBV) {
+        shouldBuy = obvSignal > 0;
+        shouldSell = obvSignal < 0;
+      } else {
+        shouldBuy = candle.close > prevCandle.close && candle.close > candle.open;
+        shouldSell = candle.close < prevCandle.close && candle.close < candle.open;
+      }
+      
+      if (shouldBuy && canLong && !position) {
+        capital -= feePerTrade;
+        position = {
+          type: 'long',
+          entryPrice: candle.close + spreadCost,
+          entryTime: candle.time
+        };
+      } else if (shouldSell && canShort && !position) {
+        capital -= feePerTrade;
+        position = {
+          type: 'short',
+          entryPrice: candle.close - spreadCost,
+          entryTime: candle.time
+        };
+      }
+    }
+    
+    equity.push(capital);
+  }
+  
+  if (position) {
+    const lastCandle = candles[candles.length - 1];
+    const pnl = position.type === 'long'
+      ? (lastCandle.close - position.entryPrice) * positionSize * 1000
+      : (position.entryPrice - lastCandle.close) * positionSize * 1000;
+    const netPnl = pnl - spreadCost * positionSize * 1000 - feePerTrade;
+    capital += netPnl;
+    trades.push({
+      type: position.type,
+      entryPrice: position.entryPrice,
+      exitPrice: lastCandle.close,
+      entryTime: position.entryTime,
+      exitTime: lastCandle.time,
+      pnl: netPnl,
+      exitReason: 'end'
+    });
+  }
+  
+  const winningTrades = trades.filter(t => t.pnl > 0);
+  const losingTrades = trades.filter(t => t.pnl < 0);
+  const neutralTrades = trades.filter(t => t.pnl === 0);
+  
+  const totalGain = capital - initialCapital;
+  const winRate = trades.length > 0 ? (winningTrades.length / trades.length) * 100 : 0;
+  
+  const gainsOnly = winningTrades.reduce((sum, t) => sum + t.pnl, 0);
+  const lossesOnly = losingTrades.reduce((sum, t) => sum + t.pnl, 0);
+  
+  const avgWin = winningTrades.length > 0 ? gainsOnly / winningTrades.length : 0;
+  const avgLoss = losingTrades.length > 0 ? Math.abs(lossesOnly) / losingTrades.length : 1;
+  const gainLossRatio = avgLoss > 0 ? avgWin / avgLoss : avgWin;
+  
+  let maxDrawdown = 0;
+  let maxRunup = 0;
+  let peak = initialCapital;
+  let trough = initialCapital;
+  
+  for (const eq of equity) {
+    if (eq > peak) peak = eq;
+    if (eq < trough) trough = eq;
+    
+    const drawdown = peak - eq;
+    const runup = eq - trough;
+    
+    if (drawdown > maxDrawdown) maxDrawdown = drawdown;
+    if (runup > maxRunup) maxRunup = runup;
+  }
+  
+  const timeInMarket = totalBars > 0 ? (barsInPosition / totalBars) * 100 : 0;
+  
+  const tradeDays = Object.keys(dailyGains).length || 1;
+  const avgOrdersPerDay = trades.length / tradeDays;
+  
+  const avgGainPerTrade = trades.length > 0 ? totalGain / trades.length : 0;
+  const bestTrade = trades.length > 0 ? Math.max(...trades.map(t => t.pnl)) : 0;
+  const worstTrade = trades.length > 0 ? Math.min(...trades.map(t => t.pnl)) : 0;
+  
+  const dailyPerformance = Object.entries(dailyGains)
+    .map(([date, gain]) => ({ date, gain }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  
+  return {
+    totalGain,
+    winRate,
+    gainLossRatio,
+    totalTrades: trades.length,
+    winningTrades: winningTrades.length,
+    losingTrades: losingTrades.length,
+    neutralTrades: neutralTrades.length,
+    gainsOnly,
+    lossesOnly,
+    avgGainPerTrade,
+    bestTrade,
+    worstTrade,
+    maxDrawdown: -maxDrawdown,
+    maxRunup,
+    timeInMarket,
+    avgOrdersPerDay,
+    dailyPerformance,
+    equity
+  };
+}
+
 // Market data endpoints
 const TWELVEDATA_API_KEY = process.env.TWELVEDATA_API_KEY;
 const METALS_API_KEY = process.env.METALS_API_KEY;

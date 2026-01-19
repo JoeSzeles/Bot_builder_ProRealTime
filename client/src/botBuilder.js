@@ -375,6 +375,12 @@ function getSettings() {
   return {
     asset: document.getElementById('assetSelect')?.value || 'silver',
     timeframe: document.getElementById('timeframeSelect')?.value || '1h',
+    initialCapital: parseFloat(document.getElementById('initialCapital')?.value) || 2000,
+    maxPositionSize: parseFloat(document.getElementById('maxPositionSize')?.value) || 1,
+    useOrderFee: document.getElementById('useOrderFee')?.checked ?? true,
+    orderFee: parseFloat(document.getElementById('orderFee')?.value) || 7,
+    useSpread: document.getElementById('useSpread')?.checked ?? true,
+    spreadPips: parseFloat(document.getElementById('spreadPips')?.value) || 2,
     positionSize: parseFloat(document.getElementById('positionSize')?.value) || 0.5,
     tradeType: document.getElementById('tradeType')?.value || 'both',
     cumulateOrders: document.getElementById('cumulateOrders')?.checked || false,
@@ -397,6 +403,17 @@ function buildBotDescription(settings) {
   
   desc += `ASSET: ${settings.asset.toUpperCase()}\n`;
   desc += `TIMEFRAME: ${settings.timeframe}\n\n`;
+  
+  desc += `CAPITAL & FEES:\n`;
+  desc += `- Initial capital: $${settings.initialCapital}\n`;
+  desc += `- Maximum position size: ${settings.maxPositionSize}\n`;
+  if (settings.useOrderFee) {
+    desc += `- Order fee: $${settings.orderFee} per order\n`;
+  }
+  if (settings.useSpread) {
+    desc += `- Spread: ${settings.spreadPips} pips\n`;
+  }
+  desc += `\n`;
   
   desc += `POSITION SETTINGS:\n`;
   desc += `- Position size: ${settings.positionSize}\n`;
@@ -820,6 +837,165 @@ export function initScreenshotHandlers() {
       if (historyItem) {
         loadBotEntry(historyItem.dataset.id);
       }
+    });
+  }
+  
+  setupBotSubTabs();
+  setupSimulator();
+}
+
+function setupBotSubTabs() {
+  const settingsTabBtn = document.getElementById('botSettingsTabBtn');
+  const simulatorTabBtn = document.getElementById('botSimulatorTabBtn');
+  const settingsContent = document.getElementById('botSettingsTabContent');
+  const simulatorContent = document.getElementById('botSimulatorTabContent');
+  
+  if (settingsTabBtn && simulatorTabBtn) {
+    settingsTabBtn.addEventListener('click', () => {
+      settingsTabBtn.className = 'bot-sub-tab px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300';
+      simulatorTabBtn.className = 'bot-sub-tab px-4 py-2 rounded-lg text-sm font-medium transition-colors text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700';
+      if (settingsContent) settingsContent.classList.remove('hidden');
+      if (simulatorContent) simulatorContent.classList.add('hidden');
+    });
+    
+    simulatorTabBtn.addEventListener('click', () => {
+      simulatorTabBtn.className = 'bot-sub-tab px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300';
+      settingsTabBtn.className = 'bot-sub-tab px-4 py-2 rounded-lg text-sm font-medium transition-colors text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700';
+      if (settingsContent) settingsContent.classList.add('hidden');
+      if (simulatorContent) simulatorContent.classList.remove('hidden');
+    });
+  }
+}
+
+let currentCandles = [];
+
+function setupSimulator() {
+  const runBtn = document.getElementById('runSimulatorBtn');
+  if (runBtn) {
+    runBtn.addEventListener('click', runSimulation);
+  }
+}
+
+async function runSimulation() {
+  const runBtn = document.getElementById('runSimulatorBtn');
+  const statusEl = document.getElementById('simulatorStatus');
+  const noResultsEl = document.getElementById('simulatorNoResults');
+  const resultsEl = document.getElementById('simulatorResults');
+  
+  if (!generatedBotCode) {
+    alert('Please generate a bot first before running the simulation.');
+    return;
+  }
+  
+  runBtn.disabled = true;
+  runBtn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Running...';
+  
+  if (statusEl) {
+    statusEl.classList.remove('hidden');
+    statusEl.textContent = 'Running simulation...';
+  }
+  
+  try {
+    const settings = getSettings();
+    const asset = document.getElementById('assetSelect')?.value || 'silver';
+    const timeframe = document.getElementById('timeframeSelect')?.value || '1m';
+    
+    const candles = await fetchMarketData(asset, timeframe);
+    currentCandles = candles;
+    
+    const response = await fetch('/api/simulate-bot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        code: generatedBotCode,
+        candles,
+        settings
+      })
+    });
+    
+    const results = await response.json();
+    
+    if (results.error) {
+      if (statusEl) {
+        statusEl.textContent = `Error: ${results.error}`;
+        statusEl.className = 'mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-sm';
+      }
+      return;
+    }
+    
+    displaySimulationResults(results);
+    
+    if (statusEl) statusEl.classList.add('hidden');
+    if (noResultsEl) noResultsEl.classList.add('hidden');
+    if (resultsEl) resultsEl.classList.remove('hidden');
+    
+  } catch (e) {
+    console.error('Simulation error:', e);
+    if (statusEl) {
+      statusEl.textContent = `Error: ${e.message}`;
+      statusEl.className = 'mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-sm';
+    }
+  } finally {
+    runBtn.disabled = false;
+    runBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+    </svg> Run Backtest`;
+  }
+}
+
+function displaySimulationResults(r) {
+  const formatMoney = (v) => {
+    const sign = v >= 0 ? '' : '-';
+    return `${sign}$${Math.abs(v).toFixed(2)}`;
+  };
+  
+  document.getElementById('simTotalGain').textContent = formatMoney(r.totalGain);
+  document.getElementById('simTotalGain').className = `text-2xl font-bold ${r.totalGain >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`;
+  
+  document.getElementById('simWinRate').textContent = `${r.winRate.toFixed(1)}%`;
+  document.getElementById('simGainLossRatio').textContent = r.gainLossRatio.toFixed(2);
+  document.getElementById('simTotalTrades').textContent = r.totalTrades;
+  
+  const winCircle = document.getElementById('winRateCircle');
+  const circumference = 2 * Math.PI * 40;
+  const dashArray = (r.winRate / 100) * circumference;
+  winCircle.setAttribute('stroke-dasharray', `${dashArray} ${circumference}`);
+  document.getElementById('winRatePercent').textContent = `${r.winRate.toFixed(0)}%`;
+  
+  document.getElementById('simWinningTrades').textContent = r.winningTrades;
+  document.getElementById('simNeutralTrades').textContent = r.neutralTrades;
+  document.getElementById('simLosingTrades').textContent = r.losingTrades;
+  
+  document.getElementById('simGainsOnly').textContent = formatMoney(r.gainsOnly);
+  document.getElementById('simLossesOnly').textContent = formatMoney(Math.abs(r.lossesOnly));
+  
+  const maxVal = Math.max(Math.abs(r.gainsOnly), Math.abs(r.lossesOnly)) || 1;
+  document.getElementById('gainsBar').style.width = `${(r.gainsOnly / maxVal) * 100}%`;
+  document.getElementById('lossesBar').style.width = `${(Math.abs(r.lossesOnly) / maxVal) * 100}%`;
+  
+  document.getElementById('simAvgGain').textContent = formatMoney(r.avgGainPerTrade);
+  document.getElementById('simBestTrade').textContent = formatMoney(r.bestTrade);
+  document.getElementById('simWorstTrade').textContent = formatMoney(r.worstTrade);
+  
+  document.getElementById('simMaxDrawdown').textContent = formatMoney(r.maxDrawdown);
+  document.getElementById('simMaxRunup').textContent = formatMoney(r.maxRunup);
+  document.getElementById('simTimeInMarket').textContent = `${r.timeInMarket.toFixed(1)}%`;
+  document.getElementById('simAvgOrdersDay').textContent = r.avgOrdersPerDay.toFixed(2);
+  
+  const chartContainer = document.getElementById('performanceChartContainer');
+  if (chartContainer && r.dailyPerformance) {
+    chartContainer.innerHTML = '';
+    const maxDailyGain = Math.max(...r.dailyPerformance.map(d => Math.abs(d.gain)), 1);
+    
+    r.dailyPerformance.slice(-30).forEach(d => {
+      const bar = document.createElement('div');
+      const height = (Math.abs(d.gain) / maxDailyGain) * 100;
+      const isPositive = d.gain >= 0;
+      bar.className = `flex-1 rounded-t ${isPositive ? 'bg-green-500' : 'bg-red-500'}`;
+      bar.style.height = `${Math.max(height, 2)}%`;
+      bar.title = `${d.date}: ${formatMoney(d.gain)}`;
+      chartContainer.appendChild(bar);
     });
   }
 }

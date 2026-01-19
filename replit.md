@@ -122,12 +122,20 @@ The frontend proxies API requests to the backend.
   - Drawing tools (trend lines, horizontal/vertical lines, high/low markers)
   - Asset selector with commodities, forex, and indices
   - Timeframe selector triggers data reload
+  - **Fee Settings Panel**: Initial capital, max position size, order fee ($/order), spread (pips)
   - Bot settings panel with position, risk, indicator, and strategy options
-  - AI-powered code generation with ProRealTime syntax rules
+  - AI-powered code generation with ProRealTime syntax rules (includes fee settings)
   - Error correction feature to fix code based on error messages
   - **Screenshot upload**: Upload or paste (Ctrl+V) chart screenshots for AI analysis
   - **Bot History sidebar**: Left sidebar shows saved bots when on Bot Builder tab
   - **Auto-save**: Each generated bot is saved to its own JSON file in data/bots/
+  - **Simulator Tab**: Backtest generated bot on current chart data
+    - Run backtest with fee/spread calculations
+    - Results dashboard: total gain, win rate (pie chart), gain/loss ratio
+    - Trade distribution (winning/losing/neutral)
+    - Max drawdown, max runup, time in market %, avg orders/day
+    - Average gain per trade with best/worst trade stats
+    - Daily performance bar chart
 
 ## Earlier Changes (Dec 12, 2025)
 - **Cancel Generation Button**: Red cancel button appears during processing to abort generation

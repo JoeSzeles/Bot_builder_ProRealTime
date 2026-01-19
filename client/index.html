@@ -361,32 +361,69 @@
 
         <!-- Bot Settings Section -->
         <section class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Bot Strategy Settings</h3>
-          
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <!-- Position Settings -->
-            <div class="space-y-4">
-              <h4 class="text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Position</h4>
-              
-              <div>
-                <label class="block text-sm text-gray-700 dark:text-gray-300 mb-1">Position Size</label>
-                <input type="number" id="positionSize" value="0.5" step="0.1" min="0.1" max="10" class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm">
+          <!-- Tab Navigation -->
+          <div class="flex items-center gap-2 mb-4 border-b border-gray-200 dark:border-gray-600 pb-3">
+            <button id="botSettingsTabBtn" class="bot-sub-tab px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300">Settings</button>
+            <button id="botSimulatorTabBtn" class="bot-sub-tab px-4 py-2 rounded-lg text-sm font-medium transition-colors text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700">Simulator</button>
+          </div>
+
+          <!-- Settings Tab Content -->
+          <div id="botSettingsTabContent">
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Bot Strategy Settings</h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <!-- Capital & Fees Settings -->
+              <div class="space-y-4">
+                <h4 class="text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Capital & Fees</h4>
+                
+                <div>
+                  <label class="block text-sm text-gray-700 dark:text-gray-300 mb-1">Initial Capital ($)</label>
+                  <input type="number" id="initialCapital" value="2000" step="100" min="100" class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm">
+                </div>
+                
+                <div>
+                  <label class="block text-sm text-gray-700 dark:text-gray-300 mb-1">Max Position Size</label>
+                  <input type="number" id="maxPositionSize" value="1" step="0.1" min="0.1" max="100" class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm">
+                </div>
+                
+                <div class="flex items-center gap-2">
+                  <input type="checkbox" id="useOrderFee" checked class="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600">
+                  <label for="useOrderFee" class="text-sm text-gray-700 dark:text-gray-300">Order Fee</label>
+                  <input type="number" id="orderFee" value="7" step="0.5" min="0" class="w-16 px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm">
+                  <span class="text-xs text-gray-500">$/order</span>
+                </div>
+                
+                <div class="flex items-center gap-2">
+                  <input type="checkbox" id="useSpread" checked class="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600">
+                  <label for="useSpread" class="text-sm text-gray-700 dark:text-gray-300">Spread</label>
+                  <input type="number" id="spreadPips" value="2" step="0.1" min="0" class="w-16 px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm">
+                  <span class="text-xs text-gray-500">pips</span>
+                </div>
               </div>
-              
-              <div>
-                <label class="block text-sm text-gray-700 dark:text-gray-300 mb-1">Trade Type</label>
-                <select id="tradeType" class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm">
-                  <option value="both">Long & Short</option>
-                  <option value="long">Long Only</option>
-                  <option value="short">Short Only</option>
-                </select>
+
+              <!-- Position Settings -->
+              <div class="space-y-4">
+                <h4 class="text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">Position</h4>
+                
+                <div>
+                  <label class="block text-sm text-gray-700 dark:text-gray-300 mb-1">Position Size</label>
+                  <input type="number" id="positionSize" value="0.5" step="0.1" min="0.1" max="10" class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm">
+                </div>
+                
+                <div>
+                  <label class="block text-sm text-gray-700 dark:text-gray-300 mb-1">Trade Type</label>
+                  <select id="tradeType" class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm">
+                    <option value="both">Long & Short</option>
+                    <option value="long">Long Only</option>
+                    <option value="short">Short Only</option>
+                  </select>
+                </div>
+                
+                <div class="flex items-center gap-2">
+                  <input type="checkbox" id="cumulateOrders" class="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600">
+                  <label for="cumulateOrders" class="text-sm text-gray-700 dark:text-gray-300">Cumulate Orders</label>
+                </div>
               </div>
-              
-              <div class="flex items-center gap-2">
-                <input type="checkbox" id="cumulateOrders" class="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600">
-                <label for="cumulateOrders" class="text-sm text-gray-700 dark:text-gray-300">Cumulate Orders</label>
-              </div>
-            </div>
 
             <!-- Stop/Target Settings -->
             <div class="space-y-4">
@@ -470,13 +507,181 @@
           </div>
 
           <!-- Generate Bot Button -->
-          <div class="mt-6">
-            <button id="generateBotBtn" class="w-full py-4 px-6 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+            <div class="mt-6">
+              <button id="generateBotBtn" class="w-full py-4 px-6 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+                </svg>
+                Generate ProRealTime Bot Code
+              </button>
+            </div>
+          </div>
+
+          <!-- Simulator Tab Content -->
+          <div id="botSimulatorTabContent" class="hidden">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Backtest Simulator</h3>
+              <button id="runSimulatorBtn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                Run Backtest
+              </button>
+            </div>
+
+            <!-- Simulator Status -->
+            <div id="simulatorStatus" class="hidden mb-4 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-sm">
+              Running simulation...
+            </div>
+
+            <!-- No Results Placeholder -->
+            <div id="simulatorNoResults" class="text-center py-12 text-gray-500 dark:text-gray-400">
+              <svg class="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
               </svg>
-              Generate ProRealTime Bot Code
-            </button>
+              <p class="text-lg font-medium mb-2">No simulation results yet</p>
+              <p class="text-sm">Generate a bot first, then click "Run Backtest" to see results</p>
+            </div>
+
+            <!-- Results Dashboard -->
+            <div id="simulatorResults" class="hidden space-y-6">
+              <!-- Top Stats Row -->
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <!-- Total Gain -->
+                <div class="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/30 dark:to-green-800/30 rounded-xl p-4 text-center">
+                  <div class="text-2xl font-bold text-green-600 dark:text-green-400" id="simTotalGain">$0.00</div>
+                  <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Total Gain</div>
+                </div>
+                <!-- Win Rate -->
+                <div class="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 rounded-xl p-4 text-center">
+                  <div class="text-2xl font-bold text-blue-600 dark:text-blue-400" id="simWinRate">0%</div>
+                  <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Win Rate</div>
+                </div>
+                <!-- Gain/Loss Ratio -->
+                <div class="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/30 rounded-xl p-4 text-center">
+                  <div class="text-2xl font-bold text-purple-600 dark:text-purple-400" id="simGainLossRatio">0.00</div>
+                  <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Gain/Loss Ratio</div>
+                </div>
+                <!-- Total Trades -->
+                <div class="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700/30 dark:to-gray-600/30 rounded-xl p-4 text-center">
+                  <div class="text-2xl font-bold text-gray-700 dark:text-gray-300" id="simTotalTrades">0</div>
+                  <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Total Trades</div>
+                </div>
+              </div>
+
+              <!-- Second Row: Win Rate Chart + Trade Distribution -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Win Rate Pie Chart -->
+                <div class="bg-white dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600">
+                  <h4 class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-3">Win Rate</h4>
+                  <div class="flex items-center justify-center">
+                    <div id="winRateChart" class="relative w-32 h-32">
+                      <svg viewBox="0 0 100 100" class="w-full h-full transform -rotate-90">
+                        <circle cx="50" cy="50" r="40" fill="none" stroke="#e5e7eb" stroke-width="12" class="dark:stroke-gray-600"/>
+                        <circle id="winRateCircle" cx="50" cy="50" r="40" fill="none" stroke="#22c55e" stroke-width="12" stroke-dasharray="0 251.2" stroke-linecap="round"/>
+                      </svg>
+                      <div class="absolute inset-0 flex items-center justify-center">
+                        <span id="winRatePercent" class="text-xl font-bold text-gray-800 dark:text-white">0%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Trade Distribution -->
+                <div class="bg-white dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600">
+                  <h4 class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-3">Trade Distribution</h4>
+                  <div class="space-y-2">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm text-green-600 dark:text-green-400">Winning</span>
+                      <span id="simWinningTrades" class="font-medium text-green-600 dark:text-green-400">0</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm text-gray-500">Neutral</span>
+                      <span id="simNeutralTrades" class="font-medium text-gray-500">0</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm text-red-600 dark:text-red-400">Losing</span>
+                      <span id="simLosingTrades" class="font-medium text-red-600 dark:text-red-400">0</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Third Row: Gains/Losses + Average Trade -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Gains & Losses -->
+                <div class="bg-white dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600">
+                  <h4 class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-3">Gains & Losses</h4>
+                  <div class="space-y-3">
+                    <div>
+                      <div class="flex justify-between text-sm mb-1">
+                        <span class="text-green-600 dark:text-green-400">Gains only</span>
+                        <span id="simGainsOnly" class="font-medium text-green-600 dark:text-green-400">$0.00</span>
+                      </div>
+                      <div class="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2">
+                        <div id="gainsBar" class="bg-green-500 h-2 rounded-full" style="width: 0%"></div>
+                      </div>
+                    </div>
+                    <div>
+                      <div class="flex justify-between text-sm mb-1">
+                        <span class="text-red-600 dark:text-red-400">Losses only</span>
+                        <span id="simLossesOnly" class="font-medium text-red-600 dark:text-red-400">$0.00</span>
+                      </div>
+                      <div class="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2">
+                        <div id="lossesBar" class="bg-red-500 h-2 rounded-full" style="width: 0%"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Avg Gain Per Trade -->
+                <div class="bg-white dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600">
+                  <h4 class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-3">Avg Gain Per Trade</h4>
+                  <div class="text-center">
+                    <div id="simAvgGain" class="text-2xl font-bold text-gray-800 dark:text-white mb-2">$0.00</div>
+                    <div class="flex justify-center gap-4 text-xs">
+                      <div>
+                        <span class="text-green-600 dark:text-green-400">Best: </span>
+                        <span id="simBestTrade" class="font-medium text-green-600 dark:text-green-400">$0.00</span>
+                      </div>
+                      <div>
+                        <span class="text-red-600 dark:text-red-400">Worst: </span>
+                        <span id="simWorstTrade" class="font-medium text-red-600 dark:text-red-400">$0.00</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Fourth Row: Drawdown + Time Stats -->
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="bg-white dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600 text-center">
+                  <div id="simMaxDrawdown" class="text-lg font-bold text-red-600 dark:text-red-400">$0.00</div>
+                  <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Max Drawdown</div>
+                </div>
+                <div class="bg-white dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600 text-center">
+                  <div id="simMaxRunup" class="text-lg font-bold text-green-600 dark:text-green-400">$0.00</div>
+                  <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Max Runup</div>
+                </div>
+                <div class="bg-white dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600 text-center">
+                  <div id="simTimeInMarket" class="text-lg font-bold text-blue-600 dark:text-blue-400">0%</div>
+                  <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Time in Market</div>
+                </div>
+                <div class="bg-white dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600 text-center">
+                  <div id="simAvgOrdersDay" class="text-lg font-bold text-purple-600 dark:text-purple-400">0</div>
+                  <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Avg Orders/Day</div>
+                </div>
+              </div>
+
+              <!-- Daily Performance Chart -->
+              <div class="bg-white dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600">
+                <h4 class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-3">Gross Performance (Daily)</h4>
+                <div id="performanceChartContainer" class="h-48 flex items-end justify-around gap-1 px-2">
+                  <!-- Bars will be injected here by JS -->
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
