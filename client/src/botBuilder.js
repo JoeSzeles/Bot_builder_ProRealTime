@@ -1,4 +1,4 @@
-import { createChart, ColorType, LineStyle, CrosshairMode, CandlestickSeries, LineSeries } from 'lightweight-charts';
+import { createChart, ColorType, LineStyle, CrosshairMode, CandlestickSeries, LineSeries, createSeriesMarkers } from 'lightweight-charts';
 
 let chart = null;
 let candleSeries = null;
@@ -1111,9 +1111,9 @@ function createTradeAnalysisChart(trades, candles) {
   
   tradeCandleSeries.setData(candles);
   
-  const tradeMarkers = [];
-  
   if (trades && trades.length > 0) {
+    const tradeMarkers = [];
+    
     trades.forEach(trade => {
       tradeMarkers.push({
         time: trade.entryTime,
@@ -1135,7 +1135,12 @@ function createTradeAnalysisChart(trades, candles) {
     });
     
     tradeMarkers.sort((a, b) => a.time - b.time);
-    tradeCandleSeries.setMarkers(tradeMarkers);
+    
+    try {
+      createSeriesMarkers(tradeCandleSeries, tradeMarkers);
+    } catch (e) {
+      console.warn('Trade markers error:', e.message);
+    }
   }
   
   tradeChart.timeScale().fitContent();
