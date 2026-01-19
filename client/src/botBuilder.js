@@ -128,9 +128,12 @@ export async function initBotBuilder() {
     wickUpColor: '#22c55e',
   });
 
-  const data = await fetchMarketData('silver', '1h');
+  const data = await fetchMarketData('eurusd', '1h');
   candleSeries.setData(data);
   chart.timeScale().fitContent();
+  
+  const assetSelect = document.getElementById('assetSelect');
+  if (assetSelect) assetSelect.value = 'eurusd';
 
   const resizeHandler = () => {
     if (chart && container) {
