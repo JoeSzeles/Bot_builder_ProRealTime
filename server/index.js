@@ -988,6 +988,30 @@ app.delete('/api/bot-history/:id', (req, res) => {
   res.json({ success: true });
 });
 
+app.patch('/api/bot-history/:id', (req, res) => {
+  const { variableOverrides, modifiedCode } = req.body;
+  const filepath = path.join(BOT_DATA_DIR, `${req.params.id}.json`);
+  
+  if (!fs.existsSync(filepath)) {
+    return res.status(404).json({ error: 'Bot entry not found' });
+  }
+  
+  try {
+    const data = JSON.parse(fs.readFileSync(filepath, 'utf-8'));
+    if (variableOverrides !== undefined) {
+      data.variableOverrides = variableOverrides;
+    }
+    if (modifiedCode !== undefined) {
+      data.modifiedCode = modifiedCode;
+    }
+    data.updatedAt = new Date().toISOString();
+    fs.writeFileSync(filepath, JSON.stringify(data, null, 2));
+    res.json({ success: true, data });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to update bot entry' });
+  }
+});
+
 // Bot generation endpoint with screenshot support
 app.post('/api/generate-bot', async (req, res) => {
   const { description, syntaxRules, settings, screenshotBase64, asset, strategy } = req.body;
@@ -1467,6 +1491,36 @@ async function fetchMetalsApiPrice(metal) {
   return null;
 }
 
+// Market data cache with TTL
+const marketDataCache = new Map();
+const CACHE_TTL = {
+  '1m': 60 * 1000,
+  '5m': 5 * 60 * 1000,
+  '15m': 15 * 60 * 1000,
+  '30m': 30 * 60 * 1000,
+  '1h': 60 * 60 * 1000,
+  '4h': 4 * 60 * 60 * 1000,
+  '1d': 24 * 60 * 60 * 1000
+};
+
+function getCachedMarketData(asset, timeframe) {
+  const key = `${asset}_${timeframe}`;
+  const cached = marketDataCache.get(key);
+  if (!cached) return null;
+  
+  const ttl = CACHE_TTL[timeframe] || 60 * 60 * 1000;
+  if (Date.now() - cached.timestamp > ttl) {
+    marketDataCache.delete(key);
+    return null;
+  }
+  return cached.data;
+}
+
+function setCachedMarketData(asset, timeframe, data) {
+  const key = `${asset}_${timeframe}`;
+  marketDataCache.set(key, { data, timestamp: Date.now() });
+}
+
 // Generate realistic candle data around a base price
 function generateCandlesFromPrice(basePrice, numBars = 100, volatility = 0.02) {
   const data = [];
@@ -1498,6 +1552,16 @@ function generateCandlesFromPrice(basePrice, numBars = 100, volatility = 0.02) {
 
 app.get('/api/market-data/:asset/:timeframe', async (req, res) => {
   const { asset, timeframe } = req.params;
+  const forceRefresh = req.query.refresh === 'true';
+  
+  // Check cache first (unless force refresh)
+  if (!forceRefresh) {
+    const cached = getCachedMarketData(asset, timeframe);
+    if (cached) {
+      console.log(`Serving cached market data for ${asset}/${timeframe}`);
+      return res.json({ ...cached, cached: true });
+    }
+  }
   
   // Try MetalPriceAPI for silver and gold
   if (asset === 'silver' || asset === 'gold') {
@@ -1506,7 +1570,9 @@ app.get('/api/market-data/:asset/:timeframe', async (req, res) => {
     
     if (currentPrice) {
       const candles = generateCandlesFromPrice(currentPrice, 100, 0.015);
-      return res.json({ candles, symbol: `${metal}/USD`, source: 'metalpriceapi' });
+      const result = { candles, symbol: `${metal}/USD`, source: 'metalpriceapi' };
+      setCachedMarketData(asset, timeframe, result);
+      return res.json(result);
     }
   }
   
@@ -1538,7 +1604,9 @@ app.get('/api/market-data/:asset/:timeframe', async (req, res) => {
           close: parseFloat(bar.close)
         }));
         
-        return res.json({ candles, symbol: data.meta?.symbol || symbol, source: 'twelvedata' });
+        const result = { candles, symbol: data.meta?.symbol || symbol, source: 'twelvedata' };
+        setCachedMarketData(asset, timeframe, result);
+        return res.json(result);
       }
     } catch (error) {
       console.error('Twelve Data fetch error:', error);
