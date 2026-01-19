@@ -1193,9 +1193,9 @@ For each strategy, provide:
 2. description: 2-3 sentences explaining the strategy logic
 3. keyPoints: Key implementation details (entry/exit conditions, indicators used)
 4. codeSnippet: A brief ProBuilder code example showing the core logic (10-20 lines max)
-5. url: If this is a known strategy from the forum, provide a plausible URL, otherwise null
 
-Return as JSON array with exactly these fields: title, description, keyPoints, codeSnippet, url
+Return as JSON array with exactly these fields: title, description, keyPoints, codeSnippet
+Do NOT include any URLs - we will generate search links separately.
 
 Focus on strategies that:
 - Are commonly discussed on ProRealCode forum
@@ -1225,7 +1225,12 @@ Focus on strategies that:
       }
     }
     
-    res.json({ results: Array.isArray(results) ? results : [] });
+    const resultsWithSearchLinks = (Array.isArray(results) ? results : []).map(r => ({
+      ...r,
+      url: null,
+      searchUrl: `https://www.prorealcode.com/?s=${encodeURIComponent(r.title || query)}`
+    }));
+    res.json({ results: resultsWithSearchLinks });
   } catch (error) {
     console.error('Strategy search error:', error);
     res.status(500).json({ error: 'Failed to search strategies' });

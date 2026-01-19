@@ -619,11 +619,11 @@ function setupStrategyIdeasModal() {
           <div class="flex-1">
             <h4 class="font-semibold text-gray-900 dark:text-white mb-1">${r.title}</h4>
             <p class="text-sm text-gray-600 dark:text-gray-300 mb-2">${r.description}</p>
-            ${r.url ? `<a href="${r.url}" target="_blank" class="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
+            ${r.searchUrl ? `<a href="${r.searchUrl}" target="_blank" class="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
               <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
               </svg>
-              View on ProRealCode
+              Search ProRealCode
             </a>` : ''}
           </div>
           <div class="flex gap-2">
