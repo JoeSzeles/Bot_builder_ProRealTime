@@ -110,10 +110,10 @@ The frontend proxies API requests to the backend.
 - Save Prompt checkbox enabled by default to save custom prompts
 
 ## Recent Changes (Jan 19, 2026)
-- **Real-time Market Data**: Integrated Twelve Data API for live price data
-  - Fetches real candlestick data for all assets (silver, gold, forex, indices)
-  - Falls back to sample data if API unavailable
-  - Caches data to minimize API calls
+- **Real-time Market Data**: 
+  - Silver & Gold: MetalPriceAPI (METALS_API_KEY secret) - real spot prices with generated candles
+  - Forex pairs: Twelve Data API for live candlestick data
+  - Falls back to sample data if APIs unavailable
 - **Bot Builder Tab**: New tab for generating ProRealTime/ProBuilder trading bots
   - Interactive candlestick chart with Lightweight Charts v5
   - Drawing tools (trend lines, horizontal/vertical lines, high/low markers)

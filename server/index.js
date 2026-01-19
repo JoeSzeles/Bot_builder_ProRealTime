@@ -992,28 +992,29 @@ const TIMEFRAME_MAP = {
   '1d': '1day'
 };
 
-// Fetch current price from Metals-API for commodities
+// Fetch current price from MetalPriceAPI for commodities
 async function fetchMetalsApiPrice(metal) {
   if (!METALS_API_KEY) {
-    console.warn('Metals-API key not configured');
+    console.warn('MetalPriceAPI key not configured');
     return null;
   }
   
   try {
-    const url = `https://metals-api.com/api/latest?access_key=${METALS_API_KEY}&base=USD&symbols=${metal}`;
+    // MetalPriceAPI uses api_key parameter and different endpoint
+    const url = `https://api.metalpriceapi.com/v1/latest?api_key=${METALS_API_KEY}&base=USD&currencies=${metal}`;
     const response = await fetch(url);
     const data = await response.json();
     
     if (data.success && data.rates && data.rates[metal]) {
-      // Metals-API returns inverted rates (1 USD = X metal), so we need 1/rate
+      // MetalPriceAPI returns inverted rates (1 USD = X metal), so we need 1/rate
       const price = 1 / data.rates[metal];
-      console.log(`Metals-API ${metal} price: $${price.toFixed(2)}`);
+      console.log(`MetalPriceAPI ${metal} price: $${price.toFixed(2)}`);
       return price;
     } else {
-      console.warn('Metals-API response:', data.error?.info || 'Unknown error');
+      console.warn('MetalPriceAPI response:', data.error?.info || data.message || 'Unknown error');
     }
   } catch (e) {
-    console.warn('Metals-API fetch failed:', e.message);
+    console.warn('MetalPriceAPI fetch failed:', e.message);
   }
   return null;
 }
@@ -1050,14 +1051,14 @@ function generateCandlesFromPrice(basePrice, numBars = 100, volatility = 0.02) {
 app.get('/api/market-data/:asset/:timeframe', async (req, res) => {
   const { asset, timeframe } = req.params;
   
-  // Try Metals-API for silver and gold
+  // Try MetalPriceAPI for silver and gold
   if (asset === 'silver' || asset === 'gold') {
     const metal = asset === 'silver' ? 'XAG' : 'XAU';
     const currentPrice = await fetchMetalsApiPrice(metal);
     
     if (currentPrice) {
       const candles = generateCandlesFromPrice(currentPrice, 100, 0.015);
-      return res.json({ candles, symbol: `${metal}/USD`, source: 'metals-api' });
+      return res.json({ candles, symbol: `${metal}/USD`, source: 'metalpriceapi' });
     }
   }
   
