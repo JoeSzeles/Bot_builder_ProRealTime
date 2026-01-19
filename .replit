@@ -1,5 +1,5 @@
 entrypoint = "index.js"
-modules = ["nodejs-22"]
+modules = ["nodejs-22", "python-3.11"]
 hidden = [".config", "package-lock.json"]
 
 [gitHubImport]
@@ -15,7 +15,7 @@ ignorePorts = false
 
 [agent]
 expertMode = true
-integrations = ["javascript_openai_ai_integrations:1.0.0", "javascript_anthropic_ai_integrations:1.0.0"]
+integrations = ["javascript_openai_ai_integrations:1.0.0", "javascript_anthropic_ai_integrations:1.0.0", "github:1.0.0"]
 
 [workflows]
 runButton = "Project"
