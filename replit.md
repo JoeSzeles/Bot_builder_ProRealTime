@@ -110,10 +110,15 @@ The frontend proxies API requests to the backend.
 - Save Prompt checkbox enabled by default to save custom prompts
 
 ## Recent Changes (Jan 19, 2026)
+- **Real-time Market Data**: Integrated Twelve Data API for live price data
+  - Fetches real candlestick data for all assets (silver, gold, forex, indices)
+  - Falls back to sample data if API unavailable
+  - Caches data to minimize API calls
 - **Bot Builder Tab**: New tab for generating ProRealTime/ProBuilder trading bots
-  - Interactive candlestick chart with Lightweight Charts
+  - Interactive candlestick chart with Lightweight Charts v5
   - Drawing tools (trend lines, horizontal/vertical lines, high/low markers)
   - Asset selector with commodities, forex, and indices
+  - Timeframe selector triggers data reload
   - Bot settings panel with position, risk, indicator, and strategy options
   - AI-powered code generation with ProRealTime syntax rules
   - Error correction feature to fix code based on error messages

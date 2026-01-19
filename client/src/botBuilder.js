@@ -11,7 +11,7 @@ let priceLines = [];
 let lineSeriesArr = [];
 let markers = [];
 
-const SAMPLE_DATA = {
+const FALLBACK_DATA = {
   silver: generateCandleData(32, 100, 0.02),
   gold: generateCandleData(2650, 100, 0.01),
   copper: generateCandleData(4.5, 100, 0.025),
@@ -24,6 +24,34 @@ const SAMPLE_DATA = {
   dax: generateCandleData(20500, 100, 0.015),
   ftse: generateCandleData(8200, 100, 0.01)
 };
+
+let cachedData = {};
+
+async function fetchMarketData(asset, timeframe = '1h') {
+  const cacheKey = `${asset}_${timeframe}`;
+  if (cachedData[cacheKey]) {
+    return cachedData[cacheKey];
+  }
+  
+  try {
+    const response = await fetch(`/api/market-data/${asset}/${timeframe}`);
+    const data = await response.json();
+    
+    if (data.error) {
+      console.warn('API returned error:', data.error);
+      return FALLBACK_DATA[asset] || FALLBACK_DATA.silver;
+    }
+    
+    if (data.candles && data.candles.length > 0) {
+      cachedData[cacheKey] = data.candles;
+      return data.candles;
+    }
+  } catch (e) {
+    console.warn('Failed to fetch live data, using fallback:', e);
+  }
+  
+  return FALLBACK_DATA[asset] || FALLBACK_DATA.silver;
+}
 
 function generateCandleData(basePrice, numBars, volatility) {
   const data = [];
@@ -53,7 +81,7 @@ function generateCandleData(basePrice, numBars, volatility) {
   return data;
 }
 
-export function initBotBuilder() {
+export async function initBotBuilder() {
   if (initialized && chart) {
     return;
   }
@@ -100,7 +128,8 @@ export function initBotBuilder() {
     wickUpColor: '#22c55e',
   });
 
-  candleSeries.setData(SAMPLE_DATA.silver);
+  const data = await fetchMarketData('silver', '1h');
+  candleSeries.setData(data);
   chart.timeScale().fitContent();
 
   const resizeHandler = () => {
@@ -148,15 +177,23 @@ function setupBotBuilderEvents() {
   const saveBotCode = document.getElementById('saveBotCode');
   const fixBotError = document.getElementById('fixBotError');
 
+  const timeframeSelect = document.getElementById('timeframeSelect');
+
+  async function loadChartData() {
+    const asset = assetSelect?.value || 'silver';
+    const timeframe = timeframeSelect?.value || '1h';
+    const data = await fetchMarketData(asset, timeframe);
+    candleSeries.setData(data);
+    chart.timeScale().fitContent();
+    clearAllDrawings();
+  }
+
   if (assetSelect) {
-    assetSelect.addEventListener('change', () => {
-      const asset = assetSelect.value;
-      if (SAMPLE_DATA[asset]) {
-        candleSeries.setData(SAMPLE_DATA[asset]);
-        chart.timeScale().fitContent();
-        clearAllDrawings();
-      }
-    });
+    assetSelect.addEventListener('change', loadChartData);
+  }
+
+  if (timeframeSelect) {
+    timeframeSelect.addEventListener('change', loadChartData);
   }
 
   const drawTools = [

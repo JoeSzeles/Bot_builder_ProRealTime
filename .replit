@@ -64,3 +64,8 @@ externalPort = 3001
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[userenv]
+
+[userenv.shared]
+TWELVEDATA_API_KEY = "14c62b0256c640fb9d84cb2a3ff4c91f"

@@ -965,6 +965,75 @@ Generate the fixed, ready-to-use ProBuilder code now:`;
   }
 });
 
+// Twelve Data market data endpoint
+const TWELVEDATA_API_KEY = process.env.TWELVEDATA_API_KEY;
+
+const ASSET_SYMBOLS = {
+  silver: 'XAG/USD',
+  gold: 'XAU/USD', 
+  copper: 'HG',
+  oil: 'CL',
+  natgas: 'NG',
+  eurusd: 'EUR/USD',
+  gbpusd: 'GBP/USD',
+  usdjpy: 'USD/JPY',
+  spx500: 'SPX',
+  dax: 'DAX',
+  ftse: 'FTSE'
+};
+
+const TIMEFRAME_MAP = {
+  '1m': '1min',
+  '5m': '5min',
+  '15m': '15min',
+  '1h': '1h',
+  '4h': '4h',
+  '1d': '1day'
+};
+
+app.get('/api/market-data/:asset/:timeframe', async (req, res) => {
+  const { asset, timeframe } = req.params;
+  
+  if (!TWELVEDATA_API_KEY) {
+    return res.status(500).json({ error: 'Market data API key not configured' });
+  }
+  
+  const symbol = ASSET_SYMBOLS[asset];
+  if (!symbol) {
+    return res.status(400).json({ error: 'Unknown asset' });
+  }
+  
+  const interval = TIMEFRAME_MAP[timeframe] || '1h';
+  
+  try {
+    const url = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(symbol)}&interval=${interval}&outputsize=100&apikey=${TWELVEDATA_API_KEY}`;
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (data.status === 'error') {
+      console.error('Twelve Data error:', data.message);
+      return res.status(400).json({ error: data.message || 'Failed to fetch data' });
+    }
+    
+    if (!data.values || !Array.isArray(data.values)) {
+      return res.status(400).json({ error: 'No data available for this asset' });
+    }
+    
+    const candles = data.values.reverse().map(bar => ({
+      time: Math.floor(new Date(bar.datetime).getTime() / 1000),
+      open: parseFloat(bar.open),
+      high: parseFloat(bar.high),
+      low: parseFloat(bar.low),
+      close: parseFloat(bar.close)
+    }));
+    
+    res.json({ candles, symbol: data.meta?.symbol || symbol });
+  } catch (error) {
+    console.error('Market data fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch market data' });
+  }
+});
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
