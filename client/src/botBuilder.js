@@ -18,17 +18,17 @@ let currentBotId = null;
 let detectedVariables = [];
 
 const FALLBACK_DATA = {
-  silver: generateCandleData(32, 100, 0.02),
-  gold: generateCandleData(2650, 100, 0.01),
+  silver: generateCandleData(65, 100, 0.02),
+  gold: generateCandleData(2900, 100, 0.01),
   copper: generateCandleData(4.5, 100, 0.025),
-  oil: generateCandleData(78, 100, 0.03),
-  natgas: generateCandleData(3.2, 100, 0.04),
-  eurusd: generateCandleData(1.03, 100, 0.005),
-  gbpusd: generateCandleData(1.22, 100, 0.006),
-  usdjpy: generateCandleData(156, 100, 0.004),
-  spx500: generateCandleData(5900, 100, 0.012),
-  dax: generateCandleData(20500, 100, 0.015),
-  ftse: generateCandleData(8200, 100, 0.01)
+  oil: generateCandleData(59.44, 100, 0.03),
+  natgas: generateCandleData(3.47, 100, 0.04),
+  eurusd: generateCandleData(1.1673, 100, 0.005),
+  gbpusd: generateCandleData(1.344, 100, 0.006),
+  usdjpy: generateCandleData(159.06, 100, 0.004),
+  spx500: generateCandleData(6947, 100, 0.012),
+  dax: generateCandleData(24921, 100, 0.015),
+  ftse: generateCandleData(10141, 100, 0.01)
 };
 
 let cachedData = {};
