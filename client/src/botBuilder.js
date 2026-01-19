@@ -307,33 +307,44 @@ function setupBotBuilderEvents() {
 
 function setupStrategyIdeasModal() {
   const openBtn = document.getElementById('getStrategyIdeasBtn');
-  const modal = document.getElementById('strategyIdeasModal');
-  const closeBtn = document.getElementById('closeStrategyModal');
-  const searchBtn = document.getElementById('searchStrategiesBtn');
-  const searchInput = document.getElementById('strategySearchInput');
-  const resultsContainer = document.getElementById('strategySearchResults');
-  const loadingEl = document.getElementById('strategySearchLoading');
-  const categoryChips = document.querySelectorAll('.strategy-category-chip');
+  const modal = document.getElementById('strategyIdeasModalGlobal');
+  const closeBtn = document.getElementById('closeStrategyModalGlobal');
+  const searchBtn = document.getElementById('searchStrategiesBtnGlobal');
+  const searchInput = document.getElementById('strategySearchInputGlobal');
+  const resultsContainer = document.getElementById('strategyResultsGlobal');
+  const loadingEl = document.getElementById('strategyLoadingGlobal');
+  const categoryChips = document.querySelectorAll('.strategy-chip');
   
-  if (openBtn && modal) {
-    openBtn.addEventListener('click', () => {
+  function showModal() {
+    if (modal) {
+      modal.style.display = 'flex';
       modal.classList.remove('hidden');
-      modal.classList.add('flex');
+    }
+  }
+  
+  function hideModal() {
+    if (modal) {
+      modal.style.display = 'none';
+      modal.classList.add('hidden');
+    }
+  }
+  
+  if (openBtn) {
+    openBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      showModal();
     });
   }
   
-  if (closeBtn && modal) {
-    closeBtn.addEventListener('click', () => {
-      modal.classList.add('hidden');
-      modal.classList.remove('flex');
-    });
+  if (closeBtn) {
+    closeBtn.addEventListener('click', hideModal);
   }
   
   if (modal) {
     modal.addEventListener('click', (e) => {
       if (e.target === modal) {
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
+        hideModal();
       }
     });
   }
@@ -399,8 +410,7 @@ function setupStrategyIdeasModal() {
       btn.addEventListener('click', () => {
         const result = results[idx];
         applyStrategyIdea(result);
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
+        hideModal();
       });
     });
     
@@ -437,7 +447,7 @@ function setupStrategyIdeasModal() {
   
   categoryChips.forEach(chip => {
     chip.addEventListener('click', () => {
-      const category = chip.dataset.category;
+      const category = chip.dataset.cat || chip.dataset.category;
       if (searchInput) searchInput.value = category;
       searchStrategies(category);
     });
