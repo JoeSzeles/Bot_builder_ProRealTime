@@ -871,12 +871,37 @@ function setupBotSubTabs() {
 }
 
 let currentCandles = [];
+let lastSimulationResults = null;
 
 function setupSimulator() {
   const runBtn = document.getElementById('runSimulatorBtn');
   if (runBtn) {
     runBtn.addEventListener('click', runSimulation);
   }
+  
+  const downloadBtn = document.getElementById('downloadResultsBtn');
+  if (downloadBtn) {
+    downloadBtn.addEventListener('click', downloadResultsJSON);
+  }
+}
+
+function downloadResultsJSON() {
+  if (!lastSimulationResults) {
+    alert('No simulation results to download. Run a backtest first.');
+    return;
+  }
+  
+  const dataStr = JSON.stringify(lastSimulationResults, null, 2);
+  const blob = new Blob([dataStr], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `backtest_results_${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 async function runSimulation() {
@@ -948,6 +973,13 @@ async function runSimulation() {
 }
 
 function displaySimulationResults(r) {
+  lastSimulationResults = r;
+  
+  const downloadBtn = document.getElementById('downloadResultsBtn');
+  if (downloadBtn) {
+    downloadBtn.classList.remove('hidden');
+  }
+  
   const formatMoney = (v) => {
     const sign = v >= 0 ? '' : '-';
     return `${sign}$${Math.abs(v).toFixed(2)}`;
