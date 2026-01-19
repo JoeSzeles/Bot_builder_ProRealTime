@@ -883,6 +883,21 @@ function setupSimulator() {
   if (downloadBtn) {
     downloadBtn.addEventListener('click', downloadResultsJSON);
   }
+  
+  const toggleRawBtn = document.getElementById('toggleRawDataBtn');
+  if (toggleRawBtn) {
+    toggleRawBtn.addEventListener('click', toggleRawDataPanel);
+  }
+}
+
+function toggleRawDataPanel() {
+  const panel = document.getElementById('rawDataPanel');
+  const chevron = document.getElementById('rawDataChevron');
+  
+  if (panel && chevron) {
+    panel.classList.toggle('hidden');
+    chevron.classList.toggle('rotate-180');
+  }
 }
 
 function downloadResultsJSON() {
@@ -978,6 +993,11 @@ function displaySimulationResults(r) {
   const downloadBtn = document.getElementById('downloadResultsBtn');
   if (downloadBtn) {
     downloadBtn.classList.remove('hidden');
+  }
+  
+  const rawDataContent = document.getElementById('rawDataContent');
+  if (rawDataContent) {
+    rawDataContent.textContent = JSON.stringify(r, null, 2);
   }
   
   const formatMoney = (v) => {
