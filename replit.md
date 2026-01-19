@@ -131,6 +131,8 @@ The frontend proxies API requests to the backend.
   - **Auto-save**: Each generated bot is saved to its own JSON file in data/bots/
   - **Simulator Tab**: Backtest generated bot on current chart data
     - Run backtest with fee/spread calculations
+    - **Equity Curve Chart**: Cyan line showing cumulative profit over time
+    - **Trade Analysis Chart**: Price chart with trade markers (green arrows for buy, red arrows for sell, yellow circles for exits with P&L)
     - Results dashboard: total gain, win rate (pie chart), gain/loss ratio
     - Trade distribution (winning/losing/neutral)
     - Max drawdown, max runup, time in market %, avg orders/day
