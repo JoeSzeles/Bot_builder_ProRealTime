@@ -1,0 +1,141 @@
+Good question — this is exactly the right instinct if you want **repeatable, grounded bot generation** instead of hallucinated strategies.
+
+Here’s how to **address ProRealCode / ProRealTime forum sources explicitly in future prompts**, in a way that actually *changes the model’s behavior*.
+
+---
+
+## 1️⃣ Use a **Source Anchor** in your prompt (most important)
+
+Always name the source **as a constraint**, not as inspiration.
+
+**Template (recommended):**
+
+```
+Source constraint:
+- Use ONLY conventions, syntax, and idioms commonly found in public ProRealCode (prorealcode.com) forum posts for ProRealTime / ProOrder bots.
+- Assume IG Markets + ProRealTime AutoTrading environment.
+- Do NOT invent undocumented functions or syntax.
+```
+
+This tells the model:
+
+* stay inside *real* ProRealTime language
+* avoid fantasy indicators / PineScript bleed
+* behave like a ProRealCode forum contributor
+
+---
+
+## 2️⃣ Reference the **community style**, not just the site
+
+ProRealCode bots have a recognizable “accent”:
+
+* verbose IF / ENDIF blocks
+* simple variables
+* defensive `ONMARKET` checks
+* `DEFPARAM` at the top
+* minimal abstraction
+
+You can lock that in explicitly:
+
+```
+Style constraint:
+- Write code in the style of ProRealCode forum users:
+  - flat structure
+  - explicit conditions
+  - readable variable names
+  - no compact one-liners
+```
+
+This prevents the model from producing “clever but invalid” code.
+
+---
+
+## 3️⃣ Add a **negative constraint** (this matters)
+
+Tell it what *not* to do, based on ProRealTime reality:
+
+```
+Exclusions:
+- No PineScript
+- No MQL4/5
+- No TradingView-only functions
+- No arrays unless strictly necessary
+- No undocumented ProRealTime keywords
+```
+
+This mirrors how experienced ProRealCode users think.
+
+---
+
+## 4️⃣ Lock the **execution environment**
+
+You’ve been working with **IG + ProRealTime**, so bake that in:
+
+```
+Execution environment:
+- Broker: IG Markets
+- Platform: ProRealTime AutoTrading (ProOrder)
+- Instrument: CFD (supports PERPOINT sizing)
+- Timeframes: intraday (5m–15m typical)
+```
+
+This avoids bots that “work” in theory but fail in IG’s ruleset.
+
+---
+
+## 5️⃣ Example of a **perfect future prompt**
+
+You can literally reuse this:
+
+```
+Act as an experienced ProRealCode forum contributor.
+
+Source constraint:
+- Follow conventions and syntax used in public ProRealCode (prorealcode.com) strategy posts.
+- Target ProRealTime ProOrder for IG Markets.
+
+Style:
+- Clear variable block at the top
+- Defensive ONMARKET logic
+- Simple, readable IF / ENDIF structure
+- No exotic indicators
+
+Task:
+Create a configurable intraday breakout bot with:
+- Adjustable lookback
+- Time filter
+- Fixed % stop and target
+- Designed to be stable on 5m charts
+
+Also:
+- Comment the code like a forum post explaining logic
+```
+
+That prompt will give you **forum-grade bots**, not generic AI junk.
+
+---
+
+## 6️⃣ Optional: create a **short name for the source**
+
+If you want shorthand for long conversations, define it once:
+
+```
+Definition:
+"PRC-style" = ProRealCode forum-compatible ProRealTime bot code
+```
+
+Then later you can just say:
+
+> “Write this in PRC-style.”
+
+---
+
+### If you want next steps
+
+I can:
+
+* define a **PRC-style bot template** you reuse forever
+* build a **“safe skeleton”** that almost never breaks on IG
+* translate messy forum bots into **clean, parametric versions**
+
+Just tell me which one.
