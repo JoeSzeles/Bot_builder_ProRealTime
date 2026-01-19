@@ -1,7 +1,10 @@
+import { initBotBuilder, updateChartTheme } from './botBuilder.js';
+
 let currentTranslation = null;
 let historyItems = [];
 let savedPrompts = [];
 let abortController = null;
+let currentTab = 'text';
 
 const elements = {
   menuToggle: document.getElementById('menuToggle'),
@@ -36,8 +39,33 @@ const elements = {
   historyList: document.getElementById('historyList'),
   promptsList: document.getElementById('promptsList'),
   modelSelect: document.getElementById('modelSelect'),
-  cancelBtn: document.getElementById('cancelBtn')
+  cancelBtn: document.getElementById('cancelBtn'),
+  tabText: document.getElementById('tabText'),
+  tabBot: document.getElementById('tabBot'),
+  textTabContent: document.getElementById('textTabContent'),
+  botTabContent: document.getElementById('botTabContent')
 };
+
+function switchTab(tab) {
+  currentTab = tab;
+  
+  if (tab === 'text') {
+    elements.textTabContent.classList.remove('hidden');
+    elements.botTabContent.classList.add('hidden');
+    elements.tabText.classList.add('bg-indigo-100', 'dark:bg-indigo-900', 'text-indigo-700', 'dark:text-indigo-300');
+    elements.tabText.classList.remove('text-gray-600', 'dark:text-gray-400');
+    elements.tabBot.classList.remove('bg-indigo-100', 'dark:bg-indigo-900', 'text-indigo-700', 'dark:text-indigo-300');
+    elements.tabBot.classList.add('text-gray-600', 'dark:text-gray-400');
+  } else {
+    elements.textTabContent.classList.add('hidden');
+    elements.botTabContent.classList.remove('hidden');
+    elements.tabBot.classList.add('bg-indigo-100', 'dark:bg-indigo-900', 'text-indigo-700', 'dark:text-indigo-300');
+    elements.tabBot.classList.remove('text-gray-600', 'dark:text-gray-400');
+    elements.tabText.classList.remove('bg-indigo-100', 'dark:bg-indigo-900', 'text-indigo-700', 'dark:text-indigo-300');
+    elements.tabText.classList.add('text-gray-600', 'dark:text-gray-400');
+    initBotBuilder();
+  }
+}
 
 function updateSplitOptionLabel(isStoryMode) {
   if (elements.splitOptionLabel) {
@@ -56,6 +84,7 @@ function initDarkMode() {
 function toggleDarkMode() {
   const isDark = document.documentElement.classList.toggle('dark');
   localStorage.setItem('darkMode', isDark);
+  updateChartTheme();
 }
 
 function toggleSidebar(show) {
@@ -691,4 +720,6 @@ document.addEventListener('DOMContentLoaded', () => {
   elements.cancelBtn.addEventListener('click', cancelGeneration);
   elements.copyBtn.addEventListener('click', copyTranslatedText);
   elements.downloadBtn.addEventListener('click', downloadPdf);
+  elements.tabText.addEventListener('click', () => switchTab('text'));
+  elements.tabBot.addEventListener('click', () => switchTab('bot'));
 });

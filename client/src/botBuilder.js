@@ -1,0 +1,584 @@
+import { createChart, ColorType, LineStyle, CrosshairMode } from 'lightweight-charts';
+
+let chart = null;
+let candleSeries = null;
+let drawings = [];
+let drawingMode = null;
+let drawingPoints = [];
+let generatedBotCode = '';
+let initialized = false;
+let priceLines = [];
+let lineSeries = [];
+
+const SAMPLE_DATA = {
+  silver: generateCandleData(30, 100, 0.02),
+  gold: generateCandleData(1950, 100, 0.01),
+  copper: generateCandleData(4.2, 100, 0.025),
+  oil: generateCandleData(75, 100, 0.03),
+  natgas: generateCandleData(2.8, 100, 0.04),
+  eurusd: generateCandleData(1.08, 100, 0.005),
+  gbpusd: generateCandleData(1.27, 100, 0.006),
+  usdjpy: generateCandleData(148, 100, 0.004),
+  spx500: generateCandleData(5000, 100, 0.012),
+  dax: generateCandleData(17500, 100, 0.015),
+  ftse: generateCandleData(7600, 100, 0.01)
+};
+
+function generateCandleData(basePrice, numBars, volatility) {
+  const data = [];
+  let price = basePrice;
+  const now = Math.floor(Date.now() / 1000);
+  const hourInSeconds = 3600;
+  
+  for (let i = numBars; i >= 0; i--) {
+    const time = now - (i * hourInSeconds);
+    const change = (Math.random() - 0.5) * 2 * volatility * price;
+    const open = price;
+    const close = price + change;
+    const high = Math.max(open, close) + Math.random() * volatility * price * 0.5;
+    const low = Math.min(open, close) - Math.random() * volatility * price * 0.5;
+    
+    data.push({
+      time,
+      open: parseFloat(open.toFixed(4)),
+      high: parseFloat(high.toFixed(4)),
+      low: parseFloat(low.toFixed(4)),
+      close: parseFloat(close.toFixed(4))
+    });
+    
+    price = close;
+  }
+  
+  return data;
+}
+
+export function initBotBuilder() {
+  if (initialized && chart) {
+    return;
+  }
+  
+  const container = document.getElementById('chartContainer');
+  if (!container) return;
+
+  if (chart) {
+    chart.remove();
+    chart = null;
+  }
+
+  const isDark = document.documentElement.classList.contains('dark');
+  
+  chart = createChart(container, {
+    width: container.clientWidth,
+    height: 384,
+    layout: {
+      background: { type: ColorType.Solid, color: isDark ? '#1f2937' : '#111827' },
+      textColor: isDark ? '#9ca3af' : '#d1d5db',
+    },
+    grid: {
+      vertLines: { color: isDark ? '#374151' : '#374151' },
+      horzLines: { color: isDark ? '#374151' : '#374151' },
+    },
+    crosshair: {
+      mode: CrosshairMode.Normal,
+    },
+    rightPriceScale: {
+      borderColor: '#374151',
+    },
+    timeScale: {
+      borderColor: '#374151',
+      timeVisible: true,
+    },
+  });
+
+  candleSeries = chart.addCandlestickSeries({
+    upColor: '#22c55e',
+    downColor: '#ef4444',
+    borderDownColor: '#ef4444',
+    borderUpColor: '#22c55e',
+    wickDownColor: '#ef4444',
+    wickUpColor: '#22c55e',
+  });
+
+  candleSeries.setData(SAMPLE_DATA.silver);
+  chart.timeScale().fitContent();
+
+  const resizeHandler = () => {
+    if (chart && container) {
+      chart.applyOptions({ width: container.clientWidth });
+    }
+  };
+  window.removeEventListener('resize', resizeHandler);
+  window.addEventListener('resize', resizeHandler);
+
+  setupBotBuilderEvents();
+  setupSliderUpdates();
+  initialized = true;
+}
+
+function setupSliderUpdates() {
+  const trailingPercent = document.getElementById('trailingPercent');
+  const trailingPercentVal = document.getElementById('trailingPercentVal');
+  const stepPercent = document.getElementById('stepPercent');
+  const stepPercentVal = document.getElementById('stepPercentVal');
+
+  if (trailingPercent && trailingPercentVal) {
+    trailingPercent.addEventListener('input', () => {
+      trailingPercentVal.textContent = trailingPercent.value;
+    });
+  }
+
+  if (stepPercent && stepPercentVal) {
+    stepPercent.addEventListener('input', () => {
+      stepPercentVal.textContent = stepPercent.value;
+    });
+  }
+}
+
+function setupBotBuilderEvents() {
+  const assetSelect = document.getElementById('assetSelect');
+  const drawLine = document.getElementById('drawLine');
+  const drawHorizontal = document.getElementById('drawHorizontal');
+  const drawVertical = document.getElementById('drawVertical');
+  const markHigh = document.getElementById('markHigh');
+  const markLow = document.getElementById('markLow');
+  const clearDrawings = document.getElementById('clearDrawings');
+  const generateBotBtn = document.getElementById('generateBotBtn');
+  const copyBotCode = document.getElementById('copyBotCode');
+  const saveBotCode = document.getElementById('saveBotCode');
+  const fixBotError = document.getElementById('fixBotError');
+
+  if (assetSelect) {
+    assetSelect.addEventListener('change', () => {
+      const asset = assetSelect.value;
+      if (SAMPLE_DATA[asset]) {
+        candleSeries.setData(SAMPLE_DATA[asset]);
+        chart.timeScale().fitContent();
+        clearAllDrawings();
+      }
+    });
+  }
+
+  const drawTools = [
+    { el: drawLine, mode: 'line' },
+    { el: drawHorizontal, mode: 'horizontal' },
+    { el: drawVertical, mode: 'vertical' },
+    { el: markHigh, mode: 'high' },
+    { el: markLow, mode: 'low' }
+  ];
+
+  drawTools.forEach(({ el, mode }) => {
+    if (el) {
+      el.addEventListener('click', () => {
+        setDrawingMode(mode);
+        document.querySelectorAll('.draw-tool').forEach(btn => btn.classList.remove('bg-blue-100', 'dark:bg-blue-900'));
+        el.classList.add('bg-blue-100', 'dark:bg-blue-900');
+      });
+    }
+  });
+
+  if (clearDrawings) {
+    clearDrawings.addEventListener('click', clearAllDrawings);
+  }
+
+  if (generateBotBtn) {
+    generateBotBtn.addEventListener('click', generateBot);
+  }
+
+  if (copyBotCode) {
+    copyBotCode.addEventListener('click', copyBotCodeToClipboard);
+  }
+
+  if (saveBotCode) {
+    saveBotCode.addEventListener('click', saveBotCodeToFile);
+  }
+
+  if (fixBotError) {
+    fixBotError.addEventListener('click', fixBotErrorAndRegenerate);
+  }
+
+  const chartContainer = document.getElementById('chartContainer');
+  if (chartContainer) {
+    chart.subscribeClick(handleChartClick);
+  }
+}
+
+function setDrawingMode(mode) {
+  drawingMode = mode;
+  drawingPoints = [];
+}
+
+function handleChartClick(param) {
+  if (!drawingMode || !param.time) return;
+
+  const price = param.seriesData.get(candleSeries);
+  if (!price) return;
+
+  const point = {
+    time: param.time,
+    price: price.close,
+    high: price.high,
+    low: price.low
+  };
+
+  if (drawingMode === 'high') {
+    addMarker(point, 'high');
+    drawings.push({ type: 'high', point });
+    updateDrawingCount();
+  } else if (drawingMode === 'low') {
+    addMarker(point, 'low');
+    drawings.push({ type: 'low', point });
+    updateDrawingCount();
+  } else if (drawingMode === 'horizontal') {
+    addHorizontalLine(point.price);
+    drawings.push({ type: 'horizontal', price: point.price });
+    updateDrawingCount();
+  } else if (drawingMode === 'vertical') {
+    addVerticalLine(point.time, point.price);
+    drawings.push({ type: 'vertical', time: point.time, price: point.price });
+    updateDrawingCount();
+  } else if (drawingMode === 'line') {
+    drawingPoints.push(point);
+    if (drawingPoints.length === 2) {
+      addTrendLine(drawingPoints[0], drawingPoints[1]);
+      drawings.push({ type: 'line', start: drawingPoints[0], end: drawingPoints[1] });
+      drawingPoints = [];
+      updateDrawingCount();
+    }
+  }
+}
+
+function addMarker(point, type) {
+  const markers = candleSeries.markers() || [];
+  markers.push({
+    time: point.time,
+    position: type === 'high' ? 'aboveBar' : 'belowBar',
+    color: type === 'high' ? '#22c55e' : '#ef4444',
+    shape: type === 'high' ? 'arrowUp' : 'arrowDown',
+    text: type === 'high' ? 'H' : 'L'
+  });
+  candleSeries.setMarkers(markers);
+}
+
+function addHorizontalLine(price) {
+  const line = candleSeries.createPriceLine({
+    price: price,
+    color: '#3b82f6',
+    lineWidth: 2,
+    lineStyle: LineStyle.Dashed,
+    axisLabelVisible: true,
+    title: `Level ${price.toFixed(2)}`,
+  });
+  priceLines.push(line);
+  return line;
+}
+
+function addTrendLine(start, end) {
+  const line = chart.addLineSeries({
+    color: '#8b5cf6',
+    lineWidth: 2,
+    lineStyle: LineStyle.Solid,
+  });
+  line.setData([
+    { time: start.time, value: start.price },
+    { time: end.time, value: end.price }
+  ]);
+  lineSeries.push(line);
+}
+
+function addVerticalLine(time, price) {
+  const line = chart.addLineSeries({
+    color: '#f59e0b',
+    lineWidth: 2,
+    lineStyle: LineStyle.Dotted,
+  });
+  line.setData([
+    { time: time, value: price * 0.95 },
+    { time: time, value: price * 1.05 }
+  ]);
+  lineSeries.push(line);
+}
+
+function clearAllDrawings() {
+  drawings = [];
+  drawingPoints = [];
+  candleSeries.setMarkers([]);
+  
+  priceLines.forEach(line => {
+    try {
+      candleSeries.removePriceLine(line);
+    } catch (e) {}
+  });
+  priceLines = [];
+  
+  lineSeries.forEach(line => {
+    try {
+      chart.removeSeries(line);
+    } catch (e) {}
+  });
+  lineSeries = [];
+  
+  updateDrawingCount();
+}
+
+function updateDrawingCount() {
+  const countEl = document.getElementById('drawingCount');
+  if (countEl) {
+    countEl.textContent = `${drawings.length} drawing${drawings.length !== 1 ? 's' : ''}`;
+  }
+}
+
+function getSettings() {
+  return {
+    asset: document.getElementById('assetSelect')?.value || 'silver',
+    timeframe: document.getElementById('timeframeSelect')?.value || '1h',
+    positionSize: parseFloat(document.getElementById('positionSize')?.value) || 0.5,
+    tradeType: document.getElementById('tradeType')?.value || 'both',
+    cumulateOrders: document.getElementById('cumulateOrders')?.checked || false,
+    stopLoss: parseInt(document.getElementById('stopLoss')?.value) || 7000,
+    takeProfit: parseInt(document.getElementById('takeProfit')?.value) || 300,
+    useTrailingStop: document.getElementById('useTrailingStop')?.checked || true,
+    trailingPercent: parseFloat(document.getElementById('trailingPercent')?.value) || 0.46,
+    stepPercent: parseFloat(document.getElementById('stepPercent')?.value) || 0.018,
+    useOBV: document.getElementById('useOBV')?.checked || true,
+    obvPeriod: parseInt(document.getElementById('obvPeriod')?.value) || 5,
+    useHeikinAshi: document.getElementById('useHeikinAshi')?.checked || true,
+    strategyType: document.getElementById('strategyType')?.value || '13thwarrior',
+    extraInstructions: document.getElementById('botExtraInstructions')?.value || '',
+    drawings: drawings
+  };
+}
+
+function buildBotDescription(settings) {
+  let desc = `Generate a ProRealTime/ProBuilder trading bot with the following specifications:\n\n`;
+  
+  desc += `ASSET: ${settings.asset.toUpperCase()}\n`;
+  desc += `TIMEFRAME: ${settings.timeframe}\n\n`;
+  
+  desc += `POSITION SETTINGS:\n`;
+  desc += `- Position size: ${settings.positionSize}\n`;
+  desc += `- Trade type: ${settings.tradeType === 'both' ? 'Long & Short' : settings.tradeType === 'long' ? 'Long Only' : 'Short Only'}\n`;
+  desc += `- Cumulate orders: ${settings.cumulateOrders ? 'Yes' : 'No'}\n\n`;
+  
+  desc += `RISK MANAGEMENT:\n`;
+  desc += `- Stop loss: ${settings.stopLoss} points\n`;
+  desc += `- Take profit: ${settings.takeProfit} points\n`;
+  
+  if (settings.useTrailingStop) {
+    desc += `- Trailing stop: Yes (${settings.trailingPercent}% trigger, ${settings.stepPercent}% step)\n`;
+  }
+  desc += `\n`;
+  
+  desc += `INDICATORS:\n`;
+  if (settings.useOBV) {
+    desc += `- OBV with period ${settings.obvPeriod}\n`;
+  }
+  if (settings.useHeikinAshi) {
+    desc += `- Heikin Ashi candles\n`;
+  }
+  desc += `\n`;
+  
+  desc += `STRATEGY: ${settings.strategyType}\n`;
+  
+  if (settings.drawings.length > 0) {
+    desc += `\nCHART ANNOTATIONS:\n`;
+    settings.drawings.forEach((d, i) => {
+      if (d.type === 'high') {
+        desc += `- High point marked at price ${d.point.high.toFixed(4)}\n`;
+      } else if (d.type === 'low') {
+        desc += `- Low point marked at price ${d.point.low.toFixed(4)}\n`;
+      } else if (d.type === 'horizontal') {
+        desc += `- Horizontal level at ${d.price.toFixed(4)}\n`;
+      } else if (d.type === 'line') {
+        desc += `- Trend line from ${d.start.price.toFixed(4)} to ${d.end.price.toFixed(4)} (trading window)\n`;
+      }
+    });
+  }
+  
+  if (settings.extraInstructions) {
+    desc += `\nADDITIONAL INSTRUCTIONS:\n${settings.extraInstructions}\n`;
+  }
+  
+  return desc;
+}
+
+const PROREALTIME_SYNTAX_RULES = `
+CRITICAL PROREALTIME/PROBUILDER SYNTAX RULES:
+
+1. VARIABLE NAMES:
+   - NO underscores allowed in variable names (use CamelCase instead)
+   - Correct: MyVariable, ObvBull, TrendUp
+   - Wrong: My_Variable, OBV_Bull, Trend_Up
+
+2. RESERVED WORDS:
+   - Cannot use as variable names: Open, High, Low, Close, Volume, Average, Buy, Sell
+
+3. IF BLOCKS:
+   - Every IF must have matching ENDIF
+   - Use ELSIF for else-if conditions
+   - Structure:
+     IF [Condition] THEN
+         // code
+     ENDIF
+
+4. COMMANDS:
+   - BUY x CONTRACT AT MARKET (open long)
+   - SELLSHORT x CONTRACT AT MARKET (open short)
+   - SELL AT MARKET (close long)
+   - EXITSHORT AT MARKET (close short)
+   - SET STOP PLOSS x (stop loss in points)
+   - SET TARGET PROFIT x (take profit in points)
+
+5. POSITION CHECKS:
+   - ONMARKET (true if any position open)
+   - LONGONMARKET (true if long position)
+   - SHORTONMARKET (true if short position)
+   - TRADEPRICE(1) (entry price of current trade)
+
+6. INDICATORS:
+   - Average[period](price)
+   - ExponentialAverage[period](price)
+   - RSI[period](price)
+   - OBV(close)
+   - AverageTrueRange[period]
+   - Highest[period](high) / Lowest[period](low)
+
+7. LOOKBACK:
+   - Use brackets: CLOSE[1] = previous candle close
+   - CLOSE[2] = 2 candles ago
+
+8. INITIALIZATION:
+   - Use ONCE for first-bar initialization: ONCE myVar = 100
+
+9. PARAMETERS:
+   - Defparam cumulateorders = true/false
+`;
+
+async function generateBot() {
+  const settings = getSettings();
+  const description = buildBotDescription(settings);
+  
+  const generateBotBtn = document.getElementById('generateBotBtn');
+  const botOutputSection = document.getElementById('botOutputSection');
+  const botCodeOutput = document.getElementById('botCodeOutput');
+  
+  generateBotBtn.disabled = true;
+  generateBotBtn.innerHTML = '<svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Generating...';
+
+  try {
+    const response = await fetch('/api/generate-bot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        description,
+        syntaxRules: PROREALTIME_SYNTAX_RULES,
+        settings
+      })
+    });
+
+    const data = await response.json();
+    if (data.error) throw new Error(data.error);
+
+    generatedBotCode = data.code;
+    botCodeOutput.textContent = generatedBotCode;
+    botOutputSection.classList.remove('hidden');
+
+  } catch (err) {
+    alert('Error generating bot: ' + err.message);
+  } finally {
+    generateBotBtn.disabled = false;
+    generateBotBtn.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg> Generate ProRealTime Bot Code';
+  }
+}
+
+async function copyBotCodeToClipboard() {
+  if (!generatedBotCode) return;
+  
+  await navigator.clipboard.writeText(generatedBotCode);
+  
+  const btn = document.getElementById('copyBotCode');
+  const originalText = btn.innerHTML;
+  btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Copied!';
+  setTimeout(() => btn.innerHTML = originalText, 2000);
+}
+
+function saveBotCodeToFile() {
+  if (!generatedBotCode) return;
+  
+  const blob = new Blob([generatedBotCode], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `bot_${document.getElementById('assetSelect')?.value || 'custom'}_${Date.now()}.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function fixBotErrorAndRegenerate() {
+  const errorInput = document.getElementById('botErrorInput');
+  const fixBotErrorBtn = document.getElementById('fixBotError');
+  const botCodeOutput = document.getElementById('botCodeOutput');
+  
+  const error = errorInput?.value?.trim();
+  
+  if (!error) {
+    alert('Please paste the error message first');
+    return;
+  }
+  
+  if (!generatedBotCode) {
+    alert('Generate a bot first, then paste any errors to fix');
+    return;
+  }
+  
+  if (!fixBotErrorBtn) return;
+  
+  fixBotErrorBtn.disabled = true;
+  fixBotErrorBtn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Fixing...';
+
+  try {
+    const response = await fetch('/api/fix-bot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        code: generatedBotCode,
+        error,
+        syntaxRules: PROREALTIME_SYNTAX_RULES
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error('Server error: ' + response.status);
+    }
+
+    const data = await response.json();
+    if (data.error) throw new Error(data.error);
+
+    generatedBotCode = data.code;
+    if (botCodeOutput) {
+      botCodeOutput.textContent = generatedBotCode;
+    }
+    errorInput.value = '';
+
+  } catch (err) {
+    alert('Error fixing bot: ' + err.message);
+  } finally {
+    fixBotErrorBtn.disabled = false;
+    fixBotErrorBtn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Fix Error & Regenerate';
+  }
+}
+
+export function updateChartTheme() {
+  if (!chart || !initialized) return;
+  
+  try {
+    const isDark = document.documentElement.classList.contains('dark');
+    chart.applyOptions({
+      layout: {
+        background: { type: ColorType.Solid, color: isDark ? '#1f2937' : '#111827' },
+        textColor: isDark ? '#9ca3af' : '#d1d5db',
+      },
+    });
+  } catch (e) {
+    console.warn('Could not update chart theme:', e);
+  }
+}

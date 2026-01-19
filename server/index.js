@@ -893,6 +893,78 @@ app.delete('/api/prompts/:index', (req, res) => {
   res.json({ prompts });
 });
 
+// Bot generation endpoint
+app.post('/api/generate-bot', async (req, res) => {
+  const { description, syntaxRules, settings } = req.body;
+  
+  if (!description) {
+    return res.status(400).json({ error: 'Bot description is required' });
+  }
+  
+  const systemPrompt = `You are an expert ProRealTime/ProBuilder trading bot developer. Generate ONLY valid ProBuilder code based on the user's requirements.
+
+${syntaxRules}
+
+IMPORTANT OUTPUT RULES:
+1. Output ONLY the code - no explanations, no markdown, no code blocks
+2. Start directly with Defparam or comments
+3. Follow all syntax rules strictly - especially NO underscores in variable names
+4. Include helpful comments using //
+5. Structure the code properly with clear sections`;
+
+  const userPrompt = `Create a ProRealTime trading bot with these specifications:
+
+${description}
+
+Generate the complete, ready-to-use ProBuilder code now:`;
+
+  try {
+    const code = await callAI(systemPrompt, userPrompt, 'claude-sonnet-4-5');
+    res.json({ code });
+  } catch (error) {
+    console.error('Bot generation error:', error);
+    res.status(500).json({ error: 'Failed to generate bot code' });
+  }
+});
+
+// Bot fix endpoint
+app.post('/api/fix-bot', async (req, res) => {
+  const { code, error, syntaxRules } = req.body;
+  
+  if (!code || !error) {
+    return res.status(400).json({ error: 'Code and error message are required' });
+  }
+  
+  const systemPrompt = `You are an expert ProRealTime/ProBuilder trading bot developer and debugger. Fix the provided code based on the error message.
+
+${syntaxRules}
+
+IMPORTANT OUTPUT RULES:
+1. Output ONLY the fixed code - no explanations, no markdown, no code blocks
+2. Start directly with Defparam or comments
+3. Identify and fix the specific error mentioned
+4. Ensure all syntax rules are followed
+5. Preserve the original logic while fixing the error`;
+
+  const userPrompt = `Fix this ProRealTime bot code:
+
+ORIGINAL CODE:
+${code}
+
+ERROR MESSAGE:
+${error}
+
+Generate the fixed, ready-to-use ProBuilder code now:`;
+
+  try {
+    const fixedCode = await callAI(systemPrompt, userPrompt, 'claude-sonnet-4-5');
+    res.json({ code: fixedCode });
+  } catch (error) {
+    console.error('Bot fix error:', error);
+    res.status(500).json({ error: 'Failed to fix bot code' });
+  }
+});
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);

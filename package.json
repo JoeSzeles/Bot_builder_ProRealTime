@@ -17,6 +17,7 @@
     "cors": "^2.8.5",
     "express": "^4.21.2",
     "jszip": "^3.10.1",
+    "lightweight-charts": "^5.1.0",
     "multer": "^1.4.5-lts.1",
     "openai": "^4.77.3",
     "p-limit": "^6.2.0",
