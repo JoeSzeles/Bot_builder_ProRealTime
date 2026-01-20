@@ -2026,7 +2026,11 @@ async function runSimulationWithModifiedVars() {
     const asset = document.getElementById('assetSelect')?.value || 'silver';
     const timeframe = document.getElementById('timeframeSelect')?.value || '1m';
     
-    const candles = await fetchMarketData(asset, timeframe);
+    const datapoints = parseInt(document.getElementById('simDatapoints')?.value) || 2000;
+    let candles = await fetchMarketData(asset, timeframe);
+    if (candles.length > datapoints) {
+      candles = candles.slice(-datapoints);
+    }
     currentCandles = candles;
     
     const results = await runSimulationWithVariables(detectedVariables, candles, settings);
@@ -2278,7 +2282,11 @@ async function runAutoOptimization() {
   const timeframe = document.getElementById('timeframeSelect')?.value || '1m';
   
   try {
-    const candles = await fetchMarketData(asset, timeframe);
+    const datapoints = parseInt(document.getElementById('simDatapoints')?.value) || 2000;
+    let candles = await fetchMarketData(asset, timeframe);
+    if (candles.length > datapoints) {
+      candles = candles.slice(-datapoints);
+    }
     currentCandles = candles;
     
     for (let i = 0; i < iterations; i++) {
@@ -2688,7 +2696,11 @@ async function runSimulation() {
     const asset = document.getElementById('assetSelect')?.value || 'silver';
     const timeframe = document.getElementById('timeframeSelect')?.value || '1m';
     
-    const candles = await fetchMarketData(asset, timeframe);
+    const datapoints = parseInt(document.getElementById('simDatapoints')?.value) || 2000;
+    let candles = await fetchMarketData(asset, timeframe);
+    if (candles.length > datapoints) {
+      candles = candles.slice(-datapoints);
+    }
     currentCandles = candles;
     
     const response = await fetch('/api/simulate-bot', {
