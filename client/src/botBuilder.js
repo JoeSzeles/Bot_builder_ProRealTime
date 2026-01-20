@@ -545,12 +545,19 @@ function setupStrategyIdeasModal() {
           <div class="flex-1 min-w-0">
             <h4 class="font-medium text-sm text-gray-900 dark:text-white truncate">${r.title}</h4>
             <p class="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">${r.description}</p>
+            ${r.url ? `<a href="${r.url}" target="_blank" class="text-xs text-green-600 dark:text-green-400 hover:underline">View on ProRealCode</a>` : ''}
           </div>
           <div class="flex gap-1 shrink-0">
             <button class="history-add-btn px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded transition-colors" data-idx="${i}">Add</button>
             <button class="history-use-btn px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium rounded transition-colors" data-idx="${i}">Use</button>
           </div>
         </div>
+        ${r.codeSnippet ? `
+          <details class="mt-2">
+            <summary class="text-xs text-gray-500 dark:text-gray-400 cursor-pointer hover:text-gray-700 dark:hover:text-gray-200">Show code</summary>
+            <pre class="mt-1 p-2 bg-gray-900 text-gray-100 rounded text-xs font-mono overflow-x-auto max-h-32">${r.codeSnippet}</pre>
+          </details>
+        ` : ''}
       </div>
     `).join('');
     
