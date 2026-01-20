@@ -175,13 +175,13 @@ async function loadSavedStrategies() {
     select.addEventListener('change', (e) => {
       const selectedOption = e.target.selectedOptions[0];
       if (selectedOption && selectedOption.value.startsWith('saved_')) {
-        const customInstructions = document.getElementById('botCustomInstructions');
-        if (customInstructions) {
+        const extraInstructions = document.getElementById('botExtraInstructions');
+        if (extraInstructions) {
           const parts = [];
           if (selectedOption.dataset.description) parts.push(selectedOption.dataset.description);
           if (selectedOption.dataset.keyPoints) parts.push(selectedOption.dataset.keyPoints);
           if (selectedOption.dataset.codeTemplate) parts.push(`Code Template:\n${selectedOption.dataset.codeTemplate}`);
-          customInstructions.value = parts.join('\n\n');
+          extraInstructions.value = parts.join('\n\n');
         }
       }
     });
@@ -885,9 +885,9 @@ function setupStrategyIdeasModal() {
       strategySelect.value = 'custom';
     }
     
-    const customInstructions = document.getElementById('botCustomInstructions');
-    if (customInstructions) {
-      customInstructions.value = `Strategy: ${strategy.title}\n\n${strategy.description}\n\n${strategy.keyPoints || ''}`;
+    const extraInstructions = document.getElementById('botExtraInstructions');
+    if (extraInstructions) {
+      extraInstructions.value = `Strategy: ${strategy.title}\n\n${strategy.description}\n\n${strategy.keyPoints || ''}`;
     }
     
     alert(`Strategy "${strategy.title}" applied! The AI will use this as the base for code generation.`);
