@@ -723,6 +723,9 @@ function setupStrategyIdeasModal() {
     option.value = `saved_${strategy.id}`;
     option.textContent = strategy.name;
     option.dataset.strategyId = strategy.id;
+    option.dataset.description = strategy.description || '';
+    option.dataset.keyPoints = strategy.keyPoints || '';
+    option.dataset.codeTemplate = strategy.codeTemplate || '';
     
     if (customOption) {
       select.insertBefore(option, customOption);
