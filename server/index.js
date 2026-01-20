@@ -1015,7 +1015,7 @@ app.patch('/api/bot-history/:id', (req, res) => {
 
 // Bot generation endpoint with screenshot support
 app.post('/api/generate-bot', async (req, res) => {
-  const { description, syntaxRules, settings, screenshotBase64, asset, strategy } = req.body;
+  const { description, syntaxRules, settings, screenshotBase64, asset, strategy, botName } = req.body;
   
   if (!description) {
     return res.status(400).json({ error: 'Bot description is required' });
@@ -1092,6 +1092,7 @@ ${description}`;
     const savedEntry = saveBotEntry({
       asset: asset || 'unknown',
       strategy: strategy || 'custom',
+      botName: botName || '',
       description,
       settings: settings || {},
       code,

@@ -966,6 +966,7 @@ function getSettings() {
   }
   
   return {
+    botName: document.getElementById('botName')?.value || '',
     asset: document.getElementById('assetSelect')?.value || 'silver',
     timeframe: document.getElementById('timeframeSelect')?.value || '1h',
     initialCapital: parseFloat(document.getElementById('initialCapital')?.value) || 2000,
@@ -1121,6 +1122,15 @@ function buildBotDescription(settings) {
 
 function buildSummaryHTML(settings) {
   const sections = [];
+  
+  // Bot Name (if set)
+  if (settings.botName) {
+    sections.push(`
+      <div class="bg-gradient-to-r from-indigo-500 to-purple-500 rounded-lg p-3 text-white">
+        <h4 class="font-bold text-lg">${settings.botName}</h4>
+      </div>
+    `);
+  }
   
   // Asset & Timeframe
   sections.push(`
@@ -1365,7 +1375,8 @@ async function generateBot() {
           settings,
           screenshotBase64: screenshotBase64,
           asset: assetSelect?.value || 'unknown',
-          strategy: strategyType?.value || 'custom'
+          strategy: strategyType?.value || 'custom',
+          botName: settings.botName
         })
       });
 
@@ -1417,7 +1428,8 @@ async function generateBot() {
           settings,
           screenshotBase64: screenshotBase64,
           asset: assetSelect?.value || 'unknown',
-          strategy: strategyType?.value || 'custom'
+          strategy: strategyType?.value || 'custom',
+          botName: settings.botName
         })
       });
 
@@ -1760,13 +1772,14 @@ export async function loadBotHistory() {
       const date = new Date(entry.createdAt).toLocaleDateString();
       const assetLabel = entry.asset?.toUpperCase() || 'Unknown';
       const strategyLabel = entry.strategy || 'custom';
+      const displayName = entry.botName || `${assetLabel} - ${strategyLabel}`;
       
       return `
         <div class="history-item group p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition-colors border border-transparent hover:border-gray-200 dark:hover:border-gray-600" data-id="${entry.id}">
           <div class="flex items-center justify-between">
             <div class="flex-1 min-w-0">
-              <p class="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">${assetLabel} - ${strategyLabel}</p>
-              <p class="text-xs text-gray-500 dark:text-gray-400">${date}</p>
+              <p class="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">${displayName}</p>
+              <p class="text-xs text-gray-500 dark:text-gray-400">${assetLabel} - ${date}</p>
             </div>
             ${entry.hasScreenshot ? '<svg class="w-4 h-4 text-blue-500 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>' : ''}
             <button class="delete-bot-btn opacity-0 group-hover:opacity-100 ml-2 p-1 text-red-500 hover:text-red-600 transition-all" data-id="${entry.id}">
@@ -1803,6 +1816,10 @@ async function loadBotEntry(id) {
     if (data.strategy) {
       const strategyType = document.getElementById('strategyType');
       if (strategyType) strategyType.value = data.strategy;
+    }
+    if (data.botName) {
+      const botNameInput = document.getElementById('botName');
+      if (botNameInput) botNameInput.value = data.botName;
     }
     
     if (data.variableOverrides && data.variableOverrides.length > 0) {
