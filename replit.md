@@ -40,3 +40,24 @@ The application features a modern full-stack architecture:
 -   **Replit AI Integrations**: For AI model access (Claude Sonnet, GPT-4o-mini).
 -   **MetalPriceAPI**: For real-time Silver & Gold spot prices (requires `METALS_API_KEY` secret).
 -   **Twelve Data API**: For live Forex candlestick data.
+
+## Recent Changes (Jan 20, 2026)
+- **AI Research Q&A Mode**:
+  - Renamed "Paste Base Code" to "Custom / Paste Code" in strategy dropdown
+  - Widened textarea to match preview code box (300% width)
+  - Changed label to "Paste Base Code / Custom Description"
+  - AI detects if input is code vs description (uses keyword detection)
+  - For descriptions: AI asks 2-4 clarifying questions before generating
+  - Purple Q&A panel appears with questions, answer textarea, Submit/Skip buttons
+  - Original description + Q&A context included in generation prompt
+- **ProRealTime Documentation System**:
+  - New "Docs" button next to strategy Ideas button
+  - Categorized markdown docs stored in data/prt-docs/
+  - Docs automatically injected into AI prompts based on keywords
+  - Full CRUD UI modal for viewing/editing/creating/deleting docs
+- **Datapoints Selector for Simulation**:
+  - New dropdown in Simulator tab: 1k, 2k, 5k, 10k, 100k datapoints
+- **Second-based Timeframes**:
+  - Added 1s, 2s, 3s, 5s, 10s, 30s options to chart timeframe selector
+- **Indicator Checkbox Fix**:
+  - Fixed useOBV, useHeikinAshi, useTrailingStop using ?? instead of ||

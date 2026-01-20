@@ -1084,6 +1084,71 @@ app.patch('/api/bot-history/:id', (req, res) => {
   }
 });
 
+// AI Research Questions endpoint - AI asks clarifying questions before generating
+app.post('/api/research-questions', async (req, res) => {
+  const { description, settings } = req.body;
+  
+  if (!description || description.trim().length < 10) {
+    return res.json({ hasQuestions: false });
+  }
+  
+  // Check if it looks like actual code (has common ProRealTime keywords)
+  const codeIndicators = ['defparam', 'if ', 'endif', 'buy ', 'sell ', 'set stop', 'set target', 'once ', 'longonmarket', 'shortonmarket'];
+  const lowerDesc = description.toLowerCase();
+  const isLikelyCode = codeIndicators.some(ind => lowerDesc.includes(ind));
+  
+  // If it looks like code, don't ask questions - just use it
+  if (isLikelyCode) {
+    return res.json({ hasQuestions: false });
+  }
+  
+  // If it's a description, ask clarifying questions
+  const systemPrompt = `You are a ProRealTime trading bot expert. The user has provided a strategy description (not code). Your job is to ask 2-4 focused clarifying questions to better understand their requirements BEFORE generating code.
+
+Focus on:
+1. Entry/exit logic clarification
+2. Risk management preferences (stop loss, take profit, position sizing)
+3. Indicators or signals they want to use
+4. Market conditions or filters they need
+
+IMPORTANT: 
+- Keep questions concise and numbered
+- Only ask if the description is vague or missing key details
+- If the description is already detailed enough, respond with exactly: NO_QUESTIONS_NEEDED
+- Do NOT generate code - only ask questions`;
+
+  const userPrompt = `Strategy description: "${description}"
+
+Current settings summary:
+- Trade Type: ${settings?.tradeType || 'both'}
+- Position Size: ${settings?.positionSize || 1}
+- Stop Loss: ${settings?.stopLoss || 'not set'}
+- Take Profit: ${settings?.takeProfit || 'not set'}
+- Trailing Stop: ${settings?.useTrailingStop ? 'enabled' : 'disabled'}
+
+Based on this description, what clarifying questions would help you build a better bot?`;
+
+  try {
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-5-20250514',
+      max_tokens: 500,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }]
+    });
+    
+    const questions = response.content[0]?.text?.trim() || '';
+    
+    if (questions === 'NO_QUESTIONS_NEEDED' || questions.length < 20) {
+      return res.json({ hasQuestions: false });
+    }
+    
+    res.json({ hasQuestions: true, questions });
+  } catch (err) {
+    console.error('Research questions error:', err.message);
+    res.json({ hasQuestions: false });
+  }
+});
+
 // Bot generation endpoint with screenshot support
 app.post('/api/generate-bot', async (req, res) => {
   const { description, syntaxRules, settings, screenshotBase64, asset, strategy, botName } = req.body;

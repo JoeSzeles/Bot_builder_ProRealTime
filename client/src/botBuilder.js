@@ -16,6 +16,9 @@ let tradeChart = null;
 let tradeCandleSeries = null;
 let currentBotId = null;
 let detectedVariables = [];
+let pendingResearchAnswers = null;
+let pendingResearchQuestions = null;
+let pendingOriginalDescription = null;
 
 const FALLBACK_DATA = {
   silver: generateCandleData(65, 100, 0.02),
@@ -413,6 +416,9 @@ function setupBotBuilderEvents() {
     });
   }
 
+  // AI Research Q&A handlers
+  setupResearchQA();
+
   const enableTimeFilters = document.getElementById('enableTimeFilters');
   const timeFiltersContent = document.getElementById('timeFiltersContent');
   if (enableTimeFilters && timeFiltersContent) {
@@ -433,6 +439,90 @@ function setupBotBuilderEvents() {
   if (chartContainer) {
     chart.subscribeClick(handleChartClick);
   }
+}
+
+function setupResearchQA() {
+  const qaContainer = document.getElementById('aiResearchQA');
+  const questionsContent = document.getElementById('aiQuestionsContent');
+  const answersInput = document.getElementById('userAnswersInput');
+  const submitBtn = document.getElementById('submitAnswersBtn');
+  const skipBtn = document.getElementById('skipQuestionsBtn');
+  
+  if (!submitBtn || !skipBtn) return;
+  
+  submitBtn.addEventListener('click', async () => {
+    if (!answersInput?.value.trim()) {
+      alert('Please provide answers to the questions');
+      return;
+    }
+    
+    pendingResearchAnswers = answersInput.value.trim();
+    
+    if (qaContainer) qaContainer.classList.add('hidden');
+    if (answersInput) answersInput.value = '';
+    
+    await generateBot();
+  });
+  
+  skipBtn.addEventListener('click', async () => {
+    pendingResearchAnswers = null;
+    pendingResearchQuestions = null;
+    pendingOriginalDescription = null;
+    
+    if (qaContainer) qaContainer.classList.add('hidden');
+    if (answersInput) answersInput.value = '';
+    
+    await generateBot();
+  });
+}
+
+async function checkForResearchQuestions() {
+  const strategyType = document.getElementById('strategyType')?.value;
+  const baseCodeInput = document.getElementById('baseCodeInput')?.value?.trim();
+  
+  if (strategyType !== 'paste' || !baseCodeInput || baseCodeInput.length < 10) {
+    return false;
+  }
+  
+  const codeIndicators = ['defparam', 'if ', 'endif', 'buy ', 'sell ', 'set stop', 'set target', 'once ', 'longonmarket', 'shortonmarket'];
+  const lowerCode = baseCodeInput.toLowerCase();
+  const isLikelyCode = codeIndicators.some(ind => lowerCode.includes(ind));
+  
+  if (isLikelyCode) {
+    return false;
+  }
+  
+  const qaContainer = document.getElementById('aiResearchQA');
+  const questionsContent = document.getElementById('aiQuestionsContent');
+  
+  try {
+    const settings = getSettings();
+    const response = await fetch('/api/research-questions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ description: baseCodeInput, settings })
+    });
+    
+    const data = await response.json();
+    
+    if (data.hasQuestions && data.questions) {
+      pendingResearchQuestions = data.questions;
+      pendingOriginalDescription = baseCodeInput;
+      
+      if (questionsContent) {
+        questionsContent.textContent = data.questions;
+      }
+      if (qaContainer) {
+        qaContainer.classList.remove('hidden');
+      }
+      
+      return true;
+    }
+  } catch (err) {
+    console.warn('Research questions error:', err);
+  }
+  
+  return false;
 }
 
 function setupStrategyIdeasModal() {
@@ -1324,13 +1414,33 @@ CRITICAL PROREALTIME/PROBUILDER SYNTAX RULES:
 
 async function generateBot() {
   const settings = getSettings();
-  const description = buildBotDescription(settings);
+  const strategyTypeEl = document.getElementById('strategyType');
+  const baseCodeInput = document.getElementById('baseCodeInput')?.value?.trim();
+  
+  // Check if we should ask research questions first (only for custom descriptions, not code)
+  if (strategyTypeEl?.value === 'paste' && baseCodeInput && !pendingResearchQuestions && !pendingResearchAnswers) {
+    const hasQuestions = await checkForResearchQuestions();
+    if (hasQuestions) {
+      return;
+    }
+  }
+  
+  let description = buildBotDescription(settings);
+  
+  // Append Q&A context if we have research answers (include original description)
+  if (pendingResearchQuestions && pendingResearchAnswers && pendingOriginalDescription) {
+    description += `\n\n--- USER'S ORIGINAL STRATEGY REQUEST ---\n${pendingOriginalDescription}\n\n--- AI RESEARCH Q&A ---\nQuestions asked:\n${pendingResearchQuestions}\n\nUser's answers:\n${pendingResearchAnswers}`;
+    
+    pendingResearchQuestions = null;
+    pendingResearchAnswers = null;
+    pendingOriginalDescription = null;
+  }
   
   const generateBotBtn = document.getElementById('generateBotBtn');
   const botOutputSection = document.getElementById('botOutputSection');
   const botCodeOutput = document.getElementById('botCodeOutput');
   const assetSelect = document.getElementById('assetSelect');
-  const strategyType = document.getElementById('strategyType');
+  const strategyType = strategyTypeEl;
   
   // Progress bar elements
   const progressContainer = document.getElementById('generateProgress');
