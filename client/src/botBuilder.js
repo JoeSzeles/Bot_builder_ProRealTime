@@ -915,7 +915,17 @@ function updateDrawingCount() {
 
 function getSettings() {
   const enableTimeFilters = document.getElementById('enableTimeFilters')?.checked ?? true;
-  const strategyType = document.getElementById('strategyType')?.value || '13thwarrior';
+  const strategySelect = document.getElementById('strategyType');
+  const strategyType = strategySelect?.value || '13thwarrior';
+  const selectedOption = strategySelect?.selectedOptions?.[0];
+  
+  // Get base code from either pasted textarea OR saved strategy template
+  let baseCode = '';
+  if (strategyType === 'paste') {
+    baseCode = document.getElementById('baseCodeInput')?.value || '';
+  } else if (strategyType.startsWith('saved_') && selectedOption?.dataset?.codeTemplate) {
+    baseCode = selectedOption.dataset.codeTemplate;
+  }
   
   return {
     asset: document.getElementById('assetSelect')?.value || 'silver',
@@ -938,7 +948,7 @@ function getSettings() {
     obvPeriod: parseInt(document.getElementById('obvPeriod')?.value) || 5,
     useHeikinAshi: document.getElementById('useHeikinAshi')?.checked || true,
     strategyType: strategyType,
-    baseCode: strategyType === 'paste' ? (document.getElementById('baseCodeInput')?.value || '') : '',
+    baseCode: baseCode,
     extraInstructions: document.getElementById('botExtraInstructions')?.value || '',
     drawings: drawings,
     enableTimeFilters: enableTimeFilters,
@@ -1007,9 +1017,9 @@ function buildBotDescription(settings) {
   desc += `\n`;
   
   desc += `STRATEGY: ${settings.strategyType}\n`;
-  if (settings.strategyType === 'paste' && settings.baseCode) {
+  if (settings.baseCode) {
     desc += `\nBASE CODE TO MODIFY/IMPROVE:\n\`\`\`\n${settings.baseCode}\n\`\`\`\n`;
-    desc += `Use this code as a starting point and apply the settings/modifications specified.\n\n`;
+    desc += `IMPORTANT: Use this code as a starting point. Apply the settings, risk management, and time filters specified above to modify/improve this base code. Keep the core strategy logic intact unless the extra instructions request changes.\n\n`;
   } else {
     desc += `\n`;
   }
