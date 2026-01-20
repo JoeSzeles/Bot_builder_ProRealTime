@@ -55,7 +55,78 @@ const fonts = {
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const BOT_DATA_DIR = path.join(__dirname, '..', 'data', 'bots');
 const BOT_SCREENSHOTS_DIR = path.join(__dirname, '..', 'data', 'bots', 'screenshots');
+const PRT_DOCS_DIR = path.join(__dirname, '..', 'data', 'prt-docs');
 const MAX_ENTRIES_PER_FILE = 10;
+
+let prtDocsCache = null;
+let prtDocsCacheMtime = 0;
+
+function loadPrtDocs() {
+  const indexPath = path.join(PRT_DOCS_DIR, 'index.json');
+  if (!fs.existsSync(indexPath)) return { docs: [], content: {} };
+  
+  const stat = fs.statSync(indexPath);
+  if (prtDocsCache && stat.mtimeMs === prtDocsCacheMtime) {
+    return prtDocsCache;
+  }
+  
+  try {
+    const index = JSON.parse(fs.readFileSync(indexPath, 'utf-8'));
+    const content = {};
+    
+    for (const doc of index.docs) {
+      const filePath = path.join(PRT_DOCS_DIR, doc.file);
+      if (fs.existsSync(filePath)) {
+        content[doc.id] = fs.readFileSync(filePath, 'utf-8');
+      }
+    }
+    
+    prtDocsCache = { docs: index.docs, content };
+    prtDocsCacheMtime = stat.mtimeMs;
+    return prtDocsCache;
+  } catch (e) {
+    console.error('Error loading PRT docs:', e.message);
+    return { docs: [], content: {} };
+  }
+}
+
+function getRelevantPrtDocs(description = '', settings = {}) {
+  const { docs, content } = loadPrtDocs();
+  const relevantDocs = [];
+  const descLower = description.toLowerCase();
+  const settingsStr = JSON.stringify(settings).toLowerCase();
+  const combined = descLower + ' ' + settingsStr;
+  
+  for (const doc of docs) {
+    if (doc.alwaysInclude) {
+      relevantDocs.push({ title: doc.title, content: content[doc.id] });
+      continue;
+    }
+    
+    for (const keyword of doc.keywords) {
+      if (combined.includes(keyword.toLowerCase())) {
+        relevantDocs.push({ title: doc.title, content: content[doc.id] });
+        break;
+      }
+    }
+  }
+  
+  return relevantDocs;
+}
+
+function buildPrtDocsPrompt(docs) {
+  if (docs.length === 0) return '';
+  
+  let prompt = '\n\n=== PROREALTIME REFERENCE DOCUMENTATION ===\n';
+  prompt += 'The following documentation contains CRITICAL syntax rules and examples. Follow these exactly:\n\n';
+  
+  for (const doc of docs) {
+    prompt += `--- ${doc.title} ---\n${doc.content}\n\n`;
+  }
+  
+  prompt += '=== END REFERENCE DOCUMENTATION ===\n';
+  return prompt;
+}
 
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -1034,18 +1105,23 @@ app.post('/api/generate-bot', async (req, res) => {
     }
   }
   
+  const relevantDocs = getRelevantPrtDocs(description, settings);
+  const docsPrompt = buildPrtDocsPrompt(relevantDocs);
+
   const systemPrompt = `You are an experienced ProRealCode forum contributor and expert ProRealTime/ProBuilder trading bot developer. Generate ONLY valid ProBuilder code based on the user's requirements.
 
 ${PRC_STYLE_CONSTRAINTS}
 
 ${syntaxRules}
+${docsPrompt}
 
 IMPORTANT OUTPUT RULES:
 1. Output ONLY the code - no explanations, no markdown, no code blocks
 2. Start directly with Defparam or comments
 3. Follow all ProRealCode forum conventions - flat structure, verbose IF/ENDIF, no underscores
 4. Include helpful comments using // like a forum post explaining logic
-5. Structure the code with clear sections: parameters, variables, conditions, orders`;
+5. Structure the code with clear sections: parameters, variables, conditions, orders
+6. CRITICAL: Follow all syntax rules from the reference documentation above`;
 
   let userPrompt = `Create a ProRealTime trading bot with these specifications:
 
@@ -1144,11 +1220,15 @@ app.post('/api/fix-bot', async (req, res) => {
     return res.status(400).json({ error: 'Code and error message are required' });
   }
   
+  const relevantDocs = getRelevantPrtDocs(code + ' ' + error, {});
+  const docsPrompt = buildPrtDocsPrompt(relevantDocs);
+  
   const systemPrompt = `You are an experienced ProRealCode forum contributor and ProRealTime/ProBuilder bot debugger. Fix the provided code based on the error message.
 
 ${PRC_STYLE_CONSTRAINTS}
 
 ${syntaxRules}
+${docsPrompt}
 
 IMPORTANT OUTPUT RULES:
 1. Output ONLY the fixed code - no explanations, no markdown, no code blocks
@@ -1156,7 +1236,8 @@ IMPORTANT OUTPUT RULES:
 3. Identify and fix the specific error mentioned
 4. Ensure all syntax rules are followed - especially ProRealCode forum conventions
 5. Preserve the original logic while fixing the error
-6. Check for common ProRealTime errors: undefined variables, missing ENDIF, incorrect function names`;
+6. Check for common ProRealTime errors: undefined variables, missing ENDIF, incorrect function names
+7. CRITICAL: Follow all syntax rules from the reference documentation above`;
 
   const userPrompt = `Fix this ProRealTime bot code:
 
@@ -2034,6 +2115,109 @@ app.get('/api/market-data/:asset/:timeframe', async (req, res) => {
   }
   
   res.status(400).json({ error: 'No data available for this asset' });
+});
+
+// ProRealTime Documentation Management API
+app.get('/api/prt-docs', (req, res) => {
+  const { docs, content } = loadPrtDocs();
+  res.json({ docs: docs.map(d => ({ ...d, content: content[d.id] || '' })) });
+});
+
+app.get('/api/prt-docs/:id', (req, res) => {
+  const { docs, content } = loadPrtDocs();
+  const doc = docs.find(d => d.id === req.params.id);
+  if (!doc) {
+    return res.status(404).json({ error: 'Document not found' });
+  }
+  res.json({ ...doc, content: content[doc.id] || '' });
+});
+
+app.put('/api/prt-docs/:id', (req, res) => {
+  const { content: newContent, title, keywords, alwaysInclude } = req.body;
+  const indexPath = path.join(PRT_DOCS_DIR, 'index.json');
+  
+  try {
+    const index = JSON.parse(fs.readFileSync(indexPath, 'utf-8'));
+    const docIndex = index.docs.findIndex(d => d.id === req.params.id);
+    
+    if (docIndex === -1) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+    
+    const doc = index.docs[docIndex];
+    if (title) doc.title = title;
+    if (keywords) doc.keywords = keywords;
+    if (alwaysInclude !== undefined) doc.alwaysInclude = alwaysInclude;
+    
+    fs.writeFileSync(indexPath, JSON.stringify(index, null, 2));
+    
+    if (newContent !== undefined) {
+      const filePath = path.join(PRT_DOCS_DIR, doc.file);
+      fs.writeFileSync(filePath, newContent);
+    }
+    
+    prtDocsCache = null;
+    res.json({ success: true, doc });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to update document' });
+  }
+});
+
+app.post('/api/prt-docs', (req, res) => {
+  const { id, title, content, keywords = [], alwaysInclude = false } = req.body;
+  
+  if (!id || !title || !content) {
+    return res.status(400).json({ error: 'id, title, and content are required' });
+  }
+  
+  const indexPath = path.join(PRT_DOCS_DIR, 'index.json');
+  
+  try {
+    const index = JSON.parse(fs.readFileSync(indexPath, 'utf-8'));
+    
+    if (index.docs.some(d => d.id === id)) {
+      return res.status(400).json({ error: 'Document with this ID already exists' });
+    }
+    
+    const filename = `${id}.md`;
+    index.docs.push({ id, title, file: filename, keywords, alwaysInclude });
+    
+    fs.writeFileSync(indexPath, JSON.stringify(index, null, 2));
+    fs.writeFileSync(path.join(PRT_DOCS_DIR, filename), content);
+    
+    prtDocsCache = null;
+    res.json({ success: true, id });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to create document' });
+  }
+});
+
+app.delete('/api/prt-docs/:id', (req, res) => {
+  const indexPath = path.join(PRT_DOCS_DIR, 'index.json');
+  
+  try {
+    const index = JSON.parse(fs.readFileSync(indexPath, 'utf-8'));
+    const docIndex = index.docs.findIndex(d => d.id === req.params.id);
+    
+    if (docIndex === -1) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+    
+    const doc = index.docs[docIndex];
+    const filePath = path.join(PRT_DOCS_DIR, doc.file);
+    
+    index.docs.splice(docIndex, 1);
+    fs.writeFileSync(indexPath, JSON.stringify(index, null, 2));
+    
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+    
+    prtDocsCache = null;
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to delete document' });
+  }
 });
 
 const PORT = process.env.PORT || 3001;

@@ -3,228 +3,40 @@
 A personal-use full-stack app for generating ProRealTime trading bots using AI, with an additional Text tab for translating/transforming literary texts.
 
 ## Overview
-- **Purpose**: Two main features:
-  1. **Bot Builder Tab** (default): Generate ProRealTime/ProBuilder trading bot code with interactive charts and AI
-  2. **Text Tab**: Translate texts (books, documents) from any language to English using AI, with support for custom translation instructions
-- **Tech Stack**: Vite (Vanilla JS + Tailwind CSS) frontend with Lightweight Charts, Node.js + Express backend
-- **AI Models**: Uses Replit AI Integrations (Claude Sonnet as primary, GPT-4o-mini as fallback) - no API keys needed
-- **Storage**: JSON file-based storage for translation history and saved prompts, local file storage for generated PDFs
+This project is a full-stack application designed for personal use, offering two primary functionalities:
+1.  **Bot Builder**: An AI-powered tool for generating ProRealTime/ProBuilder trading bot code. It includes interactive charting, extensive bot settings, and AI-driven code generation and error correction.
+2.  **Text Transformer**: An AI-powered literary translation and content generation tool. It supports translating texts from any language to English, metadata detection, PDF generation, and custom translation instructions.
 
-## Project Structure
-```
-/
-├── client/                 # Vite frontend
-│   ├── index.html         # Main HTML with tabs (Text + Bot Builder)
-│   ├── src/
-│   │   ├── main.js        # Main frontend JavaScript (tab switching, text features)
-│   │   ├── botBuilder.js  # Bot Builder tab logic (chart, settings, AI generation)
-│   │   └── style.css      # Tailwind imports + custom styles
-│   ├── vite.config.js     # Vite config (port 5000, proxy to backend)
-│   ├── tailwind.config.js # Tailwind config with dark mode support
-│   └── package.json       # Frontend dependencies (includes lightweight-charts)
-├── server/
-│   └── index.js           # Express server (port 3001)
-├── fonts/                  # Roboto TTF fonts for PDF generation
-├── data/                   # Persistent storage
-│   ├── translations.json  # Translation history
-│   └── prompts.json       # Saved prompts library
-├── downloads/              # Generated PDFs storage
-├── package.json           # Backend dependencies
-├── README.md              # Full documentation
-└── start.js               # Combined launcher script
-```
-
-## Features
-
-### Text Tab (Translation/Generation)
-1. **Text Input**: Paste text or drag-and-drop .txt/.pdf/.md files
-2. **Auto-detect Metadata**: AI-powered detection of book title and author from input text
-3. **Translation**: AI-powered literary translation with custom instructions and styles
-4. **Story Collection Mode**: Checkbox for anthology/collection books - AI detects individual stories
-5. **PDF Generation**: Single PDF, chapter-split ZIP, or story-split ZIP with professional book layout
-6. **History Sidebar (Left)**: 
-   - Automatic saving, loading, and deletion of past translations
-   - Nested structure: collection title with expandable sub-stories
-   - Click story to view just that story's content
-7. **Prompts Sidebar (Right)**:
-   - Save custom prompts (instructions + styles) for reuse
-   - Pre-populated with Suno song format template
-   - Click to fill both Custom Instructions and Custom Styles fields
-   - Delete button on hover
-
-### Bot Builder Tab (ProRealTime Bot Generator)
-1. **Interactive Chart**: Candlestick chart powered by Lightweight Charts
-   - Asset selector: Silver, Gold, Copper, Oil, Gas, Forex pairs, Indices
-   - Timeframe selector: 1m to Daily
-   - Drawing tools: Trend lines, horizontal/vertical lines, high/low markers
-2. **Bot Settings Panel**:
-   - Position size, trade type (long/short/both), cumulate orders
-   - Stop loss and take profit in points
-   - Trailing stop with configurable % and step
-   - Indicator toggles (OBV, Heikin Ashi) with periods
-   - Strategy type selection (13th Warrior, Sniper, Breakout, Custom)
-3. **Time & Session Filters**:
-   - Timezone selector (Brisbane AEST UTC+10 default, plus major trading zones)
-   - Exclude weekends and major holidays
-   - Custom trading hours (start/end time)
-   - Session avoidance: exclude first/last X minutes of session
-   - Force close positions before session end
-   - Day of week selectors (Mon-Sun)
-4. **AI Code Generation**:
-   - Compiles chart annotations + settings into bot description
-   - Sends to AI with ProRealTime syntax rules
-   - Outputs ready-to-use ProBuilder code
-5. **Error Correction**:
-   - Paste ProRealTime error messages
-   - AI fixes code and regenerates
-
-### Common Features
-8. **Dark Mode**: Toggle between light and dark themes
-9. **Mobile Responsive**: Collapsible sidebars with hamburger menus
-10. **Tab Navigation**: Switch between Text and Bot Builder tabs
-
-## UI Layout
-- **Left Sidebar**: Translation History with nested story display
-- **Main Content**: Input form, progress, output with PDF download
-- **Right Sidebar**: Saved Prompts library
-
-## API Endpoints
-
-### Text Tab
-- `POST /api/parse-pdf` - Extract text from uploaded PDF
-- `POST /api/detect-metadata` - AI detection of title/author from text
-- `POST /api/translate` - Translate text (SSE streaming)
-- `POST /api/generate-pdf` - Generate PDF from translation
-- `GET /api/history` - List all translations (includes story titles for nesting)
-- `GET /api/history/:id` - Get specific translation with full content
-- `DELETE /api/history/:id` - Delete translation
-
-### Bot Builder Tab
-- `POST /api/generate-bot` - Generate ProRealTime bot code (accepts optional screenshotBase64)
-- `POST /api/fix-bot` - Fix bot code based on error message
-- `GET /api/bot-history` - List all saved bot generations
-- `GET /api/bot-history/:id` - Get specific bot entry with full code
-- `DELETE /api/bot-history/:id` - Delete bot entry
-
-## Running the App
-The app runs with two workflows:
-1. **Backend Server**: `node server/index.js` (port 3001)
-2. **Frontend**: `cd client && npm run dev` (port 5000)
-
-The frontend proxies API requests to the backend.
+The application aims to streamline the creation of sophisticated trading algorithms and facilitate high-quality literary translation and content generation, leveraging AI capabilities without requiring external API keys.
 
 ## User Preferences
-- Private/personal use only (never deploy)
-- No external API keys - uses Replit-managed AI models
-- Auto-save translations without extra clicks
-- Save Prompt checkbox enabled by default to save custom prompts
+-   Private/personal use only (never deploy)
+-   No external API keys - uses Replit-managed AI models
+-   Auto-save translations without extra clicks
+-   Save Prompt checkbox enabled by default to save custom prompts
 
-## Recent Changes (Jan 19, 2026)
-- **Time Filters Master Toggle**:
-  - "Enable Filters" checkbox to turn off all TIME & SESSION FILTERS at once
-  - When unchecked, time filter content is dimmed and all time-based restrictions disabled
-  - Properly syncs UI state on page load
-- **Paste Base Code Strategy**:
-  - New "Paste Base Code" option in strategy dropdown
-  - Shows textarea for pasting existing ProRealTime code
-  - AI uses pasted code as base and applies configured settings/modifications
-- **Variable Optimization Checkboxes**:
-  - Each detected variable now has checkbox to include/exclude from auto-optimization
-  - Time/session related variables (PreLoadBars, StartHour, etc.) unchecked by default
-  - Generic numeric variables checked by default for optimization
-- **Strategy Search History**:
-  - Ideas modal now has Search and History tabs
-  - All searches are auto-saved to history (data/search-history.json)
-  - History shows past searches with date/time and result count
-  - Click to expand and see all results from that search
-  - Add/Use buttons work from history entries
-  - Delete button to remove old searches
-  - Keeps up to 50 most recent searches
-- **Strategy Template Library**:
-  - "Add" button saves found strategies to dropdown menu
-  - Strategies saved to data/strategies.json with name, description, and code template
-  - Auto-loads saved strategies into dropdown on page load
-  - Selecting saved strategy fills Custom Instructions with template
-  - Delete endpoint available at DELETE /api/strategies/:id
-- **Get Strategy Ideas Feature**:
-  - New "Get Strategy Ideas" button next to strategy dropdown in Bot Settings
-  - Modal with category chips (Breakout, Trend Following, Mean Reversion, RSI, MACD, Scalping, etc.)
-  - AI-powered search generates ProRealCode forum-style strategy ideas
-  - Each result shows title, description, code preview, "Add" and "Use" buttons
-  - Clicking "Use" populates Custom Instructions with strategy details
-  - Clicking "Add" saves strategy to dropdown for reuse
-- **ProRealCode Forum Conventions**:
-  - PRC_STYLE_CONSTRAINTS enforced in both generate-bot and fix-bot prompts
-  - Ensures code follows forum conventions: flat structure, verbose IF/ENDIF, no underscores
-  - Assumes IG Markets + ProRealTime AutoTrading (ProOrder) environment
-  - No TradingView/PineScript/MQL syntax - only documented ProBuilder functions
-- **Enhanced Optimization Results Panel**:
-  - Bigger, expandable panel (350px collapsed, 700px expanded)
-  - Comparison bar chart showing top 10 results (green=gain, blue=win rate)
-  - Each result card has copy code button (copies code with that result's variables applied)
-  - View details button opens full modal with all stats, variables, and copyable code
-  - Top performer has special gold gradient styling
-  - Apply button to instantly use any result's configuration
-- **Variable Persistence**: Slider adjustments now auto-save to bot history and restore when reopening saved bots
-  - Debounced 500ms auto-save when variables change
-  - PATCH endpoint updates variableOverrides and modifiedCode
-  - currentBotId tracks which bot is being edited
-- **Market Data Caching**: 
-  - Server-side cache with TTL per timeframe (1m-1d)
-  - Client-side localStorage cache mirrors server cache
-  - forceRefresh parameter bypasses both cache layers
-  - Reduces API calls significantly
-- **Real-time Market Data**: 
-  - Silver & Gold: MetalPriceAPI (METALS_API_KEY secret) - real spot prices with generated candles
-  - Forex pairs: Twelve Data API for live candlestick data
-  - Falls back to sample data if APIs unavailable
-- **Bot Builder Tab**: New tab for generating ProRealTime/ProBuilder trading bots
-  - Interactive candlestick chart with Lightweight Charts v5
-  - Drawing tools (trend lines, horizontal/vertical lines, high/low markers)
-  - Asset selector with commodities, forex, and indices
-  - Timeframe selector triggers data reload
-  - **Fee Settings Panel**: Initial capital, max position size, order fee ($/order), spread (pips)
-  - Bot settings panel with position, risk, indicator, and strategy options
-  - AI-powered code generation with ProRealTime syntax rules (includes fee settings)
-  - Error correction feature to fix code based on error messages
-  - **Screenshot upload**: Upload or paste (Ctrl+V) chart screenshots for AI analysis
-  - **Bot History sidebar**: Left sidebar shows saved bots when on Bot Builder tab
-  - **Auto-save**: Each generated bot is saved to its own JSON file in data/bots/
-  - **Simulator Tab**: Backtest generated bot on current chart data
-    - Run backtest with fee/spread calculations
-    - **Equity Curve Chart**: Cyan line showing cumulative profit over time
-    - **Trade Analysis Chart**: Price chart with trade markers (green arrows for buy, red arrows for sell, yellow circles for exits with P&L)
-    - Results dashboard: total gain, win rate (pie chart), gain/loss ratio
-    - Trade distribution (winning/losing/neutral)
-    - Max drawdown, max runup, time in market %, avg orders/day
-    - Average gain per trade with best/worst trade stats
-    - Daily performance bar chart
-  - **Variable Optimization**: Detect and adjust bot parameters for backtesting
-    - Auto-detects numeric variables from generated bot code (assignments, indicators, stop loss, take profit)
-    - Interactive sliders with bidirectional sync to number inputs
-    - Proper handling of decimal values (sub-unit parameters like 0.5, 0.018)
-    - "Run Modified" button to re-run simulation with adjusted values
-    - **Auto-Optimization Mode**: Run X iterations (5-100) with randomized parameter values
-    - Multiple optimization metrics: Total Gain, Win Rate, Gain/Loss Ratio, Sharpe-like
-    - Top 5 results panel with one-click apply to restore best configurations
-    - Progress tracking with percentage completion during optimization runs
+## System Architecture
+The application features a modern full-stack architecture:
+-   **Frontend**: Built with Vite, using Vanilla JavaScript and Tailwind CSS for a responsive and modern UI. It integrates Lightweight Charts for interactive data visualization in the Bot Builder tab.
+-   **Backend**: Powered by Node.js and Express, providing API endpoints for AI interactions, data persistence, and file operations.
+-   **AI Integration**: Leverages Replit AI Integrations (Claude Sonnet as primary, GPT-4o-mini as fallback) for all AI-driven functionalities, eliminating the need for user-supplied API keys.
+-   **Data Storage**: Utilizes JSON file-based storage for translation history, saved prompts, and bot configurations, located in the `data/` directory. Generated PDFs are stored in the `downloads/` directory.
+-   **UI/UX**:
+    -   **Tabbed Interface**: `Text` and `Bot Builder` tabs for distinct functionalities.
+    -   **Dynamic Sidebars**: Left sidebar for history (translation or bot), and a right sidebar for saved prompts, both collapsible and mobile-responsive.
+    -   **Dark Mode**: Supports a toggle for dark and light themes.
+    -   **Interactive Charts**: The Bot Builder tab includes an interactive candlestick chart with drawing tools, asset, and timeframe selectors.
+    -   **PDF Generation**: Offers professional PDF generation with various output options for translated texts.
+    -   **Bot Simulation**: Includes a comprehensive simulator for backtesting generated bots with equity curve, trade analysis, and detailed performance metrics.
+    -   **Optimization**: Features a variable optimization engine for bot parameters, including auto-optimization with multiple metrics.
+    -   **ProRealTime Documentation System**: A built-in system for managing ProRealTime documentation, allowing AI to reference relevant syntax and rules.
 
-## Earlier Changes (Dec 12, 2025)
-- **Cancel Generation Button**: Red cancel button appears during processing to abort generation
-- **Model Selection Dropdown**: Choose between Claude (4.5, 4, Opus, 3.5 Sonnet/Haiku) and GPT (4o, 4o-mini, 4-turbo) models
-- **File Rotation System**: Data files rotate after 10 entries (translations_timestamp.json, prompts_timestamp.json) to prevent data loss
-
-## Earlier Changes (Dec 10, 2025)
-- **Added Content Generation Mode**: Source text is now optional - leave empty and describe a topic to generate original content
-- **Rebranded to "Literator"** with unique SVG logo (purple/indigo book with orange-red pen)
-- Added comprehensive README.md documentation
-- Added Custom Styles text field below Custom Instructions
-- Added Save Prompt checkbox (checked by default)
-- Added right sidebar for saved prompts with delete buttons
-- Added nested history structure (book → stories)
-- Added Suno song format template as default prompt
-- Added scrollbars to both sidebars
-- Fixed event delegation for prompts sidebar (Vite module scope compatibility)
-- History items now restore ALL input fields (original text, title, author, instructions, styles, story mode)
-- Enhanced translation prompts to better respect "keep original language" instructions
-- **Moved saved prompts to server-side storage** (data/prompts.json) for cross-browser compatibility
+## External Dependencies
+-   **Vite**: Frontend build tool.
+-   **Tailwind CSS**: Utility-first CSS framework for styling.
+-   **Lightweight Charts**: For interactive candlestick charts in the Bot Builder.
+-   **Node.js**: Backend runtime environment.
+-   **Express**: Web framework for the backend API.
+-   **Replit AI Integrations**: For AI model access (Claude Sonnet, GPT-4o-mini).
+-   **MetalPriceAPI**: For real-time Silver & Gold spot prices (requires `METALS_API_KEY` secret).
+-   **Twelve Data API**: For live Forex candlestick data.

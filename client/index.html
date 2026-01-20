@@ -516,6 +516,12 @@
                     </svg>
                     Ideas
                   </button>
+                  <button id="prtDocsBtn" type="button" class="px-3 py-2 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap" title="Manage ProRealTime syntax documentation">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                    </svg>
+                    Docs
+                  </button>
                 </div>
               </div>
               
@@ -1274,6 +1280,68 @@
             </svg>
             <p class="text-lg font-medium mb-2">No search history yet</p>
             <p class="text-sm">Your searches will appear here</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ProRealTime Documentation Modal -->
+  <div id="prtDocsModal" class="fixed inset-0 bg-black/50 z-[100] hidden items-center justify-center p-4">
+    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+      <div class="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+        <h3 class="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+          <svg class="w-6 h-6 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+          </svg>
+          ProRealTime Syntax Reference
+        </h3>
+        <button id="closePrtDocsModal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <div class="flex h-[70vh]">
+        <div class="w-64 border-r border-gray-200 dark:border-gray-700 overflow-y-auto p-4">
+          <div class="mb-4">
+            <button id="addNewDocBtn" class="w-full px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+              </svg>
+              Add New Doc
+            </button>
+          </div>
+          <div id="prtDocsList" class="space-y-2">
+            <p class="text-sm text-gray-500 dark:text-gray-400 italic">Loading...</p>
+          </div>
+        </div>
+        <div class="flex-1 flex flex-col">
+          <div id="prtDocEditor" class="hidden flex-1 flex flex-col">
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700 space-y-3">
+              <div class="flex items-center gap-3">
+                <input type="text" id="prtDocTitle" placeholder="Document title" class="flex-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm">
+                <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                  <input type="checkbox" id="prtDocAlwaysInclude" class="rounded">
+                  Always include
+                </label>
+              </div>
+              <input type="text" id="prtDocKeywords" placeholder="Keywords (comma-separated, e.g., trailing, stop, ptrailing)" class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm">
+            </div>
+            <textarea id="prtDocContent" class="flex-1 p-4 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-mono text-sm resize-none" placeholder="Enter documentation content (Markdown supported)..."></textarea>
+            <div class="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-between">
+              <button id="deletePrtDoc" class="px-4 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 font-medium rounded-lg transition-colors">Delete</button>
+              <button id="savePrtDoc" class="px-6 py-2 bg-teal-600 hover:bg-teal-700 text-white font-medium rounded-lg transition-colors">Save Changes</button>
+            </div>
+          </div>
+          <div id="prtDocPlaceholder" class="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">
+            <div class="text-center">
+              <svg class="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+              </svg>
+              <p class="text-lg font-medium mb-2">Select a document to edit</p>
+              <p class="text-sm">Or click "Add New Doc" to create one</p>
+            </div>
           </div>
         </div>
       </div>

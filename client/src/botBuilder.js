@@ -2960,3 +2960,191 @@ function createTradeAnalysisChart(trades, candles) {
     }
   }).observe(container);
 }
+
+// ProRealTime Documentation Management
+let currentPrtDocId = null;
+let prtDocs = [];
+
+async function loadPrtDocs() {
+  try {
+    const response = await fetch('/api/prt-docs');
+    const data = await response.json();
+    prtDocs = data.docs || [];
+    renderPrtDocsList();
+  } catch (e) {
+    console.error('Error loading PRT docs:', e);
+  }
+}
+
+function renderPrtDocsList() {
+  const container = document.getElementById('prtDocsList');
+  if (!container) return;
+  
+  if (prtDocs.length === 0) {
+    container.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400 italic">No documents yet</p>';
+    return;
+  }
+  
+  container.innerHTML = prtDocs.map(doc => `
+    <button data-doc-id="${doc.id}" class="prt-doc-item w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${currentPrtDocId === doc.id ? 'bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300' : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'}">
+      <div class="font-medium">${doc.title}</div>
+      ${doc.alwaysInclude ? '<span class="text-xs text-teal-600 dark:text-teal-400">Always included</span>' : ''}
+    </button>
+  `).join('');
+}
+
+function showPrtDocEditor(doc) {
+  const editor = document.getElementById('prtDocEditor');
+  const placeholder = document.getElementById('prtDocPlaceholder');
+  const titleInput = document.getElementById('prtDocTitle');
+  const keywordsInput = document.getElementById('prtDocKeywords');
+  const contentInput = document.getElementById('prtDocContent');
+  const alwaysIncludeCheckbox = document.getElementById('prtDocAlwaysInclude');
+  const deleteBtn = document.getElementById('deletePrtDoc');
+  
+  if (!editor) return;
+  
+  currentPrtDocId = doc.id;
+  titleInput.value = doc.title || '';
+  keywordsInput.value = (doc.keywords || []).join(', ');
+  contentInput.value = doc.content || '';
+  alwaysIncludeCheckbox.checked = doc.alwaysInclude || false;
+  
+  deleteBtn.classList.toggle('hidden', !doc.id);
+  
+  editor.classList.remove('hidden');
+  placeholder.classList.add('hidden');
+  
+  renderPrtDocsList();
+}
+
+function hidePrtDocEditor() {
+  const editor = document.getElementById('prtDocEditor');
+  const placeholder = document.getElementById('prtDocPlaceholder');
+  
+  if (editor) editor.classList.add('hidden');
+  if (placeholder) placeholder.classList.remove('hidden');
+  
+  currentPrtDocId = null;
+  renderPrtDocsList();
+}
+
+async function savePrtDoc() {
+  const titleInput = document.getElementById('prtDocTitle');
+  const keywordsInput = document.getElementById('prtDocKeywords');
+  const contentInput = document.getElementById('prtDocContent');
+  const alwaysIncludeCheckbox = document.getElementById('prtDocAlwaysInclude');
+  
+  const title = titleInput.value.trim();
+  const content = contentInput.value.trim();
+  const keywords = keywordsInput.value.split(',').map(k => k.trim()).filter(k => k);
+  const alwaysInclude = alwaysIncludeCheckbox.checked;
+  
+  if (!title || !content) {
+    alert('Title and content are required');
+    return;
+  }
+  
+  try {
+    if (currentPrtDocId) {
+      await fetch(`/api/prt-docs/${currentPrtDocId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, content, keywords, alwaysInclude })
+      });
+    } else {
+      const id = title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      await fetch('/api/prt-docs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, title, content, keywords, alwaysInclude })
+      });
+    }
+    
+    await loadPrtDocs();
+    hidePrtDocEditor();
+  } catch (e) {
+    console.error('Error saving PRT doc:', e);
+    alert('Failed to save document');
+  }
+}
+
+async function deletePrtDoc() {
+  if (!currentPrtDocId) return;
+  
+  if (!confirm('Are you sure you want to delete this document?')) return;
+  
+  try {
+    await fetch(`/api/prt-docs/${currentPrtDocId}`, { method: 'DELETE' });
+    await loadPrtDocs();
+    hidePrtDocEditor();
+  } catch (e) {
+    console.error('Error deleting PRT doc:', e);
+    alert('Failed to delete document');
+  }
+}
+
+function initPrtDocsModal() {
+  const openBtn = document.getElementById('prtDocsBtn');
+  const modal = document.getElementById('prtDocsModal');
+  const closeBtn = document.getElementById('closePrtDocsModal');
+  const addNewBtn = document.getElementById('addNewDocBtn');
+  const saveBtn = document.getElementById('savePrtDoc');
+  const deleteBtn = document.getElementById('deletePrtDoc');
+  const docsList = document.getElementById('prtDocsList');
+  
+  if (openBtn) {
+    openBtn.addEventListener('click', () => {
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      loadPrtDocs();
+    });
+  }
+  
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      hidePrtDocEditor();
+    });
+  }
+  
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        hidePrtDocEditor();
+      }
+    });
+  }
+  
+  if (addNewBtn) {
+    addNewBtn.addEventListener('click', () => {
+      showPrtDocEditor({ id: null, title: '', content: '', keywords: [], alwaysInclude: false });
+    });
+  }
+  
+  if (saveBtn) {
+    saveBtn.addEventListener('click', savePrtDoc);
+  }
+  
+  if (deleteBtn) {
+    deleteBtn.addEventListener('click', deletePrtDoc);
+  }
+  
+  if (docsList) {
+    docsList.addEventListener('click', async (e) => {
+      const docItem = e.target.closest('.prt-doc-item');
+      if (!docItem) return;
+      
+      const docId = docItem.dataset.docId;
+      const doc = prtDocs.find(d => d.id === docId);
+      if (doc) {
+        showPrtDocEditor(doc);
+      }
+    });
+  }
+}
+
+initPrtDocsModal();
