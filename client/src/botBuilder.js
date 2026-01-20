@@ -475,6 +475,10 @@ function setupStrategyIdeasModal() {
       return;
     }
     
+    // Store history data in memory instead of DOM to avoid JSON corruption
+    const historyDataMap = new Map();
+    history.forEach(entry => historyDataMap.set(entry.id, entry.results));
+    
     historyList.innerHTML = history.map(entry => {
       const date = new Date(entry.createdAt).toLocaleDateString();
       const time = new Date(entry.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -501,7 +505,7 @@ function setupStrategyIdeasModal() {
               </svg>
             </div>
           </div>
-          <div class="history-results hidden p-4 space-y-3 max-h-80 overflow-y-auto" data-results='${JSON.stringify(entry.results)}'>
+          <div class="history-results hidden p-4 space-y-3 max-h-96 overflow-y-auto" data-history-id="${entry.id}">
           </div>
         </div>
       `;
@@ -512,10 +516,11 @@ function setupStrategyIdeasModal() {
         if (e.target.closest('.delete-history-btn')) return;
         const resultsDiv = header.nextElementSibling;
         const icon = header.querySelector('.expand-icon');
+        const historyId = resultsDiv.dataset.historyId;
         if (resultsDiv.classList.contains('hidden')) {
           resultsDiv.classList.remove('hidden');
           icon.classList.add('rotate-180');
-          const results = JSON.parse(resultsDiv.dataset.results);
+          const results = historyDataMap.get(historyId) || [];
           renderHistoryResults(resultsDiv, results);
         } else {
           resultsDiv.classList.add('hidden');
@@ -538,13 +543,18 @@ function setupStrategyIdeasModal() {
     });
   }
   
+  function escapeHtml(text) {
+    if (!text) return '';
+    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  
   function renderHistoryResults(container, results) {
     container.innerHTML = results.map((r, i) => `
       <div class="p-3 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700">
         <div class="flex items-start justify-between gap-2">
           <div class="flex-1 min-w-0">
-            <h4 class="font-medium text-sm text-gray-900 dark:text-white truncate">${r.title}</h4>
-            <p class="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">${r.description}</p>
+            <h4 class="font-medium text-sm text-gray-900 dark:text-white truncate">${escapeHtml(r.title)}</h4>
+            <p class="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">${escapeHtml(r.description)}</p>
             ${r.url ? `<a href="${r.url}" target="_blank" class="text-xs text-green-600 dark:text-green-400 hover:underline">View on ProRealCode</a>` : ''}
           </div>
           <div class="flex gap-1 shrink-0">
@@ -554,10 +564,10 @@ function setupStrategyIdeasModal() {
         </div>
         ${r.codeSnippet ? `
           <details class="mt-2">
-            <summary class="text-xs text-gray-500 dark:text-gray-400 cursor-pointer hover:text-gray-700 dark:hover:text-gray-200">Show code</summary>
-            <pre class="mt-1 p-2 bg-gray-900 text-gray-100 rounded text-xs font-mono overflow-x-auto max-h-32">${r.codeSnippet}</pre>
+            <summary class="text-xs text-gray-500 dark:text-gray-400 cursor-pointer hover:text-gray-700 dark:hover:text-gray-200">Show code (${r.codeSnippet.length} chars)</summary>
+            <pre class="mt-1 p-2 bg-gray-900 text-gray-100 rounded text-xs font-mono overflow-x-auto max-h-48 whitespace-pre-wrap">${escapeHtml(r.codeSnippet)}</pre>
           </details>
-        ` : ''}
+        ` : '<p class="text-xs text-gray-400 mt-1 italic">No code found</p>'}
       </div>
     `).join('');
     
