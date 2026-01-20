@@ -1,0 +1,79 @@
+The "unknown command" error on line 116 is happening because **ProRealTime does not support the `STEP` keyword** within the `SET STOP pTRAILING` instruction.
+
+While some platforms allow you to define a "step" (the increment the stop moves by) in a single line, ProRealTime's native trailing stop command only accepts the **distance** from the price. The "step" is usually handled automatically by the broker's server (often 1 point) or must be coded manually if you want a custom increment.
+
+### 🛠️ The Fix: Native Trailing Stop
+
+To fix the error and use the built-in broker-side trailing stop, change your final block to this:
+
+```prorealtime
+// Apply trailing stop (Fixed Syntax)
+IF ONMARKET THEN
+    // ProRealTime native trailing stop only takes the distance. 
+    // It will trail by 'trailingTrigger' points.
+    SET STOP pTRAILING trailingTrigger 
+ENDIF
+
+```
+
+---
+
+### 🛡️ Why "Native" Trailing Stops can be tricky:
+
+The command `SET STOP pTRAILING` is very convenient, but it has a few "hidden" behaviors you should know:
+
+1. **The Step Problem:** The broker-side stop usually moves as soon as the price moves 1 point in your favor. If you want it to *only* move in 50-point chunks (your `trailingStep`), you cannot use the native command; you have to use the **manual coding method** below.
+2. **IG Index Restriction:** If you are using IG, they often require a minimum distance for trailing stops. If `trailingTrigger` is too small (e.g., under 10 points), the order might be rejected live even if it works in backtesting.
+
+---
+
+### 🚀 The "13th Warrior" Manual Trailing Fix (Recommended)
+
+If you specifically need the stop to move in **50-point steps** (your `trailingStep`), replace your entire trailing stop block with this manual logic. This is the most robust way to code it:
+
+```prorealtime
+// Initialize manual trailing variable at the top of your script (with other ONCEs)
+ONCE newSL = 0
+
+// Reset when not on market
+IF NOT ONMARKET THEN
+    newSL = 0
+ENDIF
+
+// Manual Trailing Logic
+IF LONGONMARKET THEN
+    // If no stop is set yet and price hits the trigger
+    IF newSL = 0 AND close - tradeprice(1) >= trailingTrigger THEN
+        newSL = tradeprice(1) + trailingStep
+    // Move stop up in steps
+    ELSIF newSL > 0 AND close - newSL >= trailingStep THEN
+        newSL = newSL + trailingStep
+    ENDIF
+ENDIF
+
+IF SHORTONMARKET THEN
+    // If no stop is set yet and price hits the trigger
+    IF newSL = 0 AND tradeprice(1) - close >= trailingTrigger THEN
+        newSL = tradeprice(1) - trailingStep
+    // Move stop down in steps
+    ELSIF newSL > 0 AND newSL - close >= trailingStep THEN
+        newSL = newSL - trailingStep
+    ENDIF
+ENDIF
+
+// Execute the manual stop
+IF newSL > 0 THEN
+    SELL AT newSL STOP
+    EXITSHORT AT newSL STOP
+ENDIF
+
+```
+
+### Which one should you use?
+
+* **Use the Native Fix** if you just want a simple trailing stop that follows the price as closely as possible.
+* **Use the Manual Fix** if the "50-point step" is vital to your strategy's performance, as it gives you total control over the movement.
+
+[Trailing Stop Loss Indicator for ProRealtime.com](https://www.youtube.com/watch?v=mY7jfXr2mmg)
+
+This video demonstrates how trailing stop indicators work within ProRealTime, which can help you visualize how the price interaction we just coded behaves on your 5s chart.
