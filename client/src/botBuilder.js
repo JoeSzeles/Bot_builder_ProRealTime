@@ -334,6 +334,44 @@ function setupBotBuilderEvents() {
   if (generateBotBtn) {
     generateBotBtn.addEventListener('click', generateBot);
   }
+  
+  // Summary Preview Modal
+  const previewSummaryBtn = document.getElementById('previewSummaryBtn');
+  const summaryModal = document.getElementById('summaryPreviewModal');
+  const closeSummaryModal = document.getElementById('closeSummaryModal');
+  const closeSummaryBtn = document.getElementById('closeSummaryBtn');
+  const generateFromSummaryBtn = document.getElementById('generateFromSummaryBtn');
+  const summaryContent = document.getElementById('summaryPreviewContent');
+  
+  function showSummaryPreview() {
+    const settings = getSettings();
+    const html = buildSummaryHTML(settings);
+    if (summaryContent) summaryContent.innerHTML = html;
+    if (summaryModal) {
+      summaryModal.style.display = 'flex';
+      summaryModal.classList.remove('hidden');
+    }
+  }
+  
+  function hideSummaryModal() {
+    if (summaryModal) {
+      summaryModal.style.display = 'none';
+      summaryModal.classList.add('hidden');
+    }
+  }
+  
+  if (previewSummaryBtn) previewSummaryBtn.addEventListener('click', showSummaryPreview);
+  if (closeSummaryModal) closeSummaryModal.addEventListener('click', hideSummaryModal);
+  if (closeSummaryBtn) closeSummaryBtn.addEventListener('click', hideSummaryModal);
+  if (generateFromSummaryBtn) generateFromSummaryBtn.addEventListener('click', () => {
+    hideSummaryModal();
+    generateBot();
+  });
+  if (summaryModal) {
+    summaryModal.addEventListener('click', (e) => {
+      if (e.target === summaryModal) hideSummaryModal();
+    });
+  }
 
   if (copyBotCode) {
     copyBotCode.addEventListener('click', copyBotCodeToClipboard);
@@ -1081,6 +1119,147 @@ function buildBotDescription(settings) {
   return desc;
 }
 
+function buildSummaryHTML(settings) {
+  const sections = [];
+  
+  // Asset & Timeframe
+  sections.push(`
+    <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 border border-blue-200 dark:border-blue-700">
+      <h4 class="font-semibold text-blue-700 dark:text-blue-300 mb-2 flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/></svg>
+        Asset & Timeframe
+      </h4>
+      <div class="grid grid-cols-2 gap-2 text-sm">
+        <div><span class="text-gray-500 dark:text-gray-400">Asset:</span> <span class="font-medium text-gray-900 dark:text-white">${settings.asset.toUpperCase()}</span></div>
+        <div><span class="text-gray-500 dark:text-gray-400">Timeframe:</span> <span class="font-medium text-gray-900 dark:text-white">${settings.timeframe}</span></div>
+      </div>
+    </div>
+  `);
+  
+  // Fee Settings
+  sections.push(`
+    <div class="bg-gray-50 dark:bg-gray-700/30 rounded-lg p-3 border border-gray-200 dark:border-gray-600">
+      <h4 class="font-semibold text-gray-700 dark:text-gray-300 mb-2">Fee Settings</h4>
+      <div class="grid grid-cols-2 gap-2 text-sm">
+        <div><span class="text-gray-500 dark:text-gray-400">Initial Capital:</span> <span class="font-medium">$${settings.initialCapital}</span></div>
+        <div><span class="text-gray-500 dark:text-gray-400">Max Position:</span> <span class="font-medium">${settings.maxPositionSize}</span></div>
+        ${settings.useOrderFee ? `<div><span class="text-gray-500 dark:text-gray-400">Order Fee:</span> <span class="font-medium">$${settings.orderFee}</span></div>` : ''}
+        ${settings.useSpread ? `<div><span class="text-gray-500 dark:text-gray-400">Spread:</span> <span class="font-medium">${settings.spreadPips} pips</span></div>` : ''}
+      </div>
+    </div>
+  `);
+  
+  // Position Settings
+  sections.push(`
+    <div class="bg-green-50 dark:bg-green-900/20 rounded-lg p-3 border border-green-200 dark:border-green-700">
+      <h4 class="font-semibold text-green-700 dark:text-green-300 mb-2">Position Settings</h4>
+      <div class="grid grid-cols-3 gap-2 text-sm">
+        <div><span class="text-gray-500 dark:text-gray-400">Size:</span> <span class="font-medium">${settings.positionSize}</span></div>
+        <div><span class="text-gray-500 dark:text-gray-400">Type:</span> <span class="font-medium">${settings.tradeType === 'both' ? 'Long & Short' : settings.tradeType}</span></div>
+        <div><span class="text-gray-500 dark:text-gray-400">Cumulate:</span> <span class="font-medium">${settings.cumulateOrders ? 'Yes' : 'No'}</span></div>
+      </div>
+    </div>
+  `);
+  
+  // Risk Management
+  sections.push(`
+    <div class="bg-red-50 dark:bg-red-900/20 rounded-lg p-3 border border-red-200 dark:border-red-700">
+      <h4 class="font-semibold text-red-700 dark:text-red-300 mb-2">Risk Management</h4>
+      <div class="grid grid-cols-2 gap-2 text-sm">
+        <div><span class="text-gray-500 dark:text-gray-400">Stop Loss:</span> <span class="font-medium">${settings.stopLoss} pts</span></div>
+        <div><span class="text-gray-500 dark:text-gray-400">Take Profit:</span> <span class="font-medium">${settings.takeProfit} pts</span></div>
+        ${settings.useTrailingStop ? `<div class="col-span-2"><span class="text-gray-500 dark:text-gray-400">Trailing Stop:</span> <span class="font-medium">${settings.trailingPercent}% trigger, ${settings.stepPercent}% step</span></div>` : ''}
+      </div>
+    </div>
+  `);
+  
+  // Indicators
+  const indicators = [];
+  if (settings.useOBV) indicators.push(`OBV (${settings.obvPeriod})`);
+  if (settings.useHeikinAshi) indicators.push('Heikin Ashi');
+  if (indicators.length > 0) {
+    sections.push(`
+      <div class="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3 border border-purple-200 dark:border-purple-700">
+        <h4 class="font-semibold text-purple-700 dark:text-purple-300 mb-2">Indicators</h4>
+        <div class="text-sm font-medium">${indicators.join(', ')}</div>
+      </div>
+    `);
+  }
+  
+  // Strategy & Base Code
+  let strategyName = settings.strategyType;
+  if (strategyName.startsWith('saved_')) strategyName = strategyName.replace('saved_', '').replace(/_/g, ' ');
+  sections.push(`
+    <div class="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 border border-amber-200 dark:border-amber-700">
+      <h4 class="font-semibold text-amber-700 dark:text-amber-300 mb-2">Strategy</h4>
+      <div class="text-sm font-medium mb-2">${strategyName}</div>
+      ${settings.baseCode ? `
+        <details class="mt-2">
+          <summary class="text-xs text-amber-600 dark:text-amber-400 cursor-pointer">View Base Code (${settings.baseCode.length} chars)</summary>
+          <pre class="mt-1 p-2 bg-gray-900 text-gray-100 rounded text-xs font-mono overflow-x-auto max-h-32 whitespace-pre-wrap">${settings.baseCode.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
+        </details>
+      ` : '<div class="text-xs text-gray-500 dark:text-gray-400">No base code - will generate from scratch</div>'}
+    </div>
+  `);
+  
+  // Time Filters
+  if (settings.enableTimeFilters) {
+    const tradeDays = Object.entries(settings.tradeDays).filter(([,v]) => v).map(([k]) => k.charAt(0).toUpperCase() + k.slice(1)).join(', ');
+    sections.push(`
+      <div class="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-3 border border-indigo-200 dark:border-indigo-700">
+        <h4 class="font-semibold text-indigo-700 dark:text-indigo-300 mb-2">Time & Session Filters</h4>
+        <div class="grid grid-cols-2 gap-2 text-sm">
+          <div><span class="text-gray-500 dark:text-gray-400">Timezone:</span> <span class="font-medium">${settings.timezone}</span></div>
+          <div><span class="text-gray-500 dark:text-gray-400">Days:</span> <span class="font-medium">${tradeDays}</span></div>
+          ${settings.useTimeFilter ? `<div class="col-span-2"><span class="text-gray-500 dark:text-gray-400">Hours:</span> <span class="font-medium">${settings.tradingStartTime} - ${settings.tradingEndTime}</span></div>` : ''}
+          ${settings.excludeWeekends ? `<div><span class="text-green-600">✓</span> Exclude weekends</div>` : ''}
+          ${settings.excludeHolidays ? `<div><span class="text-green-600">✓</span> Exclude holidays</div>` : ''}
+          ${settings.excludeOpenPeriod ? `<div><span class="text-green-600">✓</span> Skip first ${settings.openPeriodMinutes}min</div>` : ''}
+          ${settings.excludeClosePeriod ? `<div><span class="text-green-600">✓</span> Skip last ${settings.closePeriodMinutes}min</div>` : ''}
+          ${settings.closeBeforeEnd ? `<div><span class="text-green-600">✓</span> Force close ${settings.closeBeforeMinutes}min before end</div>` : ''}
+        </div>
+      </div>
+    `);
+  } else {
+    sections.push(`
+      <div class="bg-gray-100 dark:bg-gray-700/30 rounded-lg p-3 border border-gray-300 dark:border-gray-600">
+        <h4 class="font-semibold text-gray-500 dark:text-gray-400 mb-1">Time & Session Filters</h4>
+        <div class="text-sm text-gray-500">Disabled - no time restrictions</div>
+      </div>
+    `);
+  }
+  
+  // Chart Annotations
+  if (settings.drawings.length > 0) {
+    sections.push(`
+      <div class="bg-cyan-50 dark:bg-cyan-900/20 rounded-lg p-3 border border-cyan-200 dark:border-cyan-700">
+        <h4 class="font-semibold text-cyan-700 dark:text-cyan-300 mb-2">Chart Annotations (${settings.drawings.length})</h4>
+        <ul class="text-sm space-y-1">
+          ${settings.drawings.map(d => {
+            if (d.type === 'high') return `<li>• High point at ${d.point.high.toFixed(4)}</li>`;
+            if (d.type === 'low') return `<li>• Low point at ${d.point.low.toFixed(4)}</li>`;
+            if (d.type === 'horizontal') return `<li>• Horizontal level at ${d.price.toFixed(4)}</li>`;
+            if (d.type === 'line') return `<li>• Trend line: ${d.start.price.toFixed(4)} → ${d.end.price.toFixed(4)}</li>`;
+            return '';
+          }).join('')}
+        </ul>
+      </div>
+    `);
+  }
+  
+  // Extra Instructions
+  if (settings.extraInstructions) {
+    sections.push(`
+      <div class="bg-pink-50 dark:bg-pink-900/20 rounded-lg p-3 border border-pink-200 dark:border-pink-700">
+        <h4 class="font-semibold text-pink-700 dark:text-pink-300 mb-2">Additional Instructions</h4>
+        <div class="text-sm whitespace-pre-wrap">${settings.extraInstructions}</div>
+      </div>
+    `);
+  }
+  
+  return sections.join('');
+}
+
 const PROREALTIME_SYNTAX_RULES = `
 CRITICAL PROREALTIME/PROBUILDER SYNTAX RULES:
 
@@ -1143,43 +1322,126 @@ async function generateBot() {
   const assetSelect = document.getElementById('assetSelect');
   const strategyType = document.getElementById('strategyType');
   
+  // Progress bar elements
+  const progressContainer = document.getElementById('generateProgress');
+  const progressBar = document.getElementById('generateProgressBar');
+  const progressText = document.getElementById('generateProgressText');
+  const progressPercent = document.getElementById('generateProgressPercent');
+  
   generateBotBtn.disabled = true;
-  generateBotBtn.innerHTML = '<svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Generating...';
-
-  try {
-    const response = await fetch('/api/generate-bot', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        description,
-        syntaxRules: PROREALTIME_SYNTAX_RULES,
-        settings,
-        screenshotBase64: screenshotBase64,
-        asset: assetSelect?.value || 'unknown',
-        strategy: strategyType?.value || 'custom'
-      })
-    });
-
-    const data = await response.json();
-    if (data.error) throw new Error(data.error);
-
-    generatedBotCode = data.code;
-    currentBotId = data.entryId;
-    botCodeOutput.textContent = generatedBotCode;
-    botOutputSection.classList.remove('hidden');
+  generateBotBtn.classList.add('hidden');
+  
+  // Show and animate progress bar
+  if (progressContainer) {
+    progressContainer.classList.remove('hidden');
+    let progress = 0;
+    const progressSteps = [
+      { pct: 10, text: 'Preparing request...' },
+      { pct: 25, text: 'Sending to AI...' },
+      { pct: 40, text: 'AI processing settings...' },
+      { pct: 55, text: 'Generating bot logic...' },
+      { pct: 70, text: 'Writing ProRealTime code...' },
+      { pct: 85, text: 'Finalizing code...' }
+    ];
+    let stepIndex = 0;
     
-    loadBotHistory();
+    const progressInterval = setInterval(() => {
+      if (stepIndex < progressSteps.length) {
+        progress = progressSteps[stepIndex].pct;
+        if (progressBar) progressBar.style.width = progress + '%';
+        if (progressText) progressText.textContent = progressSteps[stepIndex].text;
+        if (progressPercent) progressPercent.textContent = progress + '%';
+        stepIndex++;
+      }
+    }, 800);
     
-    const optPanel = document.getElementById('variableOptPanel');
-    if (optPanel) optPanel.classList.remove('hidden');
-    detectAndDisplayVariables();
-    showCodeVariableSliders();
+    try {
+      const response = await fetch('/api/generate-bot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          description,
+          syntaxRules: PROREALTIME_SYNTAX_RULES,
+          settings,
+          screenshotBase64: screenshotBase64,
+          asset: assetSelect?.value || 'unknown',
+          strategy: strategyType?.value || 'custom'
+        })
+      });
 
-  } catch (err) {
-    alert('Error generating bot: ' + err.message);
-  } finally {
-    generateBotBtn.disabled = false;
-    generateBotBtn.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg> Generate ProRealTime Bot Code';
+      clearInterval(progressInterval);
+      
+      // Complete progress
+      if (progressBar) progressBar.style.width = '100%';
+      if (progressText) progressText.textContent = 'Complete!';
+      if (progressPercent) progressPercent.textContent = '100%';
+
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+
+      generatedBotCode = data.code;
+      currentBotId = data.entryId;
+      botCodeOutput.textContent = generatedBotCode;
+      botOutputSection.classList.remove('hidden');
+      
+      loadBotHistory();
+      
+      const optPanel = document.getElementById('variableOptPanel');
+      if (optPanel) optPanel.classList.remove('hidden');
+      detectAndDisplayVariables();
+      showCodeVariableSliders();
+
+    } catch (err) {
+      clearInterval(progressInterval);
+      alert('Error generating bot: ' + err.message);
+    } finally {
+      // Hide progress and show button again
+      setTimeout(() => {
+        if (progressContainer) progressContainer.classList.add('hidden');
+        if (progressBar) progressBar.style.width = '0%';
+        generateBotBtn.disabled = false;
+        generateBotBtn.classList.remove('hidden');
+      }, 500);
+    }
+  } else {
+    // Fallback if no progress bar
+    generateBotBtn.innerHTML = '<svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Generating...';
+    
+    try {
+      const response = await fetch('/api/generate-bot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          description,
+          syntaxRules: PROREALTIME_SYNTAX_RULES,
+          settings,
+          screenshotBase64: screenshotBase64,
+          asset: assetSelect?.value || 'unknown',
+          strategy: strategyType?.value || 'custom'
+        })
+      });
+
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+
+      generatedBotCode = data.code;
+      currentBotId = data.entryId;
+      botCodeOutput.textContent = generatedBotCode;
+      botOutputSection.classList.remove('hidden');
+      
+      loadBotHistory();
+      
+      const optPanel = document.getElementById('variableOptPanel');
+      if (optPanel) optPanel.classList.remove('hidden');
+      detectAndDisplayVariables();
+      showCodeVariableSliders();
+
+    } catch (err) {
+      alert('Error generating bot: ' + err.message);
+    } finally {
+      generateBotBtn.disabled = false;
+      generateBotBtn.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg> Generate ProRealTime Bot Code';
+    }
   }
 }
 
