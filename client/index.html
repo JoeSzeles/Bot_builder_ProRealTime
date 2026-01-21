@@ -78,6 +78,12 @@
             <h1 class="text-xl lg:text-2xl font-bold bg-gradient-to-r from-emerald-600 to-indigo-600 dark:from-emerald-400 dark:to-indigo-400 bg-clip-text text-transparent">Bot Builder</h1>
           </div>
           <div class="flex items-center gap-2">
+            <button id="donateBtn" class="px-3 py-2 rounded-lg text-sm font-medium transition-all bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white shadow-sm hover:shadow flex items-center gap-1.5" title="Buy me a coffee!">
+              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M2 21h18v-2H2M20 8h-2V5h2m0-2H4v10a4 4 0 0 0 4 4h6a4 4 0 0 0 4-4v-3h2a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z"/>
+              </svg>
+              <span class="hidden sm:inline">Donate</span>
+            </button>
             <button id="tabBot" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300">Bot Builder</button>
             <button id="tabText" class="tab-btn px-4 py-2 rounded-lg text-sm font-medium transition-colors text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700">Text</button>
           </div>
@@ -1364,6 +1370,79 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Donation Modal -->
+  <div id="donationModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+    <div class="flex items-center justify-center min-h-screen p-4">
+      <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" id="donationModalOverlay"></div>
+      <div class="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg p-6 border border-gray-200 dark:border-gray-700">
+        <button id="closeDonationModal" class="absolute top-4 right-4 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+          <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+        
+        <div class="text-center mb-6">
+          <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 mb-4">
+            <svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M2 21h18v-2H2M20 8h-2V5h2m0-2H4v10a4 4 0 0 0 4 4h6a4 4 0 0 0 4-4v-3h2a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z"/>
+            </svg>
+          </div>
+          <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">Buy Me a Coffee!</h2>
+          <p class="text-gray-600 dark:text-gray-400 text-sm">(or Bread... Literally Just Bread)</p>
+        </div>
+        
+        <div class="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-4 mb-6 border border-amber-200 dark:border-amber-700">
+          <p class="text-sm text-amber-800 dark:text-amber-200 text-center leading-relaxed">
+            Hey there! I'm just a humble coder surviving on a strict diet of bread and water (the sparkling kind on good days). 
+            Your donation could upgrade my dinner from "plain bread" to "bread with butter" or even the legendary "bread with cheese" combo!
+          </p>
+        </div>
+        
+        <div class="space-y-4">
+          <div class="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center">
+                <span class="text-white text-xs font-bold">ETH</span>
+              </div>
+              <span class="font-semibold text-gray-900 dark:text-white">Ethereum</span>
+              <span class="text-xs text-gray-500 dark:text-gray-400 italic ml-auto">Gas me up!</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <code class="flex-1 text-xs bg-white dark:bg-gray-800 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 overflow-x-auto">0xf5D65740108977498E14776F1D5E2c6CefFa2666</code>
+              <button onclick="navigator.clipboard.writeText('0xf5D65740108977498E14776F1D5E2c6CefFa2666');this.innerHTML='<svg class=\'w-4 h-4 text-green-500\' fill=\'none\' stroke=\'currentColor\' viewBox=\'0 0 24 24\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M5 13l4 4L19 7\'/></svg>';setTimeout(()=>this.innerHTML='<svg class=\'w-4 h-4\' fill=\'none\' stroke=\'currentColor\' viewBox=\'0 0 24 24\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z\'/></svg>',1500)" class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors" title="Copy">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+          
+          <div class="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center">
+                <span class="text-white text-xs font-bold">BTC</span>
+              </div>
+              <span class="font-semibold text-gray-900 dark:text-white">Bitcoin</span>
+              <span class="text-xs text-gray-500 dark:text-gray-400 italic ml-auto">OG hodler style</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <code class="flex-1 text-xs bg-white dark:bg-gray-800 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 overflow-x-auto">bc1qsny8dhsnmv0hzs7ctsmfxy2cn7vqk79gs0acv0</code>
+              <button onclick="navigator.clipboard.writeText('bc1qsny8dhsnmv0hzs7ctsmfxy2cn7vqk79gs0acv0');this.innerHTML='<svg class=\'w-4 h-4 text-green-500\' fill=\'none\' stroke=\'currentColor\' viewBox=\'0 0 24 24\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M5 13l4 4L19 7\'/></svg>';setTimeout(()=>this.innerHTML='<svg class=\'w-4 h-4\' fill=\'none\' stroke=\'currentColor\' viewBox=\'0 0 24 24\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z\'/></svg>',1500)" class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors" title="Copy">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <p class="text-center text-xs text-gray-500 dark:text-gray-400 mt-6 italic">
+          Side effects may include: warm fuzzy feelings, instant karma, and knowing you helped a coder level up from instant noodles to... slightly better instant noodles.
+        </p>
       </div>
     </div>
   </div>

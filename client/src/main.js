@@ -735,5 +735,23 @@ document.addEventListener('DOMContentLoaded', () => {
   elements.tabText.addEventListener('click', () => switchTab('text'));
   elements.tabBot.addEventListener('click', () => switchTab('bot'));
   
+  // Donation modal
+  const donateBtn = document.getElementById('donateBtn');
+  const donationModal = document.getElementById('donationModal');
+  const closeDonationModal = document.getElementById('closeDonationModal');
+  const donationModalOverlay = document.getElementById('donationModalOverlay');
+  
+  if (donateBtn && donationModal) {
+    donateBtn.addEventListener('click', () => {
+      donationModal.classList.remove('hidden');
+    });
+    closeDonationModal?.addEventListener('click', () => {
+      donationModal.classList.add('hidden');
+    });
+    donationModalOverlay?.addEventListener('click', () => {
+      donationModal.classList.add('hidden');
+    });
+  }
+  
   switchTab('bot');
 });
