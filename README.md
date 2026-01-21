@@ -160,7 +160,7 @@ The app also includes a **Text tab** for translating/transforming literary texts
 
 Hey there, fellow human! If this bot builder has saved you countless hours of staring at ProBuilder documentation until your eyes crossed, or helped you generate that one strategy that *almost* didn't blow up your demo account... consider tossing a few crypto coins my way!
 
-I'm just a humble coder surviving on a strict diet of bread and water (the sparkling kind on good days). Your donation could upgrade my dinner from "plain bread" to "bread with butter" or even the legendary "bread with cheese" combo!
+I'm just a humble coder surviving on a strict diet of bread and water (the sparkling kind on good days). Your donation could upgrade my dinner from "plain bread" to "bread with butter and coffee" or even the legendary "bread with cheese sandwich and coffee" combo!
 
 **Every satoshi helps keep the AI running and the developer dreaming about one day affording avocado toast.**
 
