@@ -154,6 +154,44 @@ The app also includes a **Text tab** for translating/transforming literary texts
 - PDF generation with professional book layout
 - Translation history and saved prompts
 
+---
+
+## Buy Me a Coffee (or Bread... Literally Just Bread)
+
+Hey there, fellow human! If this bot builder has saved you countless hours of staring at ProBuilder documentation until your eyes crossed, or helped you generate that one strategy that *almost* didn't blow up your demo account... consider tossing a few crypto coins my way!
+
+I'm just a humble coder surviving on a strict diet of bread and water (the sparkling kind on good days). Your donation could upgrade my dinner from "plain bread" to "bread with butter" or even the legendary "bread with cheese" combo!
+
+**Every satoshi helps keep the AI running and the developer dreaming about one day affording avocado toast.**
+
+### Ethereum (ETH)
+*For when you want to gas me up (pun intended)*
+
+<p align="center">
+  <img src="docs/images/ethereum_qr.jpg" alt="Ethereum QR Code" width="200"/>
+</p>
+
+```
+0xf5D65740108977498E14776F1D5E2c6CefFa2666
+```
+
+### Bitcoin (BTC)
+*For the OG hodlers who remember when this could buy a pizza*
+
+<p align="center">
+  <img src="docs/images/bitcoin_qr.jpg" alt="Bitcoin QR Code" width="200"/>
+</p>
+
+```
+bc1qsny8dhsnmv0hzs7ctsmfxy2cn7vqk79gs0acv0
+```
+
+**Thank you for being awesome!** Whether you donate or just star this repo, you're helping a broke coder believe that maybe, just maybe, all those late nights debugging were worth it.
+
+*Note: Side effects of donating may include: warm fuzzy feelings, instant karma, and knowing you helped someone level up from instant noodles to... slightly better instant noodles.*
+
+---
+
 ## License
 
 Personal use only. Not for commercial distribution.
