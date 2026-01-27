@@ -2392,10 +2392,10 @@ function updateAiProjectionChart(result) {
   });
   bearishSeries.setData(bearishData);
   
-  // Expected line (purple, solid)
+  // AI Projected line (bright blue, solid, thicker)
   const expectedSeries = aiProjectionChart.addSeries(LineSeries, {
-    color: '#a855f7',
-    lineWidth: 2,
+    color: '#3b82f6',
+    lineWidth: 3,
   });
   expectedSeries.setData(expectedData);
   
