@@ -20,19 +20,6 @@ let pendingResearchAnswers = null;
 let pendingResearchQuestions = null;
 let pendingOriginalDescription = null;
 
-const FALLBACK_DATA = {
-  silver: generateCandleData(65, 100, 0.02),
-  gold: generateCandleData(2900, 100, 0.01),
-  copper: generateCandleData(4.5, 100, 0.025),
-  oil: generateCandleData(59.44, 100, 0.03),
-  natgas: generateCandleData(3.47, 100, 0.04),
-  eurusd: generateCandleData(1.1673, 100, 0.005),
-  gbpusd: generateCandleData(1.344, 100, 0.006),
-  usdjpy: generateCandleData(159.06, 100, 0.004),
-  spx500: generateCandleData(6947, 100, 0.012),
-  dax: generateCandleData(24921, 100, 0.015),
-  ftse: generateCandleData(10141, 100, 0.01)
-};
 
 let cachedData = {};
 
@@ -99,7 +86,7 @@ async function fetchMarketData(asset, timeframe = '1h', forceRefresh = false) {
     
     if (data.error) {
       console.warn('API returned error:', data.error);
-      return FALLBACK_DATA[asset] || FALLBACK_DATA.silver;
+      return null;
     }
     
     if (data.candles && data.candles.length > 0) {
@@ -108,39 +95,12 @@ async function fetchMarketData(asset, timeframe = '1h', forceRefresh = false) {
       return data.candles;
     }
   } catch (e) {
-    console.warn('Failed to fetch live data, using fallback:', e);
+    console.warn('Failed to fetch live data:', e);
   }
   
-  return FALLBACK_DATA[asset] || FALLBACK_DATA.silver;
+  return null;
 }
 
-function generateCandleData(basePrice, numBars, volatility) {
-  const data = [];
-  let price = basePrice;
-  const now = Math.floor(Date.now() / 1000);
-  const hourInSeconds = 3600;
-  
-  for (let i = numBars; i >= 0; i--) {
-    const time = now - (i * hourInSeconds);
-    const change = (Math.random() - 0.5) * 2 * volatility * price;
-    const open = price;
-    const close = price + change;
-    const high = Math.max(open, close) + Math.random() * volatility * price * 0.5;
-    const low = Math.min(open, close) - Math.random() * volatility * price * 0.5;
-    
-    data.push({
-      time,
-      open: parseFloat(open.toFixed(4)),
-      high: parseFloat(high.toFixed(4)),
-      low: parseFloat(low.toFixed(4)),
-      close: parseFloat(close.toFixed(4))
-    });
-    
-    price = close;
-  }
-  
-  return data;
-}
 
 async function loadSavedStrategies() {
   try {
@@ -241,8 +201,12 @@ export async function initBotBuilder() {
   });
 
   const data = await fetchMarketData('silver', '1m');
-  candleSeries.setData(data);
-  chart.timeScale().fitContent();
+  if (data && data.length > 0) {
+    candleSeries.setData(data);
+    chart.timeScale().fitContent();
+  } else {
+    console.warn('No market data available for initial chart load');
+  }
   
   const assetSelect = document.getElementById('assetSelect');
   if (assetSelect) assetSelect.value = 'silver';
@@ -300,9 +264,13 @@ function setupBotBuilderEvents() {
     const asset = assetSelect?.value || 'silver';
     const timeframe = timeframeSelect?.value || '1h';
     const data = await fetchMarketData(asset, timeframe);
-    candleSeries.setData(data);
-    chart.timeScale().fitContent();
-    clearAllDrawings();
+    if (data && data.length > 0) {
+      candleSeries.setData(data);
+      chart.timeScale().fitContent();
+      clearAllDrawings();
+    } else {
+      alert(`Unable to load market data for ${asset}. Please try a different asset or timeframe.`);
+    }
   }
 
   if (assetSelect) {
@@ -2875,6 +2843,13 @@ async function runSimulationWithModifiedVars() {
     
     const datapoints = parseInt(document.getElementById('simDatapoints')?.value) || 2000;
     let candles = await fetchMarketData(asset, timeframe);
+    if (!candles || candles.length === 0) {
+      if (statusEl) {
+        statusEl.textContent = `Error: Unable to load market data for ${asset}`;
+        statusEl.className = 'mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-sm';
+      }
+      return;
+    }
     if (candles.length > datapoints) {
       candles = candles.slice(-datapoints);
     }
@@ -3131,6 +3106,13 @@ async function runAutoOptimization() {
   try {
     const datapoints = parseInt(document.getElementById('simDatapoints')?.value) || 2000;
     let candles = await fetchMarketData(asset, timeframe);
+    if (!candles || candles.length === 0) {
+      if (statusEl) {
+        statusEl.textContent = `Error: Unable to load market data for ${asset}`;
+        statusEl.className = 'mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-sm';
+      }
+      return;
+    }
     if (candles.length > datapoints) {
       candles = candles.slice(-datapoints);
     }
@@ -3545,6 +3527,13 @@ async function runSimulation() {
     
     const datapoints = parseInt(document.getElementById('simDatapoints')?.value) || 2000;
     let candles = await fetchMarketData(asset, timeframe);
+    if (!candles || candles.length === 0) {
+      if (statusEl) {
+        statusEl.textContent = `Error: Unable to load market data for ${asset}`;
+        statusEl.className = 'mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-sm';
+      }
+      return;
+    }
     if (candles.length > datapoints) {
       candles = candles.slice(-datapoints);
     }
