@@ -2119,7 +2119,7 @@ function setupAiTradingSubTabs() {
 }
 
 // Current selected AI Results timeframe
-let aiResultsTimeframe = 'M5';
+let aiResultsTimeframe = '5m';
 
 function setupAiResultsTimeframes() {
   const container = document.getElementById('aiResultsTimeframeBtns');
@@ -2155,7 +2155,7 @@ function updateAiResultsForTimeframe(tf, result) {
   }
   
   // Get timeframe-specific predictions from result
-  const tfData = result.predictions?.[tf] || result.predictions?.M5 || {};
+  const tfData = result.predictions?.[tf] || result.predictions?.['5m'] || {};
   
   // Update directional bias
   updateDirectionalBias(result.predictions || {});
@@ -2174,7 +2174,7 @@ function updateDirectionalBias(predictions) {
   const container = document.getElementById('aiDirectionalBias');
   if (!container) return;
   
-  const timeframes = ['M5', 'M15', 'H1', 'H4'];
+  const timeframes = ['1s', '2s', '3s', '5s', '10s', '30s', '1m', '5m', '15m', '1h', '4h', '1d'];
   
   container.innerHTML = timeframes.map(tf => {
     const data = predictions[tf] || {};
@@ -2307,7 +2307,7 @@ async function updateAiProjectionChart(result) {
   
   const forecastCandles = parseInt(document.getElementById('aiProjectionCandles')?.value || '100');
   const tf = aiResultsTimeframe;
-  const tfData = result.predictions?.[tf] || result.predictions?.M5 || {};
+  const tfData = result.predictions?.[tf] || result.predictions?.['5m'] || {};
   
   // Try to get historical candles from result, or fetch fresh data
   let historicalCandles = (result.marketData || []).slice(-50);
@@ -2387,7 +2387,7 @@ async function updateAiProjectionChart(result) {
   const volatility = Math.sqrt(priceChanges.reduce((sum, c) => sum + Math.pow(c - avgChange, 2), 0) / priceChanges.length) || 0.002;
   
   // Calculate time interval based on timeframe
-  const tfIntervals = { 'M5': 300, 'M15': 900, 'H1': 3600, 'H4': 14400 };
+  const tfIntervals = { '1s': 1, '2s': 2, '3s': 3, '5s': 5, '10s': 10, '30s': 30, '1m': 60, '5m': 300, '15m': 900, '1h': 3600, '4h': 14400, '1d': 86400 };
   const interval = tfIntervals[tf] || 300;
   
   // Generate bullish, bearish, and expected projections with realistic movement
@@ -2639,7 +2639,7 @@ function generateMultiTimeframePredictions(result) {
   const volatility = context.volatility || 'Normal';
   
   const predictions = {};
-  const timeframes = ['M5', 'M15', 'H1', 'H4'];
+  const timeframes = ['1s', '2s', '3s', '5s', '10s', '30s', '1m', '5m', '15m', '1h', '4h', '1d'];
   
   timeframes.forEach((tf, idx) => {
     // Shorter timeframes have more noise, longer have clearer trend
