@@ -41,7 +41,26 @@ The application features a modern full-stack architecture:
 -   **MetalPriceAPI**: For real-time Silver & Gold spot prices (requires `METALS_API_KEY` secret).
 -   **Twelve Data API**: For live Forex candlestick data.
 
-## Recent Changes (Jan 20, 2026)
+## Recent Changes (Jan 27, 2026)
+- **AI Trading Tab**:
+  - New third sub-tab in Bot Builder: Settings | Simulator | AI Trading
+  - Purple color scheme to distinguish from main bot builder (indigo)
+  - Two internal sub-tabs: "AI Strategy" and "AI Results"
+  - **AI Strategy Section**:
+    - Symbol/Session selectors (XAGUSD, XAUUSD, auto-detect session)
+    - Search bar with filter chips (Trend, Mean Rev, Breakout, London, NY, Asia, timeframes)
+    - Market Context card: auto-detected symbol, session, volatility, regime, structure, confidence
+    - Strategy Hypotheses cards with tags, rationale bullets, "Add to Bot" and "Use" buttons
+    - Learning Feedback panel: similar setups count, performance trend, adaptation suggestions
+  - **AI Results Section**:
+    - Timeframe selector buttons (M5, M15, H1, H4)
+    - Directional Bias table per timeframe with confidence indicators
+    - Price Targets table with probability bars (Primary, Stretch, Risk)
+    - Probability Curve SVG visualization with skew/confidence info
+    - ProRealTime Output collapsible panel with sample code and copy/add buttons
+  - All components are static UI placeholders ready for backend integration
+
+## Previous Changes (Jan 20, 2026)
 - **AI Research Q&A Mode**:
   - Renamed "Paste Base Code" to "Custom / Paste Code" in strategy dropdown
   - Widened textarea to match preview code box (300% width)
