@@ -2102,6 +2102,20 @@ function setupAiTradingSubTabs() {
       }
     });
   }
+  
+  // Toggle projection list panel
+  const toggleListBtn = document.getElementById('toggleProjectionList');
+  const listPanel = document.getElementById('projectionListPanel');
+  const listChevron = document.getElementById('projectionListChevron');
+  if (toggleListBtn && listPanel) {
+    toggleListBtn.addEventListener('click', () => {
+      listPanel.classList.toggle('hidden');
+      if (listChevron) listChevron.classList.toggle('rotate-180');
+    });
+  }
+  
+  // Start real price updates for AI projection
+  startRealPriceUpdates();
 }
 
 // Current selected AI Results timeframe
@@ -2307,6 +2321,7 @@ function updateAiProjectionChart(result) {
   if (aiProjectionChart) {
     aiProjectionChart.remove();
     aiProjectionChart = null;
+    realPriceSeries = null; // Reset real price series reference
   }
   
   // Create chart
@@ -2400,6 +2415,145 @@ function updateAiProjectionChart(result) {
   expectedSeries.setData(expectedData);
   
   aiProjectionChart.timeScale().fitContent();
+  
+  // Store projection data for list view and real price comparison
+  window.projectionData = {
+    expected: expectedData,
+    bullish: bullishData,
+    bearish: bearishData,
+    lastPrice,
+    symbol: result.context?.symbol || 'Unknown',
+    startTime: lastTime
+  };
+  
+  // Update list view
+  updateProjectionListView(expectedData, bullishData, bearishData);
+}
+
+// Real price line series reference
+let realPriceSeries = null;
+let realPriceInterval = null;
+
+function startRealPriceUpdates() {
+  // Clear existing interval
+  if (realPriceInterval) {
+    clearInterval(realPriceInterval);
+  }
+  
+  // Update real price every 30 seconds
+  realPriceInterval = setInterval(async () => {
+    if (!window.lastAiResult || !aiProjectionChart || !window.projectionData) return;
+    
+    try {
+      const symbol = document.getElementById('aiSymbol')?.value || 'silver';
+      const response = await fetch(`/api/market-data/${symbol}/1m`);
+      const data = await response.json();
+      
+      if (data.candles && data.candles.length > 0) {
+        const realCandles = data.candles.slice(-10);
+        updateRealPriceLine(realCandles);
+        calculatePredictionAccuracy(realCandles);
+      }
+    } catch (e) {
+      console.warn('Failed to fetch real price:', e);
+    }
+  }, 30000);
+}
+
+function updateRealPriceLine(realCandles) {
+  if (!aiProjectionChart || !window.projectionData) return;
+  
+  const { startTime } = window.projectionData;
+  
+  // Filter candles that are after our projection start
+  const relevantCandles = realCandles.filter(c => c.time >= startTime);
+  
+  if (relevantCandles.length === 0) return;
+  
+  // Create or update real price series
+  if (!realPriceSeries) {
+    realPriceSeries = aiProjectionChart.addSeries(LineSeries, {
+      color: '#ff3333',
+      lineWidth: 2,
+      lastValueVisible: true,
+      priceLineVisible: true,
+    });
+  }
+  
+  realPriceSeries.setData(relevantCandles.map(c => ({
+    time: c.time,
+    value: c.close
+  })));
+}
+
+function calculatePredictionAccuracy(realCandles) {
+  if (!window.projectionData) return;
+  
+  const { expected, lastPrice } = window.projectionData;
+  const latestReal = realCandles[realCandles.length - 1];
+  
+  if (!latestReal || expected.length === 0) return;
+  
+  // Find the projected value closest to current time
+  const currentTime = latestReal.time;
+  let closestProjected = expected[0];
+  for (const p of expected) {
+    if (Math.abs(p.time - currentTime) < Math.abs(closestProjected.time - currentTime)) {
+      closestProjected = p;
+    }
+  }
+  
+  const projectedPrice = closestProjected.value;
+  const actualPrice = latestReal.close;
+  const deviation = ((actualPrice - projectedPrice) / projectedPrice * 100);
+  const accuracy = Math.max(0, 100 - Math.abs(deviation) * 10);
+  
+  // Update UI
+  const accuracyEl = document.getElementById('aiAccuracyValue');
+  const projectedEl = document.getElementById('aiProjectedPrice');
+  const actualEl = document.getElementById('aiActualPrice');
+  const deviationEl = document.getElementById('aiPriceDeviation');
+  
+  if (accuracyEl) {
+    accuracyEl.textContent = `${accuracy.toFixed(1)}%`;
+    accuracyEl.className = accuracy >= 80 ? 'text-lg font-bold text-green-600' :
+                           accuracy >= 60 ? 'text-lg font-bold text-yellow-600' :
+                           'text-lg font-bold text-red-600';
+  }
+  if (projectedEl) projectedEl.textContent = `$${projectedPrice.toFixed(4)}`;
+  if (actualEl) actualEl.textContent = `$${actualPrice.toFixed(4)}`;
+  if (deviationEl) {
+    deviationEl.textContent = `${deviation >= 0 ? '+' : ''}${deviation.toFixed(3)}%`;
+    deviationEl.className = Math.abs(deviation) < 0.5 ? 'text-green-600' : 
+                            Math.abs(deviation) < 1 ? 'text-yellow-600' : 'text-red-600';
+  }
+}
+
+function updateProjectionListView(expected, bullish, bearish) {
+  const tbody = document.getElementById('projectionListBody');
+  if (!tbody) return;
+  
+  if (expected.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-gray-500">No projection data</td></tr>';
+    return;
+  }
+  
+  tbody.innerHTML = expected.map((exp, i) => {
+    const bull = bullish[i] || {};
+    const bear = bearish[i] || {};
+    const time = new Date(exp.time * 1000).toLocaleTimeString();
+    
+    return `
+      <tr class="hover:bg-gray-100 dark:hover:bg-gray-700">
+        <td class="p-2 text-gray-600 dark:text-gray-400">${time}</td>
+        <td class="p-2 font-medium text-blue-600">$${exp.value.toFixed(4)}</td>
+        <td class="p-2 text-green-600">$${bull.value?.toFixed(4) || '--'}</td>
+        <td class="p-2 text-red-600">$${bear.value?.toFixed(4) || '--'}</td>
+        <td class="p-2 text-gray-400" id="actual_${i}">--</td>
+        <td class="p-2" id="acc_${i}">--</td>
+      </tr>
+    `;
+  }).join('');
 }
 
 // Generate multi-timeframe predictions based on context

@@ -1472,6 +1472,47 @@
                     <span class="flex items-center gap-2"><span class="w-4 h-0.5 bg-green-500 rounded" style="border-top: 1px dashed #22c55e;"></span> <span class="text-gray-600 dark:text-gray-300">Bullish</span></span>
                     <span class="flex items-center gap-2"><span class="w-4 h-0.5 bg-red-500 rounded" style="border-top: 1px dashed #ef4444;"></span> <span class="text-gray-600 dark:text-gray-300">Bearish</span></span>
                     <span class="flex items-center gap-2"><span class="w-4 h-1 bg-blue-500 rounded"></span> <span class="font-medium text-blue-600 dark:text-blue-400">AI Projected</span></span>
+                    <span class="flex items-center gap-2"><span class="w-4 h-1 rounded" style="background: #ff3333; box-shadow: 0 0 6px #ff3333;"></span> <span class="font-medium text-red-500">Real Price</span></span>
+                  </div>
+                  
+                  <!-- Accuracy Display -->
+                  <div id="aiPredictionAccuracy" class="mt-3 p-3 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-lg border border-purple-200 dark:border-purple-700">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Prediction Accuracy</span>
+                      <span id="aiAccuracyValue" class="text-lg font-bold text-purple-600 dark:text-purple-400">--</span>
+                    </div>
+                    <div class="flex gap-4 mt-2 text-xs text-gray-600 dark:text-gray-400">
+                      <span>Projected: <strong id="aiProjectedPrice" class="text-blue-600">--</strong></span>
+                      <span>Actual: <strong id="aiActualPrice" class="text-red-500">--</strong></span>
+                      <span>Deviation: <strong id="aiPriceDeviation">--</strong></span>
+                    </div>
+                  </div>
+                  
+                  <!-- Projection List View -->
+                  <div class="mt-4">
+                    <button id="toggleProjectionList" class="w-full flex items-center justify-between p-3 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                      <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Projection Data (List View)</span>
+                      <svg id="projectionListChevron" class="w-5 h-5 text-gray-500 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                      </svg>
+                    </button>
+                    <div id="projectionListPanel" class="hidden mt-2 h-[300px] overflow-y-auto bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600">
+                      <table class="w-full text-xs">
+                        <thead class="sticky top-0 bg-gray-100 dark:bg-gray-700">
+                          <tr class="text-left text-gray-600 dark:text-gray-300">
+                            <th class="p-2">Time</th>
+                            <th class="p-2">Projected</th>
+                            <th class="p-2">Bullish</th>
+                            <th class="p-2">Bearish</th>
+                            <th class="p-2">Actual</th>
+                            <th class="p-2">Accuracy</th>
+                          </tr>
+                        </thead>
+                        <tbody id="projectionListBody" class="divide-y divide-gray-200 dark:divide-gray-600">
+                          <tr><td colspan="6" class="p-4 text-center text-gray-500">Run AI analysis to see projection data</td></tr>
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
 
