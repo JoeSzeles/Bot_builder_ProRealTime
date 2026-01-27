@@ -2152,9 +2152,9 @@ const YAHOO_SYMBOLS = {
   gold: 'GC=F',
   platinum: 'PL=F',
   palladium: 'PA=F',
-  // Spot Metals (alternative)
-  xagusd: 'XAGUSD=X',
-  xauusd: 'XAUUSD=X',
+  // Spot Metals (use futures as fallback since Yahoo spot symbols are unavailable)
+  xagusd: 'SI=F',
+  xauusd: 'GC=F',
   // Energy
   oil: 'CL=F',
   brent: 'BZ=F',
