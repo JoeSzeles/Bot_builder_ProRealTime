@@ -1151,7 +1151,7 @@ Based on this description, what clarifying questions would help you build a bett
 
 // AI Strategy Analysis endpoint
 app.post('/api/ai-strategy', async (req, res) => {
-  const { symbol, session, searchQuery, candles, currentPrice, multiMarket } = req.body;
+  const { symbol, session, searchQuery, candles, currentPrice } = req.body;
   
   if (!candles || candles.length === 0) {
     return res.status(400).json({ error: 'Market data (candles) is required' });
@@ -1198,20 +1198,23 @@ app.post('/api/ai-strategy', async (req, res) => {
       else detectedSession = 'Asia';
     }
     
-    // Build multi-market context if available
-    let multiMarketContext = '';
-    if (multiMarket && multiMarket.length > 0) {
-      multiMarketContext = `
-WORLDWIDE MARKET OVERVIEW:
-${multiMarket.map(m => `- ${m.symbol}: $${m.price.toFixed(2)} (${m.change > 0 ? '+' : ''}${m.change}%)`).join('\n')}
-
-This is a multi-market analysis. Generate strategies that could apply across different asset classes based on current market conditions.
+    // Handle "all" sessions (worldwide)
+    let sessionContext = '';
+    if (session === 'all') {
+      detectedSession = 'All Sessions (Worldwide)';
+      sessionContext = `
+WORLDWIDE TRADING CONTEXT:
+This analysis should consider all major trading sessions:
+- Asia Session (Tokyo, Sydney, Hong Kong): 00:00-08:00 UTC
+- London/European Session: 08:00-16:00 UTC  
+- New York/US Session: 13:00-21:00 UTC
+Generate strategies that work across all sessions or specify which session each strategy is best suited for.
 `;
     }
     
     // Build AI prompt for strategy analysis
     const analysisPrompt = `You are an expert trading strategy analyst. Analyze the following market data and generate trading strategy hypotheses.
-${multiMarketContext}
+${sessionContext}
 MARKET DATA:
 - Symbol: ${symbol.toUpperCase()}
 - Current Price: ${currentPrice}
