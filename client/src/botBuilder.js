@@ -2301,19 +2301,35 @@ function updateProbabilityCurve(tfData) {
 let aiProjectionChart = null;
 let aiProjectionSeries = [];
 
-function updateAiProjectionChart(result) {
+async function updateAiProjectionChart(result) {
   const container = document.getElementById('aiProjectionChart');
   if (!container) return;
   
-  const forecastCandles = parseInt(document.getElementById('aiProjectionCandles')?.value || '10');
+  const forecastCandles = parseInt(document.getElementById('aiProjectionCandles')?.value || '100');
   const tf = aiResultsTimeframe;
   const tfData = result.predictions?.[tf] || result.predictions?.M5 || {};
   
-  // Get last 30 historical candles from stored data
-  const historicalCandles = (result.marketData || []).slice(-30);
+  // Try to get historical candles from result, or fetch fresh data
+  let historicalCandles = (result.marketData || []).slice(-50);
   
   if (historicalCandles.length === 0) {
-    container.innerHTML = '<div class="h-full flex items-center justify-center text-gray-500">No market data available</div>';
+    // Fetch fresh market data
+    const symbol = document.getElementById('aiSymbol')?.value || 'silver';
+    try {
+      container.innerHTML = '<div class="h-full flex items-center justify-center text-gray-500">Loading market data...</div>';
+      const response = await fetch(`/api/market-data/${symbol}/1h`);
+      const data = await response.json();
+      if (data.candles && data.candles.length > 0) {
+        historicalCandles = data.candles.slice(-50);
+        result.marketData = historicalCandles; // Store for future use
+      }
+    } catch (e) {
+      console.warn('Failed to fetch market data for projection:', e);
+    }
+  }
+  
+  if (historicalCandles.length === 0) {
+    container.innerHTML = '<div class="h-full flex items-center justify-center text-red-500 font-medium">No market data available - Please run AI analysis first</div>';
     return;
   }
   
@@ -2360,35 +2376,57 @@ function updateAiProjectionChart(result) {
   const lastPrice = lastCandle.close;
   const lastTime = lastCandle.time;
   const direction = tfData.direction || 'Neutral';
-  const volatility = (result.context?.volatility === 'High' ? 0.003 : (result.context?.volatility === 'Low' ? 0.001 : 0.002));
+  
+  // Calculate actual volatility from historical data
+  let priceChanges = [];
+  for (let i = 1; i < historicalCandles.length; i++) {
+    const change = (historicalCandles[i].close - historicalCandles[i-1].close) / historicalCandles[i-1].close;
+    priceChanges.push(change);
+  }
+  const avgChange = priceChanges.reduce((a, b) => a + b, 0) / priceChanges.length;
+  const volatility = Math.sqrt(priceChanges.reduce((sum, c) => sum + Math.pow(c - avgChange, 2), 0) / priceChanges.length) || 0.002;
   
   // Calculate time interval based on timeframe
   const tfIntervals = { 'M5': 300, 'M15': 900, 'H1': 3600, 'H4': 14400 };
   const interval = tfIntervals[tf] || 300;
   
-  // Generate bullish, bearish, and expected projections
+  // Generate bullish, bearish, and expected projections with realistic movement
   const bullishData = [];
   const bearishData = [];
   const expectedData = [];
+  
+  let bullPrice = lastPrice;
+  let bearPrice = lastPrice;
+  let expPrice = lastPrice;
+  
+  // Seed for consistent random-like behavior based on last price
+  const seed = lastPrice * 1000;
   
   for (let i = 0; i <= forecastCandles; i++) {
     const time = lastTime + (i * interval);
     const progress = i / forecastCandles;
     
-    // Bullish projection (green)
-    const bullishChange = (volatility * 1.5) * progress + (Math.random() * volatility * 0.3);
-    bullishData.push({ time, value: lastPrice * (1 + bullishChange) });
+    // Use sine waves and noise for more realistic price movement
+    const noise1 = Math.sin(seed + i * 0.5) * 0.3 + Math.sin(seed + i * 0.17) * 0.2;
+    const noise2 = Math.sin(seed + i * 0.7) * 0.25 + Math.sin(seed + i * 0.23) * 0.15;
+    const noise3 = Math.sin(seed + i * 0.3) * 0.2 + Math.sin(seed + i * 0.13) * 0.3;
     
-    // Bearish projection (red)
-    const bearishChange = -(volatility * 1.5) * progress - (Math.random() * volatility * 0.3);
-    bearishData.push({ time, value: lastPrice * (1 + bearishChange) });
+    // Bullish projection with upward trend + volatility waves
+    const bullTrend = volatility * 2 * progress;
+    bullPrice = lastPrice * (1 + bullTrend + volatility * noise1);
+    bullishData.push({ time, value: bullPrice });
     
-    // Expected projection based on AI direction (purple)
-    let expectedMult = 0;
-    if (direction === 'Long') expectedMult = volatility * 0.8 * progress;
-    else if (direction === 'Short') expectedMult = -volatility * 0.8 * progress;
-    else expectedMult = (Math.random() - 0.5) * volatility * 0.2 * progress;
-    expectedData.push({ time, value: lastPrice * (1 + expectedMult) });
+    // Bearish projection with downward trend + volatility waves
+    const bearTrend = -volatility * 2 * progress;
+    bearPrice = lastPrice * (1 + bearTrend + volatility * noise2);
+    bearishData.push({ time, value: bearPrice });
+    
+    // Expected projection based on AI direction with realistic movement
+    let expTrend = 0;
+    if (direction === 'Long') expTrend = volatility * 1.2 * progress;
+    else if (direction === 'Short') expTrend = -volatility * 1.2 * progress;
+    expPrice = lastPrice * (1 + expTrend + volatility * 0.5 * noise3);
+    expectedData.push({ time, value: expPrice });
   }
   
   // Bullish line (green, dashed)
@@ -2489,7 +2527,7 @@ function updateRealPriceLine(realCandles) {
 function calculatePredictionAccuracy(realCandles) {
   if (!window.projectionData) return;
   
-  const { expected, lastPrice } = window.projectionData;
+  const { expected, bullish, bearish, lastPrice } = window.projectionData;
   const latestReal = realCandles[realCandles.length - 1];
   
   if (!latestReal || expected.length === 0) return;
@@ -2527,33 +2565,61 @@ function calculatePredictionAccuracy(realCandles) {
     deviationEl.className = Math.abs(deviation) < 0.5 ? 'text-green-600' : 
                             Math.abs(deviation) < 1 ? 'text-yellow-600' : 'text-red-600';
   }
+  
+  // Update list view with actual prices
+  updateProjectionListView(expected, bullish, bearish, realCandles);
 }
 
-function updateProjectionListView(expected, bullish, bearish) {
+function updateProjectionListView(expected, bullish, bearish, actualData = []) {
   const tbody = document.getElementById('projectionListBody');
   if (!tbody) return;
   
   if (expected.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-gray-500">No projection data</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-gray-500">No projection data available</td></tr>';
     return;
   }
   
-  tbody.innerHTML = expected.map((exp, i) => {
+  // Only show first 100 rows in list for performance
+  const displayData = expected.slice(0, 100);
+  
+  tbody.innerHTML = displayData.map((exp, i) => {
     const bull = bullish[i] || {};
     const bear = bearish[i] || {};
-    const time = new Date(exp.time * 1000).toLocaleTimeString();
+    const time = new Date(exp.time * 1000).toLocaleString();
+    
+    // Find actual price for this time if available
+    const actual = actualData.find(a => Math.abs(a.time - exp.time) < 300);
+    let actualStr = '--';
+    let accStr = '--';
+    let accClass = 'text-gray-400';
+    
+    if (actual) {
+      actualStr = `$${actual.close.toFixed(4)}`;
+      const deviation = Math.abs((actual.close - exp.value) / exp.value * 100);
+      const accuracy = Math.max(0, 100 - deviation * 10);
+      accStr = `${accuracy.toFixed(1)}%`;
+      accClass = accuracy >= 80 ? 'text-green-600 font-medium' : 
+                 accuracy >= 60 ? 'text-yellow-600' : 'text-red-600';
+    }
     
     return `
-      <tr class="hover:bg-gray-100 dark:hover:bg-gray-700">
+      <tr class="hover:bg-gray-100 dark:hover:bg-gray-700 text-sm">
         <td class="p-2 text-gray-600 dark:text-gray-400">${time}</td>
         <td class="p-2 font-medium text-blue-600">$${exp.value.toFixed(4)}</td>
         <td class="p-2 text-green-600">$${bull.value?.toFixed(4) || '--'}</td>
         <td class="p-2 text-red-600">$${bear.value?.toFixed(4) || '--'}</td>
-        <td class="p-2 text-gray-400" id="actual_${i}">--</td>
-        <td class="p-2" id="acc_${i}">--</td>
+        <td class="p-2 text-purple-600" id="actual_${i}">${actualStr}</td>
+        <td class="p-2 ${accClass}" id="acc_${i}">${accStr}</td>
       </tr>
     `;
   }).join('');
+  
+  // Add row count info
+  if (expected.length > 100) {
+    const info = document.createElement('tr');
+    info.innerHTML = `<td colspan="6" class="p-2 text-center text-gray-500 text-sm">Showing first 100 of ${expected.length} projections</td>`;
+    tbody.appendChild(info);
+  }
 }
 
 // Generate multi-timeframe predictions based on context
