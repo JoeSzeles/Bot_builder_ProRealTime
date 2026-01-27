@@ -2114,6 +2114,177 @@ function setupAiTradingSubTabs() {
       }
     });
   }
+  
+  // Run AI Analysis button
+  const runAiBtn = document.getElementById('runAiAnalysis');
+  if (runAiBtn) {
+    runAiBtn.addEventListener('click', runAiStrategyAnalysis);
+  }
+}
+
+// AI Strategy Analysis
+async function runAiStrategyAnalysis() {
+  const runBtn = document.getElementById('runAiAnalysis');
+  const symbol = document.getElementById('aiSymbol')?.value || 'silver';
+  const session = document.getElementById('aiSession')?.value || 'auto';
+  const searchQuery = document.getElementById('aiStrategySearch')?.value || '';
+  
+  // Show loading state
+  if (runBtn) {
+    runBtn.disabled = true;
+    runBtn.innerHTML = `
+      <svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      </svg>
+      Analyzing...
+    `;
+  }
+  
+  try {
+    // Fetch current market data for context
+    const timeframe = '1h';
+    const marketDataRes = await fetch(`/api/market-data/${symbol}/${timeframe}`);
+    const marketData = await marketDataRes.json();
+    
+    if (!marketData.candles || marketData.candles.length === 0) {
+      throw new Error('No market data available');
+    }
+    
+    // Call AI strategy endpoint
+    const response = await fetch('/api/ai-strategy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        symbol,
+        session,
+        searchQuery,
+        candles: marketData.candles.slice(-50), // Last 50 candles for context
+        currentPrice: marketData.candles[marketData.candles.length - 1].close
+      })
+    });
+    
+    const result = await response.json();
+    
+    if (result.error) {
+      throw new Error(result.error);
+    }
+    
+    // Update UI with results
+    updateAiStrategyUI(result);
+    
+  } catch (error) {
+    console.error('AI Strategy error:', error);
+    alert('AI Analysis failed: ' + error.message);
+  } finally {
+    // Restore button
+    if (runBtn) {
+      runBtn.disabled = false;
+      runBtn.innerHTML = `
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        </svg>
+        Run AI
+      `;
+    }
+  }
+}
+
+function updateAiStrategyUI(result) {
+  // Update Market Context
+  const contextSymbol = document.getElementById('aiContextSymbol');
+  const contextSession = document.getElementById('aiContextSession');
+  const contextVolatility = document.getElementById('aiContextVolatility');
+  const contextRegime = document.getElementById('aiContextRegime');
+  const contextStructure = document.getElementById('aiContextStructure');
+  const contextConfidence = document.getElementById('aiContextConfidence');
+  
+  if (result.context) {
+    if (contextSymbol) contextSymbol.textContent = result.context.symbol || 'N/A';
+    if (contextSession) contextSession.textContent = result.context.session || 'N/A';
+    if (contextVolatility) contextVolatility.textContent = result.context.volatility || 'Normal';
+    if (contextRegime) contextRegime.textContent = result.context.regime || 'Unknown';
+    if (contextStructure) contextStructure.textContent = result.context.structure || 'N/A';
+    if (contextConfidence) {
+      const conf = result.context.confidence || 3;
+      contextConfidence.innerHTML = '●'.repeat(conf) + '○'.repeat(5 - conf);
+    }
+  }
+  
+  // Update Learning Feedback
+  const learningSetups = document.getElementById('aiLearningSetups');
+  const learningPerf = document.getElementById('aiLearningPerf');
+  const learningAdapt = document.getElementById('aiLearningAdapt');
+  
+  if (result.learning) {
+    if (learningSetups) learningSetups.textContent = result.learning.similarSetups || '0';
+    if (learningPerf) learningPerf.textContent = result.learning.performance || 'N/A';
+    if (learningAdapt) learningAdapt.textContent = result.learning.adaptation || 'N/A';
+  }
+  
+  // Update Strategy Hypotheses
+  const hypothesesContainer = document.getElementById('aiHypothesesContainer');
+  if (hypothesesContainer && result.hypotheses && result.hypotheses.length > 0) {
+    hypothesesContainer.innerHTML = result.hypotheses.map((h, i) => `
+      <div class="bg-white dark:bg-gray-700/50 rounded-xl p-4 border border-purple-200 dark:border-purple-700/50">
+        <div class="flex items-start justify-between mb-2">
+          <h5 class="font-medium text-gray-800 dark:text-white flex items-center gap-2">
+            <span class="w-2 h-2 bg-purple-500 rounded-full"></span>
+            ${h.name || 'Strategy ' + (i + 1)}
+          </h5>
+          <span class="text-xs px-2 py-0.5 ${h.direction === 'Long' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : h.direction === 'Short' ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300' : 'bg-gray-100 dark:bg-gray-600 text-gray-600 dark:text-gray-300'} rounded">${h.direction || 'Neutral'} (${h.timeframe || 'M5'})</span>
+        </div>
+        <div class="flex flex-wrap gap-1.5 mb-3">
+          ${(h.tags || []).map(tag => `<span class="px-2 py-0.5 text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded">${tag}</span>`).join('')}
+        </div>
+        <div class="text-sm text-gray-600 dark:text-gray-400 mb-3">
+          <p class="mb-1"><strong>Rationale:</strong></p>
+          <ul class="list-disc list-inside text-xs space-y-0.5 ml-2">
+            ${(h.rationale || []).map(r => `<li>${r}</li>`).join('')}
+          </ul>
+        </div>
+        <div class="flex items-center justify-between">
+          <div class="flex gap-2">
+            <button onclick="addAiHypothesisToBot(${i})" class="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors">+ Add to Bot</button>
+            <button onclick="useAiHypothesis(${i})" class="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 rounded-lg transition-colors">Use</button>
+          </div>
+          <span class="text-xs text-gray-500">Confidence: ${h.confidence || 'Medium'}</span>
+        </div>
+      </div>
+    `).join('');
+    
+    // Store hypotheses globally for button actions
+    window.aiHypotheses = result.hypotheses;
+  }
+}
+
+// Global functions for hypothesis buttons
+window.addAiHypothesisToBot = function(index) {
+  const h = window.aiHypotheses?.[index];
+  if (!h) return;
+  
+  const extraInstructions = document.getElementById('botExtraInstructions');
+  if (extraInstructions) {
+    extraInstructions.value = (extraInstructions.value ? extraInstructions.value + '\n\n' : '') + 
+      `AI Strategy: ${h.name}\nDirection: ${h.direction}\nTimeframe: ${h.timeframe}\nRationale: ${h.rationale?.join('; ')}`;
+  }
+  alert('Strategy added to Additional Instructions!');
+};
+
+window.useAiHypothesis = function(index) {
+  const h = window.aiHypotheses?.[index];
+  if (!h || !h.prtCode) {
+    alert('No ProRealTime code available for this strategy');
+    return;
+  }
+  
+  // Copy to clipboard
+  navigator.clipboard.writeText(h.prtCode).then(() => {
+    alert('ProRealTime code copied to clipboard!');
+  }).catch(() => {
+    console.log('PRT Code:', h.prtCode);
+    alert('Check console for ProRealTime code');
+  });
 }
 
 let currentCandles = [];

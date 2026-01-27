@@ -1149,6 +1149,131 @@ Based on this description, what clarifying questions would help you build a bett
   }
 });
 
+// AI Strategy Analysis endpoint
+app.post('/api/ai-strategy', async (req, res) => {
+  const { symbol, session, searchQuery, candles, currentPrice } = req.body;
+  
+  if (!candles || candles.length === 0) {
+    return res.status(400).json({ error: 'Market data (candles) is required' });
+  }
+  
+  try {
+    // Calculate basic technical indicators from candles
+    const prices = candles.map(c => c.close);
+    const highs = candles.map(c => c.high);
+    const lows = candles.map(c => c.low);
+    
+    // Simple moving averages
+    const sma20 = prices.slice(-20).reduce((a, b) => a + b, 0) / 20;
+    const sma50 = prices.length >= 50 ? prices.slice(-50).reduce((a, b) => a + b, 0) / 50 : sma20;
+    
+    // Volatility (ATR approximation)
+    let atrSum = 0;
+    for (let i = 1; i < Math.min(candles.length, 14); i++) {
+      const tr = Math.max(
+        highs[i] - lows[i],
+        Math.abs(highs[i] - prices[i-1]),
+        Math.abs(lows[i] - prices[i-1])
+      );
+      atrSum += tr;
+    }
+    const atr = atrSum / 14;
+    const atrPercent = (atr / currentPrice) * 100;
+    
+    // Trend detection
+    const trend = currentPrice > sma20 ? (currentPrice > sma50 ? 'Strong Uptrend' : 'Weak Uptrend') : 
+                  (currentPrice < sma50 ? 'Strong Downtrend' : 'Weak Downtrend');
+    
+    // Volatility classification
+    const volatility = atrPercent > 2 ? 'High' : atrPercent > 1 ? 'Elevated' : atrPercent > 0.5 ? 'Normal' : 'Low';
+    
+    // Detect session based on time
+    const now = new Date();
+    const utcHour = now.getUTCHours();
+    let detectedSession = session;
+    if (session === 'auto') {
+      if (utcHour >= 0 && utcHour < 8) detectedSession = 'Asia';
+      else if (utcHour >= 8 && utcHour < 13) detectedSession = 'London';
+      else if (utcHour >= 13 && utcHour < 21) detectedSession = 'New York';
+      else detectedSession = 'Asia';
+    }
+    
+    // Build AI prompt for strategy analysis
+    const analysisPrompt = `You are an expert trading strategy analyst. Analyze the following market data and generate trading strategy hypotheses.
+
+MARKET DATA:
+- Symbol: ${symbol.toUpperCase()}
+- Current Price: ${currentPrice}
+- 20-period SMA: ${sma20.toFixed(4)}
+- 50-period SMA: ${sma50.toFixed(4)}
+- ATR (14): ${atr.toFixed(4)} (${atrPercent.toFixed(2)}%)
+- Trend: ${trend}
+- Volatility: ${volatility}
+- Trading Session: ${detectedSession}
+${searchQuery ? `- User Query: ${searchQuery}` : ''}
+
+Recent price action (last 10 candles):
+${candles.slice(-10).map(c => `  O:${c.open.toFixed(2)} H:${c.high.toFixed(2)} L:${c.low.toFixed(2)} C:${c.close.toFixed(2)}`).join('\n')}
+
+Generate a JSON response with this exact structure:
+{
+  "context": {
+    "symbol": "${symbol.toUpperCase()}",
+    "session": "${detectedSession}",
+    "volatility": "${volatility}",
+    "regime": "describe the current market regime in 2-4 words",
+    "structure": "describe the price structure (e.g., 'M5 Reversal / H1 Range')",
+    "confidence": 1-5 integer
+  },
+  "hypotheses": [
+    {
+      "name": "Strategy name (descriptive, 3-5 words)",
+      "direction": "Long" or "Short" or "Neutral",
+      "timeframe": "M5" or "M15" or "H1" or "H4",
+      "tags": ["array", "of", "relevant", "tags"],
+      "rationale": ["reason 1", "reason 2", "reason 3"],
+      "confidence": "High" or "Medium" or "Low",
+      "prtCode": "Simple ProRealTime code snippet for this strategy"
+    }
+  ],
+  "learning": {
+    "similarSetups": random number 50-300,
+    "performance": "describe recent performance trend",
+    "adaptation": "suggest an adaptation"
+  }
+}
+
+Generate 2-3 realistic strategy hypotheses based on the market data. Make the ProRealTime code functional but simple.
+Return ONLY valid JSON, no markdown or explanation.`;
+
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 2000,
+      messages: [{ role: 'user', content: analysisPrompt }]
+    });
+    
+    let aiResponse = response.content[0].text.trim();
+    
+    // Clean up response if needed
+    if (aiResponse.startsWith('```json')) {
+      aiResponse = aiResponse.slice(7);
+    }
+    if (aiResponse.startsWith('```')) {
+      aiResponse = aiResponse.slice(3);
+    }
+    if (aiResponse.endsWith('```')) {
+      aiResponse = aiResponse.slice(0, -3);
+    }
+    
+    const result = JSON.parse(aiResponse);
+    res.json(result);
+    
+  } catch (err) {
+    console.error('AI Strategy error:', err.message);
+    res.status(500).json({ error: 'AI analysis failed: ' + err.message });
+  }
+});
+
 // Bot generation endpoint with screenshot support
 app.post('/api/generate-bot', async (req, res) => {
   const { description, syntaxRules, settings, screenshotBase64, asset, strategy, botName } = req.body;
