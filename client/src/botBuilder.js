@@ -2128,6 +2128,7 @@ async function runAiStrategyAnalysis() {
   const symbol = document.getElementById('aiSymbol')?.value || 'silver';
   const session = document.getElementById('aiSession')?.value || 'auto';
   const searchQuery = document.getElementById('aiStrategySearch')?.value || '';
+  const candleCount = parseInt(document.getElementById('aiCandleCount')?.value || '100');
   
   // Show loading state
   if (runBtn) {
@@ -2152,6 +2153,7 @@ async function runAiStrategyAnalysis() {
     }
     
     // Call AI strategy endpoint
+    const candlesToSend = Math.min(candleCount, marketData.candles.length);
     const response = await fetch('/api/ai-strategy', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2159,8 +2161,9 @@ async function runAiStrategyAnalysis() {
         symbol,
         session,
         searchQuery,
-        candles: marketData.candles.slice(-50), // Last 50 candles for context
-        currentPrice: marketData.candles[marketData.candles.length - 1].close
+        candles: marketData.candles.slice(-candlesToSend),
+        currentPrice: marketData.candles[marketData.candles.length - 1].close,
+        candleCount: candlesToSend
       })
     });
     
