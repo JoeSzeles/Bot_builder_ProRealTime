@@ -2040,22 +2040,78 @@ export function initScreenshotHandlers() {
 function setupBotSubTabs() {
   const settingsTabBtn = document.getElementById('botSettingsTabBtn');
   const simulatorTabBtn = document.getElementById('botSimulatorTabBtn');
+  const aiTradingTabBtn = document.getElementById('botAiTradingTabBtn');
   const settingsContent = document.getElementById('botSettingsTabContent');
   const simulatorContent = document.getElementById('botSimulatorTabContent');
+  const aiTradingContent = document.getElementById('botAiTradingTabContent');
   
-  if (settingsTabBtn && simulatorTabBtn) {
-    settingsTabBtn.addEventListener('click', () => {
-      settingsTabBtn.className = 'bot-sub-tab px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300';
-      simulatorTabBtn.className = 'bot-sub-tab px-4 py-2 rounded-lg text-sm font-medium transition-colors text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700';
-      if (settingsContent) settingsContent.classList.remove('hidden');
-      if (simulatorContent) simulatorContent.classList.add('hidden');
-    });
+  const activeClass = 'bot-sub-tab px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300';
+  const inactiveClass = 'bot-sub-tab px-4 py-2 rounded-lg text-sm font-medium transition-colors text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700';
+  const aiActiveClass = 'bot-sub-tab px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 flex items-center gap-1.5';
+  const aiInactiveClass = 'bot-sub-tab px-4 py-2 rounded-lg text-sm font-medium transition-colors text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-1.5';
+  
+  function switchToTab(tab) {
+    settingsTabBtn.className = tab === 'settings' ? activeClass : inactiveClass;
+    simulatorTabBtn.className = tab === 'simulator' ? activeClass : inactiveClass;
+    if (aiTradingTabBtn) aiTradingTabBtn.className = tab === 'aiTrading' ? aiActiveClass : aiInactiveClass;
     
-    simulatorTabBtn.addEventListener('click', () => {
-      simulatorTabBtn.className = 'bot-sub-tab px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300';
-      settingsTabBtn.className = 'bot-sub-tab px-4 py-2 rounded-lg text-sm font-medium transition-colors text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700';
-      if (settingsContent) settingsContent.classList.add('hidden');
-      if (simulatorContent) simulatorContent.classList.remove('hidden');
+    if (settingsContent) settingsContent.classList.toggle('hidden', tab !== 'settings');
+    if (simulatorContent) simulatorContent.classList.toggle('hidden', tab !== 'simulator');
+    if (aiTradingContent) aiTradingContent.classList.toggle('hidden', tab !== 'aiTrading');
+  }
+  
+  if (settingsTabBtn) {
+    settingsTabBtn.addEventListener('click', () => switchToTab('settings'));
+  }
+  if (simulatorTabBtn) {
+    simulatorTabBtn.addEventListener('click', () => switchToTab('simulator'));
+  }
+  if (aiTradingTabBtn) {
+    aiTradingTabBtn.addEventListener('click', () => switchToTab('aiTrading'));
+  }
+  
+  // AI Trading sub-tabs (AI Strategy / AI Results)
+  setupAiTradingSubTabs();
+}
+
+function setupAiTradingSubTabs() {
+  const strategySubTab = document.getElementById('aiStrategySubTab');
+  const resultsSubTab = document.getElementById('aiResultsSubTab');
+  const strategyContent = document.getElementById('aiStrategyContent');
+  const resultsContent = document.getElementById('aiResultsContent');
+  
+  const activeClass = 'ai-sub-tab px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 flex items-center gap-1.5';
+  const inactiveClass = 'ai-sub-tab px-4 py-2 rounded-lg text-sm font-medium transition-colors text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-1.5';
+  
+  if (strategySubTab) {
+    strategySubTab.addEventListener('click', () => {
+      strategySubTab.className = activeClass;
+      if (resultsSubTab) resultsSubTab.className = inactiveClass;
+      if (strategyContent) strategyContent.classList.remove('hidden');
+      if (resultsContent) resultsContent.classList.add('hidden');
+    });
+  }
+  
+  if (resultsSubTab) {
+    resultsSubTab.addEventListener('click', () => {
+      resultsSubTab.className = activeClass;
+      if (strategySubTab) strategySubTab.className = inactiveClass;
+      if (strategyContent) strategyContent.classList.add('hidden');
+      if (resultsContent) resultsContent.classList.remove('hidden');
+    });
+  }
+  
+  // Toggle PRT code panel
+  const togglePrtBtn = document.getElementById('toggleAiPrtCode');
+  const prtPanel = document.getElementById('aiPrtCodePanel');
+  const prtChevron = document.getElementById('aiPrtChevron');
+  
+  if (togglePrtBtn && prtPanel) {
+    togglePrtBtn.addEventListener('click', () => {
+      prtPanel.classList.toggle('hidden');
+      if (prtChevron) {
+        prtChevron.classList.toggle('rotate-180');
+      }
     });
   }
 }

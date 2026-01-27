@@ -379,6 +379,12 @@
           <div class="flex items-center gap-2 mb-4 border-b border-gray-200 dark:border-gray-600 pb-3">
             <button id="botSettingsTabBtn" class="bot-sub-tab px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300">Settings</button>
             <button id="botSimulatorTabBtn" class="bot-sub-tab px-4 py-2 rounded-lg text-sm font-medium transition-colors text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700">Simulator</button>
+            <button id="botAiTradingTabBtn" class="bot-sub-tab px-4 py-2 rounded-lg text-sm font-medium transition-colors text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-1.5">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+              </svg>
+              AI Trading
+            </button>
           </div>
 
           <!-- Settings Tab Content -->
@@ -1128,6 +1134,393 @@
                 </button>
                 <div id="rawDataPanel" class="hidden px-4 pb-4">
                   <pre id="rawDataContent" class="max-h-96 overflow-auto p-4 bg-gray-900 text-green-400 rounded-lg font-mono text-xs whitespace-pre-wrap scrollbar-thin"></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- AI Trading Tab Content -->
+          <div id="botAiTradingTabContent" class="hidden">
+            <div class="space-y-6">
+              <!-- Header with Controls -->
+              <div class="flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-white flex items-center gap-2">
+                  <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                  </svg>
+                  AI Strategy Engine
+                </h3>
+                <div class="flex items-center gap-2">
+                  <select id="aiSymbol" class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+                    <option value="XAGUSD">Silver (XAG/USD)</option>
+                    <option value="XAUUSD">Gold (XAU/USD)</option>
+                  </select>
+                  <select id="aiSession" class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+                    <option value="auto">Auto-detect</option>
+                    <option value="asia">Asia</option>
+                    <option value="london">London</option>
+                    <option value="newyork">New York</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- AI Sub-tabs -->
+              <div class="flex items-center gap-2 border-b border-gray-200 dark:border-gray-600 pb-3">
+                <button id="aiStrategySubTab" class="ai-sub-tab px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 flex items-center gap-1.5">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                  </svg>
+                  AI Strategy
+                </button>
+                <button id="aiResultsSubTab" class="ai-sub-tab px-4 py-2 rounded-lg text-sm font-medium transition-colors text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-1.5">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                  </svg>
+                  AI Results
+                </button>
+              </div>
+
+              <!-- AI Strategy Sub-tab Content -->
+              <div id="aiStrategyContent">
+                <!-- Search Bar -->
+                <div class="mb-4">
+                  <div class="flex gap-2">
+                    <input type="text" id="aiStrategySearch" placeholder="Search market idea or setup..." class="flex-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+                    <button id="runAiAnalysis" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                      </svg>
+                      Run AI
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Filter Chips -->
+                <div class="flex flex-wrap gap-2 mb-6">
+                  <span class="px-3 py-1 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-800/50">Trend</span>
+                  <span class="px-3 py-1 text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-full cursor-pointer hover:bg-green-200 dark:hover:bg-green-800/50">Mean Rev</span>
+                  <span class="px-3 py-1 text-xs font-medium bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full cursor-pointer hover:bg-orange-200 dark:hover:bg-orange-800/50">Breakout</span>
+                  <span class="px-3 py-1 text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full cursor-pointer hover:bg-purple-200 dark:hover:bg-purple-800/50">London</span>
+                  <span class="px-3 py-1 text-xs font-medium bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300 rounded-full cursor-pointer hover:bg-pink-200 dark:hover:bg-pink-800/50">NY</span>
+                  <span class="px-3 py-1 text-xs font-medium bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300 rounded-full cursor-pointer hover:bg-cyan-200 dark:hover:bg-cyan-800/50">Asia</span>
+                  <span class="px-3 py-1 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600">M5</span>
+                  <span class="px-3 py-1 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600">M15</span>
+                  <span class="px-3 py-1 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600">H1</span>
+                  <span class="px-3 py-1 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600">H4</span>
+                </div>
+
+                <!-- Market Context Card -->
+                <div class="bg-gradient-to-r from-slate-50 to-gray-50 dark:from-gray-700/50 dark:to-gray-700/30 rounded-xl p-4 border border-gray-200 dark:border-gray-600 mb-4">
+                  <div class="flex items-center justify-between mb-3">
+                    <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                      <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                      </svg>
+                      Market Context
+                    </h4>
+                    <span class="text-xs text-gray-500 dark:text-gray-400">Auto-detected</span>
+                  </div>
+                  <div class="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                    <div>
+                      <span class="text-gray-500 dark:text-gray-400">Symbol:</span>
+                      <span id="aiContextSymbol" class="ml-1 font-medium text-gray-800 dark:text-white">XAGUSD</span>
+                    </div>
+                    <div>
+                      <span class="text-gray-500 dark:text-gray-400">Session:</span>
+                      <span id="aiContextSession" class="ml-1 font-medium text-purple-600 dark:text-purple-400">London</span>
+                    </div>
+                    <div>
+                      <span class="text-gray-500 dark:text-gray-400">Volatility:</span>
+                      <span id="aiContextVolatility" class="ml-1 font-medium text-orange-600 dark:text-orange-400">Elevated</span>
+                    </div>
+                    <div>
+                      <span class="text-gray-500 dark:text-gray-400">Regime:</span>
+                      <span id="aiContextRegime" class="ml-1 font-medium text-gray-800 dark:text-white">Low Liquidity Fakeout</span>
+                    </div>
+                    <div>
+                      <span class="text-gray-500 dark:text-gray-400">Structure:</span>
+                      <span id="aiContextStructure" class="ml-1 font-medium text-gray-800 dark:text-white">M5 Reversal / H1 Range</span>
+                    </div>
+                    <div>
+                      <span class="text-gray-500 dark:text-gray-400">Confidence:</span>
+                      <span id="aiContextConfidence" class="ml-1 text-yellow-500">●●●●○</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Strategy Hypotheses -->
+                <div class="space-y-4 mb-4">
+                  <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                    <svg class="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                    </svg>
+                    AI Strategy Hypotheses
+                  </h4>
+
+                  <div id="aiHypothesesContainer" class="space-y-3">
+                    <!-- Sample Hypothesis Card -->
+                    <div class="bg-white dark:bg-gray-700/50 rounded-xl p-4 border border-purple-200 dark:border-purple-700/50">
+                      <div class="flex items-start justify-between mb-2">
+                        <h5 class="font-medium text-gray-800 dark:text-white flex items-center gap-2">
+                          <span class="w-2 h-2 bg-purple-500 rounded-full"></span>
+                          London Fake Breakdown Reversal
+                        </h5>
+                        <span class="text-xs px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded">Long (M5)</span>
+                      </div>
+                      <div class="flex flex-wrap gap-1.5 mb-3">
+                        <span class="px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">Trend</span>
+                        <span class="px-2 py-0.5 text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded">London</span>
+                        <span class="px-2 py-0.5 text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded">Mean Reversion</span>
+                      </div>
+                      <div class="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                        <p class="mb-1"><strong>Rationale:</strong></p>
+                        <ul class="list-disc list-inside text-xs space-y-0.5 ml-2">
+                          <li>Asia low sweep detected</li>
+                          <li>Volume absorption at key level</li>
+                          <li>Historical match: 78 similar cases</li>
+                        </ul>
+                      </div>
+                      <div class="flex items-center justify-between">
+                        <div class="flex gap-2">
+                          <button class="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors">+ Add to Bot</button>
+                          <button class="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 rounded-lg transition-colors">Use</button>
+                        </div>
+                        <button class="text-xs text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1">
+                          View Logic
+                          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Second Hypothesis -->
+                    <div class="bg-white dark:bg-gray-700/50 rounded-xl p-4 border border-orange-200 dark:border-orange-700/50">
+                      <div class="flex items-start justify-between mb-2">
+                        <h5 class="font-medium text-gray-800 dark:text-white flex items-center gap-2">
+                          <span class="w-2 h-2 bg-orange-500 rounded-full"></span>
+                          Breakout Continuation
+                        </h5>
+                        <span class="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-600 text-gray-600 dark:text-gray-300 rounded">Neutral (H1)</span>
+                      </div>
+                      <div class="flex flex-wrap gap-1.5 mb-3">
+                        <span class="px-2 py-0.5 text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded">Breakout</span>
+                        <span class="px-2 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded">H1</span>
+                      </div>
+                      <div class="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                        <p class="mb-1"><strong>Rationale:</strong></p>
+                        <ul class="list-disc list-inside text-xs space-y-0.5 ml-2">
+                          <li>Prior resistance now support</li>
+                          <li>Momentum building on higher timeframe</li>
+                          <li>Historical match: 42 similar cases</li>
+                        </ul>
+                      </div>
+                      <div class="flex items-center justify-between">
+                        <div class="flex gap-2">
+                          <button class="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors">+ Add to Bot</button>
+                          <button class="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 rounded-lg transition-colors">Use</button>
+                        </div>
+                        <button class="text-xs text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1">
+                          View Logic
+                          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Learning Feedback -->
+                <div class="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-xl p-4 border border-emerald-200 dark:border-emerald-700/50">
+                  <h4 class="text-sm font-semibold text-emerald-700 dark:text-emerald-300 mb-3 flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                    </svg>
+                    Learning Feedback
+                  </h4>
+                  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                    <div>
+                      <span class="text-gray-500 dark:text-gray-400">Similar setups:</span>
+                      <span id="aiLearningSetups" class="ml-1 font-medium text-gray-800 dark:text-white">214</span>
+                    </div>
+                    <div>
+                      <span class="text-gray-500 dark:text-gray-400">Recent perf:</span>
+                      <span id="aiLearningPerf" class="ml-1 font-medium text-orange-600 dark:text-orange-400">↓ Slight decay</span>
+                    </div>
+                    <div>
+                      <span class="text-gray-500 dark:text-gray-400">Adaptation:</span>
+                      <span id="aiLearningAdapt" class="ml-1 font-medium text-emerald-600 dark:text-emerald-400">Wider targets</span>
+                    </div>
+                    <div>
+                      <button class="text-xs text-purple-600 dark:text-purple-400 hover:underline">View History</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- AI Results Sub-tab Content -->
+              <div id="aiResultsContent" class="hidden">
+                <!-- Timeframe Selector -->
+                <div class="flex items-center gap-2 mb-4">
+                  <span class="text-sm text-gray-600 dark:text-gray-400">Timeframes:</span>
+                  <div class="flex gap-1">
+                    <button class="ai-tf-btn px-3 py-1 text-xs font-medium bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded-lg">M5</button>
+                    <button class="ai-tf-btn px-3 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">M15</button>
+                    <button class="ai-tf-btn px-3 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">H1</button>
+                    <button class="ai-tf-btn px-3 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">H4</button>
+                  </div>
+                </div>
+
+                <!-- Directional Bias -->
+                <div class="bg-white dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600 mb-4">
+                  <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Directional Bias</h4>
+                  <div class="space-y-2">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm text-gray-600 dark:text-gray-400">M5</span>
+                      <div class="flex items-center gap-2">
+                        <span class="text-sm font-medium text-green-600 dark:text-green-400">Long</span>
+                        <span class="text-yellow-500">●●●●○</span>
+                        <span class="text-xs text-gray-500">(68%)</span>
+                      </div>
+                    </div>
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm text-gray-600 dark:text-gray-400">M15</span>
+                      <div class="flex items-center gap-2">
+                        <span class="text-sm font-medium text-green-600 dark:text-green-400">Long</span>
+                        <span class="text-yellow-500">●●●○○</span>
+                        <span class="text-xs text-gray-500">(54%)</span>
+                      </div>
+                    </div>
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm text-gray-600 dark:text-gray-400">H1</span>
+                      <div class="flex items-center gap-2">
+                        <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Neutral</span>
+                        <span class="text-yellow-500">●●○○○</span>
+                        <span class="text-xs text-gray-500">(42%)</span>
+                      </div>
+                    </div>
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm text-gray-600 dark:text-gray-400">H4</span>
+                      <div class="flex items-center gap-2">
+                        <span class="text-sm font-medium text-blue-600 dark:text-blue-400">Range</span>
+                        <span class="text-yellow-500">●●●○○</span>
+                        <span class="text-xs text-gray-500">(57%)</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Price Targets Table -->
+                <div class="bg-white dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600 mb-4">
+                  <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Price Targets (M5)</h4>
+                  <table class="w-full text-sm">
+                    <thead>
+                      <tr class="text-left text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-600">
+                        <th class="pb-2">Target</th>
+                        <th class="pb-2">Probability</th>
+                        <th class="pb-2">Outcome</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-600">
+                      <tr>
+                        <td class="py-2 font-medium text-green-600 dark:text-green-400">+0.15%</td>
+                        <td class="py-2">
+                          <div class="flex items-center gap-2">
+                            <div class="w-20 bg-gray-200 dark:bg-gray-600 rounded-full h-2">
+                              <div class="bg-green-500 h-2 rounded-full" style="width: 62%"></div>
+                            </div>
+                            <span>62%</span>
+                          </div>
+                        </td>
+                        <td class="py-2"><span class="px-2 py-0.5 text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded">Primary</span></td>
+                      </tr>
+                      <tr>
+                        <td class="py-2 font-medium text-amber-600 dark:text-amber-400">+0.30%</td>
+                        <td class="py-2">
+                          <div class="flex items-center gap-2">
+                            <div class="w-20 bg-gray-200 dark:bg-gray-600 rounded-full h-2">
+                              <div class="bg-amber-500 h-2 rounded-full" style="width: 41%"></div>
+                            </div>
+                            <span>41%</span>
+                          </div>
+                        </td>
+                        <td class="py-2"><span class="px-2 py-0.5 text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded">Stretch</span></td>
+                      </tr>
+                      <tr>
+                        <td class="py-2 font-medium text-red-600 dark:text-red-400">-0.10%</td>
+                        <td class="py-2">
+                          <div class="flex items-center gap-2">
+                            <div class="w-20 bg-gray-200 dark:bg-gray-600 rounded-full h-2">
+                              <div class="bg-red-500 h-2 rounded-full" style="width: 22%"></div>
+                            </div>
+                            <span>22%</span>
+                          </div>
+                        </td>
+                        <td class="py-2"><span class="px-2 py-0.5 text-xs bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded">Risk</span></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <!-- Probability Curve -->
+                <div class="bg-white dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600 mb-4">
+                  <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Probability Curve</h4>
+                  <div class="h-32 flex items-end justify-center px-8">
+                    <!-- SVG Bell Curve -->
+                    <svg viewBox="0 0 200 80" class="w-full h-full" preserveAspectRatio="xMidYMid meet">
+                      <defs>
+                        <linearGradient id="curveGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                          <stop offset="0%" style="stop-color:rgb(147, 51, 234);stop-opacity:0.3" />
+                          <stop offset="100%" style="stop-color:rgb(147, 51, 234);stop-opacity:0.05" />
+                        </linearGradient>
+                      </defs>
+                      <path d="M 10 70 Q 50 70 70 50 Q 90 30 100 20 Q 110 30 130 50 Q 150 70 190 70" stroke="rgb(147, 51, 234)" stroke-width="2" fill="none"/>
+                      <path d="M 10 70 Q 50 70 70 50 Q 90 30 100 20 Q 110 30 130 50 Q 150 70 190 70 L 190 70 L 10 70 Z" fill="url(#curveGradient)"/>
+                      <text x="20" y="78" class="text-xs fill-gray-400" style="font-size: 8px">-0.1%</text>
+                      <text x="95" y="78" class="text-xs fill-gray-400" style="font-size: 8px">0</text>
+                      <text x="170" y="78" class="text-xs fill-gray-400" style="font-size: 8px">+0.3%</text>
+                    </svg>
+                  </div>
+                  <div class="flex justify-center gap-6 text-xs text-gray-500 dark:text-gray-400 mt-2">
+                    <span>Skew: <strong class="text-green-600 dark:text-green-400">Upside</strong></span>
+                    <span>Confidence: <strong class="text-purple-600 dark:text-purple-400">0.71</strong></span>
+                  </div>
+                </div>
+
+                <!-- ProRealTime Output -->
+                <div class="bg-white dark:bg-gray-700/50 rounded-xl border border-gray-200 dark:border-gray-600">
+                  <button id="toggleAiPrtCode" class="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50 dark:hover:bg-gray-600/50 rounded-t-xl transition-colors">
+                    <div class="flex items-center gap-2">
+                      <svg class="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+                      </svg>
+                      <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">ProRealTime Strategy Output</h4>
+                    </div>
+                    <svg id="aiPrtChevron" class="w-5 h-5 text-gray-400 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                  </button>
+                  <div id="aiPrtCodePanel" class="hidden px-4 pb-4">
+                    <pre class="p-4 bg-gray-900 text-green-400 rounded-lg font-mono text-xs overflow-x-auto">DEFPARAM CumulateOrders = False
+
+IF NOT OnMarket THEN
+  IF Close CROSSES OVER VWAP THEN
+    BUY 1 CONTRACT AT MARKET
+  ENDIF
+ENDIF
+
+SET STOP pLOSS ATR(14) * 1.2</pre>
+                    <div class="flex gap-2 mt-3">
+                      <button class="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 rounded-lg transition-colors flex items-center gap-1">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                        </svg>
+                        Copy
+                      </button>
+                      <button class="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors">+ Add to Bot</button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
