@@ -1,0 +1,172 @@
+Perfect — then we **hard-restrict to zero-API-key sources only** 👍
+Below is a **clean, practical setup** that works *today* and fits your **Auto-Trading + AI learning tab** without signups, keys, or accounts.
+
+---
+
+## ✅ NO-API-KEY Silver & Gold Data (Usable)
+
+### **1️⃣ Yahoo Finance (Primary Source) — BEST OPTION**
+
+**Unofficial, but reliable and widely used**
+
+**Silver**
+
+```
+XAGUSD=X
+```
+
+**Gold**
+
+```
+XAUUSD=X
+```
+
+**Endpoint pattern**
+
+```
+https://query1.finance.yahoo.com/v8/finance/chart/XAGUSD=X
+```
+
+**What you get**
+
+* ✅ Live / near-live price
+* ✅ OHLC bars
+* ✅ Multiple timeframes (1m → 1d)
+* ✅ Long historical depth
+* ❌ No order book (not needed)
+
+**Why this fits your app perfectly**
+
+* Polling-friendly
+* Easy JSON
+* Stable enough for AI + backtests
+* Used by TradingView scrapers, quants, bots
+
+👉 **This should be your main feed**
+
+---
+
+### **2️⃣ Stooq (Backup / Historical)**
+
+Simple CSV downloads.
+
+```
+https://stooq.com/q/d/l/?s=xagusd&i=d
+https://stooq.com/q/d/l/?s=xauusd&i=d
+```
+
+**What you get**
+
+* ✅ Daily OHLC history
+* ✅ No limits
+* ❌ No intraday
+
+**Use case**
+
+* Backfill data
+* Model training
+* Regime analysis
+
+---
+
+### **3️⃣ Investing.com (Scrape-only fallback)**
+
+Not recommended as primary, but usable.
+
+**Pros**
+
+* Free
+* Near-real-time
+
+**Cons**
+
+* HTML scraping
+* Breaks often
+* Legal gray area
+
+👉 Only use if Yahoo is temporarily down.
+
+---
+
+## ❌ What You Are *NOT* Using (by choice)
+
+You explicitly avoid these:
+
+* ❌ Alpha Vantage
+* ❌ Quandl / Nasdaq
+* ❌ Metals APIs
+* ❌ Broker feeds
+* ❌ CME / LBMA
+
+Good call — this keeps the system **open + offline-trainable**.
+
+---
+
+## 🧠 Data Coverage vs Your Auto-Trading Tab
+
+| Requirement           | Yahoo | Stooq |
+| --------------------- | ----- | ----- |
+| Live price            | ✅     | ❌     |
+| OHLC bars             | ✅     | ✅     |
+| Multi-timeframe       | ✅     | ❌     |
+| Backtesting           | ✅     | ✅     |
+| AI probability curves | ✅     | ✅     |
+| No API key            | ✅     | ✅     |
+
+---
+
+## 🧩 Recommended Architecture (No API Keys)
+
+```
+[ Yahoo Finance Poller ]
+        |
+        v
+[ Bar Normalizer ]
+ (M1 → M5 → H1 → D1)
+        |
+        v
+[ Feature Engine ]
+ (RSI, MACD, ATR, VWAP)
+        |
+        v
+[ AI / Probability Engine ]
+ (targets + % chance)
+        |
+        v
+[ ProRealTime Code Generator ]
+```
+
+---
+
+## 🔒 Stability & Safety Notes (Important)
+
+Because Yahoo is unofficial:
+
+* Cache aggressively
+* Retry with backoff
+* Never trade tick-by-tick
+* Use **bar-close logic only** (PRT-style)
+
+This actually aligns *perfectly* with ProRealTime’s philosophy.
+
+---
+
+## ✅ Final Recommendation (Do This)
+
+**Use only:**
+
+* Yahoo Finance → live + intraday
+* Stooq → historical backfill
+
+No keys. No signups. No dependency hell.
+
+---
+
+If you want next:
+
+* I can write a **Node.js Yahoo poller** (clean + safe)
+* Add **anti-ban throttling**
+* Build **multi-timeframe aggregation**
+* Wire it directly into your AI learning tab
+
+Just say the word 👌

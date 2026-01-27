@@ -38,10 +38,27 @@ The application features a modern full-stack architecture:
 -   **Node.js**: Backend runtime environment.
 -   **Express**: Web framework for the backend API.
 -   **Replit AI Integrations**: For AI model access (Claude Sonnet, GPT-4o-mini).
--   **MetalPriceAPI**: For real-time Silver & Gold spot prices (requires `METALS_API_KEY` secret).
--   **Twelve Data API**: For live Forex candlestick data.
+-   **Yahoo Finance API**: For live candlestick data across 50+ assets (no API key required).
+-   **MetalPriceAPI**: Fallback for real-time Silver & Gold spot prices (requires `METALS_API_KEY` secret).
 
 ## Recent Changes (Jan 27, 2026)
+- **Yahoo Finance Data Integration**:
+  - Replaced TwelveData API with Yahoo Finance (no API key required)
+  - Added 50+ popular assets across all categories:
+    - Precious Metals: Silver, Gold, Platinum, Palladium (futures & spot)
+    - Energy: Crude Oil WTI, Brent, Natural Gas, Gasoline RBOB
+    - Agricultural: Corn, Wheat, Soybeans, Coffee, Sugar, Cotton, Cocoa
+    - Forex Majors: EUR/USD, GBP/USD, USD/JPY, USD/CHF, AUD/USD, USD/CAD, NZD/USD
+    - Forex Crosses: EUR/GBP, EUR/JPY, GBP/JPY
+    - US Indices: S&P 500, NASDAQ, Dow Jones, Russell 2000, VIX
+    - European Indices: DAX 40, FTSE 100, CAC 40, Euro Stoxx 50
+    - Asian Indices: Nikkei 225, Hang Seng, Shanghai Composite
+    - US Stocks: AAPL, MSFT, GOOGL, AMZN, NVDA, TSLA, META
+    - Crypto: BTC/USD, ETH/USD, SOL/USD, XRP/USD
+    - ETFs: SPY, QQQ, IWM, GLD, SLV, USO, TLT
+  - Implemented caching with appropriate TTL per timeframe
+  - Added 4-hour timeframe aggregation from 1-hour data
+
 - **AI Trading Tab**:
   - New third sub-tab in Bot Builder: Settings | Simulator | AI Trading
   - Purple color scheme to distinguish from main bot builder (indigo)

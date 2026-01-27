@@ -264,22 +264,84 @@
             <div class="flex items-center gap-2">
               <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Asset:</label>
               <select id="assetSelect" class="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-blue-500">
-                <optgroup label="Commodities">
-                  <option value="silver" selected>Silver (XAG/USD)</option>
-                  <option value="gold">Gold (XAU/USD)</option>
-                  <option value="copper">Copper</option>
-                  <option value="oil">Crude Oil (WTI)</option>
-                  <option value="natgas">Natural Gas</option>
+                <optgroup label="Precious Metals">
+                  <option value="silver" selected>Silver Futures (SI)</option>
+                  <option value="gold">Gold Futures (GC)</option>
+                  <option value="xagusd">Silver Spot (XAG/USD)</option>
+                  <option value="xauusd">Gold Spot (XAU/USD)</option>
+                  <option value="platinum">Platinum (PL)</option>
+                  <option value="palladium">Palladium (PA)</option>
                 </optgroup>
-                <optgroup label="Forex">
+                <optgroup label="Energy">
+                  <option value="oil">Crude Oil WTI (CL)</option>
+                  <option value="brent">Brent Crude (BZ)</option>
+                  <option value="natgas">Natural Gas (NG)</option>
+                  <option value="rbob">Gasoline RBOB (RB)</option>
+                </optgroup>
+                <optgroup label="Agricultural">
+                  <option value="corn">Corn (ZC)</option>
+                  <option value="wheat">Wheat (ZW)</option>
+                  <option value="soybeans">Soybeans (ZS)</option>
+                  <option value="coffee">Coffee (KC)</option>
+                  <option value="sugar">Sugar (SB)</option>
+                  <option value="cotton">Cotton (CT)</option>
+                  <option value="cocoa">Cocoa (CC)</option>
+                </optgroup>
+                <optgroup label="Forex - Majors">
                   <option value="eurusd">EUR/USD</option>
                   <option value="gbpusd">GBP/USD</option>
                   <option value="usdjpy">USD/JPY</option>
+                  <option value="usdchf">USD/CHF</option>
+                  <option value="audusd">AUD/USD</option>
+                  <option value="usdcad">USD/CAD</option>
+                  <option value="nzdusd">NZD/USD</option>
                 </optgroup>
-                <optgroup label="Indices">
+                <optgroup label="Forex - Crosses">
+                  <option value="eurgbp">EUR/GBP</option>
+                  <option value="eurjpy">EUR/JPY</option>
+                  <option value="gbpjpy">GBP/JPY</option>
+                </optgroup>
+                <optgroup label="US Indices">
                   <option value="spx500">S&P 500</option>
+                  <option value="nasdaq">NASDAQ Composite</option>
+                  <option value="dow">Dow Jones</option>
+                  <option value="russell">Russell 2000</option>
+                  <option value="vix">VIX Volatility</option>
+                </optgroup>
+                <optgroup label="European Indices">
                   <option value="dax">DAX 40</option>
                   <option value="ftse">FTSE 100</option>
+                  <option value="cac">CAC 40</option>
+                  <option value="stoxx">Euro Stoxx 50</option>
+                </optgroup>
+                <optgroup label="Asian Indices">
+                  <option value="nikkei">Nikkei 225</option>
+                  <option value="hangseng">Hang Seng</option>
+                  <option value="shanghai">Shanghai Composite</option>
+                </optgroup>
+                <optgroup label="US Stocks">
+                  <option value="aapl">Apple (AAPL)</option>
+                  <option value="msft">Microsoft (MSFT)</option>
+                  <option value="googl">Google (GOOGL)</option>
+                  <option value="amzn">Amazon (AMZN)</option>
+                  <option value="nvda">NVIDIA (NVDA)</option>
+                  <option value="tsla">Tesla (TSLA)</option>
+                  <option value="meta">Meta (META)</option>
+                </optgroup>
+                <optgroup label="Crypto">
+                  <option value="btcusd">Bitcoin (BTC/USD)</option>
+                  <option value="ethusd">Ethereum (ETH/USD)</option>
+                  <option value="solusd">Solana (SOL/USD)</option>
+                  <option value="xrpusd">XRP (XRP/USD)</option>
+                </optgroup>
+                <optgroup label="ETFs">
+                  <option value="spy">SPY (S&P 500 ETF)</option>
+                  <option value="qqq">QQQ (NASDAQ ETF)</option>
+                  <option value="iwm">IWM (Russell 2000 ETF)</option>
+                  <option value="gld">GLD (Gold ETF)</option>
+                  <option value="slv">SLV (Silver ETF)</option>
+                  <option value="uso">USO (Oil ETF)</option>
+                  <option value="tlt">TLT (Treasury ETF)</option>
                 </optgroup>
               </select>
               <button id="favoriteAsset" class="p-2 text-gray-400 hover:text-yellow-500 transition-colors" title="Add to favorites">
@@ -1152,8 +1214,14 @@
                 </h3>
                 <div class="flex items-center gap-2">
                   <select id="aiSymbol" class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
-                    <option value="XAGUSD">Silver (XAG/USD)</option>
-                    <option value="XAUUSD">Gold (XAU/USD)</option>
+                    <option value="silver">Silver Futures</option>
+                    <option value="gold">Gold Futures</option>
+                    <option value="xagusd">Silver Spot</option>
+                    <option value="xauusd">Gold Spot</option>
+                    <option value="oil">Crude Oil WTI</option>
+                    <option value="btcusd">Bitcoin</option>
+                    <option value="eurusd">EUR/USD</option>
+                    <option value="spx500">S&P 500</option>
                   </select>
                   <select id="aiSession" class="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
                     <option value="auto">Auto-detect</option>

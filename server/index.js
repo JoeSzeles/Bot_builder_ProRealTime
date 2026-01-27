@@ -2003,31 +2003,108 @@ function runBacktest(code, candles, settings) {
   };
 }
 
-// Market data endpoints
-const TWELVEDATA_API_KEY = process.env.TWELVEDATA_API_KEY;
+// Market data endpoints - Using Yahoo Finance (no API key required)
 const METALS_API_KEY = process.env.METALS_API_KEY;
 
-const ASSET_SYMBOLS = {
-  silver: 'XAG/USD',
-  gold: 'XAU/USD', 
-  copper: 'HG',
-  oil: 'CL',
-  natgas: 'NG',
-  eurusd: 'EUR/USD',
-  gbpusd: 'GBP/USD',
-  usdjpy: 'USD/JPY',
-  spx500: 'SPX',
-  dax: 'DAX',
-  ftse: 'FTSE'
+// Yahoo Finance symbols mapping
+const YAHOO_SYMBOLS = {
+  // Precious Metals
+  silver: 'SI=F',
+  gold: 'GC=F',
+  platinum: 'PL=F',
+  palladium: 'PA=F',
+  // Spot Metals (alternative)
+  xagusd: 'XAGUSD=X',
+  xauusd: 'XAUUSD=X',
+  // Energy
+  oil: 'CL=F',
+  brent: 'BZ=F',
+  natgas: 'NG=F',
+  rbob: 'RB=F',
+  // Agricultural
+  corn: 'ZC=F',
+  wheat: 'ZW=F',
+  soybeans: 'ZS=F',
+  coffee: 'KC=F',
+  sugar: 'SB=F',
+  cotton: 'CT=F',
+  cocoa: 'CC=F',
+  // Forex Majors
+  eurusd: 'EURUSD=X',
+  gbpusd: 'GBPUSD=X',
+  usdjpy: 'USDJPY=X',
+  usdchf: 'USDCHF=X',
+  audusd: 'AUDUSD=X',
+  usdcad: 'USDCAD=X',
+  nzdusd: 'NZDUSD=X',
+  // Forex Crosses
+  eurgbp: 'EURGBP=X',
+  eurjpy: 'EURJPY=X',
+  gbpjpy: 'GBPJPY=X',
+  // US Indices
+  spx500: '^GSPC',
+  nasdaq: '^IXIC',
+  dow: '^DJI',
+  russell: '^RUT',
+  vix: '^VIX',
+  // European Indices
+  dax: '^GDAXI',
+  ftse: '^FTSE',
+  cac: '^FCHI',
+  stoxx: '^STOXX50E',
+  // Asian Indices
+  nikkei: '^N225',
+  hangseng: '^HSI',
+  shanghai: '000001.SS',
+  // US Stocks (Popular)
+  aapl: 'AAPL',
+  msft: 'MSFT',
+  googl: 'GOOGL',
+  amzn: 'AMZN',
+  nvda: 'NVDA',
+  tsla: 'TSLA',
+  meta: 'META',
+  // Crypto
+  btcusd: 'BTC-USD',
+  ethusd: 'ETH-USD',
+  solusd: 'SOL-USD',
+  xrpusd: 'XRP-USD',
+  // ETFs
+  spy: 'SPY',
+  qqq: 'QQQ',
+  iwm: 'IWM',
+  gld: 'GLD',
+  slv: 'SLV',
+  uso: 'USO',
+  tlt: 'TLT'
 };
 
-const TIMEFRAME_MAP = {
-  '1m': '1min',
-  '5m': '5min',
-  '15m': '15min',
-  '1h': '1h',
-  '4h': '4h',
-  '1d': '1day'
+// Yahoo Finance interval mapping
+const YAHOO_INTERVALS = {
+  '1m': '1m',
+  '2m': '2m',
+  '5m': '5m',
+  '15m': '15m',
+  '30m': '30m',
+  '1h': '60m',
+  '4h': '60m',  // Yahoo doesn't have 4h, use 1h and aggregate
+  '1d': '1d',
+  '1w': '1wk',
+  '1M': '1mo'
+};
+
+// Yahoo Finance range mapping (how far back to fetch)
+const YAHOO_RANGES = {
+  '1m': '1d',
+  '2m': '1d', 
+  '5m': '5d',
+  '15m': '5d',
+  '30m': '1mo',
+  '1h': '1mo',
+  '4h': '3mo',
+  '1d': '1y',
+  '1w': '5y',
+  '1M': '10y'
 };
 
 // Fetch current price from MetalPriceAPI for commodities
@@ -2116,6 +2193,91 @@ function generateCandlesFromPrice(basePrice, numBars = 100, volatility = 0.02) {
   return data;
 }
 
+// Fetch data from Yahoo Finance (no API key required)
+async function fetchYahooFinanceData(symbol, interval, range) {
+  try {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${interval}&range=${range}`;
+    console.log(`Fetching Yahoo Finance: ${url}`);
+    
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    });
+    
+    if (!response.ok) {
+      console.error(`Yahoo Finance HTTP error: ${response.status}`);
+      return null;
+    }
+    
+    const data = await response.json();
+    
+    if (data.chart?.error) {
+      console.error('Yahoo Finance API error:', data.chart.error.description);
+      return null;
+    }
+    
+    const result = data.chart?.result?.[0];
+    if (!result || !result.timestamp) {
+      console.error('No data in Yahoo Finance response');
+      return null;
+    }
+    
+    const timestamps = result.timestamp;
+    const quote = result.indicators?.quote?.[0];
+    
+    if (!quote) {
+      console.error('No quote data in Yahoo Finance response');
+      return null;
+    }
+    
+    const candles = [];
+    for (let i = 0; i < timestamps.length; i++) {
+      if (quote.open[i] != null && quote.high[i] != null && quote.low[i] != null && quote.close[i] != null) {
+        candles.push({
+          time: timestamps[i],
+          open: parseFloat(quote.open[i].toFixed(4)),
+          high: parseFloat(quote.high[i].toFixed(4)),
+          low: parseFloat(quote.low[i].toFixed(4)),
+          close: parseFloat(quote.close[i].toFixed(4)),
+          volume: quote.volume?.[i] || 0
+        });
+      }
+    }
+    
+    return {
+      candles,
+      symbol: result.meta?.symbol || symbol,
+      currency: result.meta?.currency,
+      exchangeName: result.meta?.exchangeName
+    };
+  } catch (error) {
+    console.error('Yahoo Finance fetch error:', error.message);
+    return null;
+  }
+}
+
+// Aggregate hourly candles to 4-hour candles
+function aggregateTo4Hour(candles) {
+  if (!candles || candles.length === 0) return candles;
+  
+  const result = [];
+  for (let i = 0; i < candles.length; i += 4) {
+    const chunk = candles.slice(i, i + 4);
+    if (chunk.length === 0) continue;
+    
+    result.push({
+      time: chunk[0].time,
+      open: chunk[0].open,
+      high: Math.max(...chunk.map(c => c.high)),
+      low: Math.min(...chunk.map(c => c.low)),
+      close: chunk[chunk.length - 1].close,
+      volume: chunk.reduce((sum, c) => sum + (c.volume || 0), 0)
+    });
+  }
+  return result;
+}
+
 app.get('/api/market-data/:asset/:timeframe', async (req, res) => {
   const { asset, timeframe } = req.params;
   const forceRefresh = req.query.refresh === 'true';
@@ -2129,9 +2291,40 @@ app.get('/api/market-data/:asset/:timeframe', async (req, res) => {
     }
   }
   
-  // Try MetalPriceAPI for silver and gold
-  if (asset === 'silver' || asset === 'gold') {
-    const metal = asset === 'silver' ? 'XAG' : 'XAU';
+  // Get Yahoo Finance symbol
+  const yahooSymbol = YAHOO_SYMBOLS[asset];
+  if (!yahooSymbol) {
+    return res.status(400).json({ error: `Unknown asset: ${asset}. Available assets: ${Object.keys(YAHOO_SYMBOLS).join(', ')}` });
+  }
+  
+  const interval = YAHOO_INTERVALS[timeframe] || '1h';
+  const range = YAHOO_RANGES[timeframe] || '1mo';
+  
+  // Fetch from Yahoo Finance
+  const yahooData = await fetchYahooFinanceData(yahooSymbol, interval, range);
+  
+  if (yahooData && yahooData.candles.length > 0) {
+    let candles = yahooData.candles;
+    
+    // Aggregate to 4H if needed
+    if (timeframe === '4h') {
+      candles = aggregateTo4Hour(candles);
+    }
+    
+    const result = { 
+      candles, 
+      symbol: yahooData.symbol, 
+      source: 'yahoo',
+      currency: yahooData.currency,
+      exchange: yahooData.exchangeName
+    };
+    setCachedMarketData(asset, timeframe, result);
+    return res.json(result);
+  }
+  
+  // Fallback: Try MetalPriceAPI for silver and gold spot prices
+  if ((asset === 'silver' || asset === 'gold' || asset === 'xagusd' || asset === 'xauusd') && METALS_API_KEY) {
+    const metal = (asset === 'silver' || asset === 'xagusd') ? 'XAG' : 'XAU';
     const currentPrice = await fetchMetalsApiPrice(metal);
     
     if (currentPrice) {
@@ -2142,44 +2335,7 @@ app.get('/api/market-data/:asset/:timeframe', async (req, res) => {
     }
   }
   
-  // Try Twelve Data for forex
-  if (TWELVEDATA_API_KEY) {
-    const symbol = ASSET_SYMBOLS[asset];
-    if (!symbol) {
-      return res.status(400).json({ error: 'Unknown asset' });
-    }
-    
-    const interval = TIMEFRAME_MAP[timeframe] || '1h';
-    
-    try {
-      const url = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(symbol)}&interval=${interval}&outputsize=100&apikey=${TWELVEDATA_API_KEY}`;
-      const response = await fetch(url);
-      const data = await response.json();
-      
-      if (data.status === 'error') {
-        console.error('Twelve Data error:', data.message);
-        return res.status(400).json({ error: data.message || 'Failed to fetch data' });
-      }
-      
-      if (data.values && Array.isArray(data.values)) {
-        const candles = data.values.reverse().map(bar => ({
-          time: Math.floor(new Date(bar.datetime).getTime() / 1000),
-          open: parseFloat(bar.open),
-          high: parseFloat(bar.high),
-          low: parseFloat(bar.low),
-          close: parseFloat(bar.close)
-        }));
-        
-        const result = { candles, symbol: data.meta?.symbol || symbol, source: 'twelvedata' };
-        setCachedMarketData(asset, timeframe, result);
-        return res.json(result);
-      }
-    } catch (error) {
-      console.error('Twelve Data fetch error:', error);
-    }
-  }
-  
-  res.status(400).json({ error: 'No data available for this asset' });
+  res.status(400).json({ error: 'No data available for this asset. Yahoo Finance may be temporarily unavailable.' });
 });
 
 // ProRealTime Documentation Management API
