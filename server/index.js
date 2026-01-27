@@ -1151,7 +1151,7 @@ Based on this description, what clarifying questions would help you build a bett
 
 // AI Strategy Analysis endpoint
 app.post('/api/ai-strategy', async (req, res) => {
-  const { symbol, session, searchQuery, candles, currentPrice } = req.body;
+  const { symbol, session, searchQuery, candles, currentPrice, multiMarket } = req.body;
   
   if (!candles || candles.length === 0) {
     return res.status(400).json({ error: 'Market data (candles) is required' });
@@ -1198,9 +1198,20 @@ app.post('/api/ai-strategy', async (req, res) => {
       else detectedSession = 'Asia';
     }
     
+    // Build multi-market context if available
+    let multiMarketContext = '';
+    if (multiMarket && multiMarket.length > 0) {
+      multiMarketContext = `
+WORLDWIDE MARKET OVERVIEW:
+${multiMarket.map(m => `- ${m.symbol}: $${m.price.toFixed(2)} (${m.change > 0 ? '+' : ''}${m.change}%)`).join('\n')}
+
+This is a multi-market analysis. Generate strategies that could apply across different asset classes based on current market conditions.
+`;
+    }
+    
     // Build AI prompt for strategy analysis
     const analysisPrompt = `You are an expert trading strategy analyst. Analyze the following market data and generate trading strategy hypotheses.
-
+${multiMarketContext}
 MARKET DATA:
 - Symbol: ${symbol.toUpperCase()}
 - Current Price: ${currentPrice}

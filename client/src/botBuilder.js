@@ -2506,27 +2506,58 @@ async function runAiStrategyAnalysis() {
   }
   
   try {
-    // Fetch current market data for context
     const timeframe = '1h';
-    const marketDataRes = await fetch(`/api/market-data/${symbol}/${timeframe}`);
-    const marketData = await marketDataRes.json();
+    let marketData, candlesToSend, displaySymbol;
+    
+    if (symbol === 'all') {
+      // Fetch multiple markets for worldwide analysis
+      const markets = ['spx500', 'gold', 'eurusd', 'btcusd'];
+      const allData = await Promise.all(
+        markets.map(m => fetch(`/api/market-data/${m}/${timeframe}`).then(r => r.json()).catch(() => null))
+      );
+      
+      // Use S&P 500 as primary reference with data from other markets
+      const validData = allData.filter(d => d && d.candles && d.candles.length > 0);
+      if (validData.length === 0) {
+        throw new Error('No market data available');
+      }
+      
+      marketData = validData[0]; // Use first available as primary
+      displaySymbol = 'ALL MARKETS';
+      
+      // Store multi-market summary for AI
+      marketData.multiMarket = markets.map((m, i) => {
+        const d = allData[i];
+        if (!d || !d.candles || d.candles.length === 0) return null;
+        const lastPrice = d.candles[d.candles.length - 1].close;
+        const firstPrice = d.candles[0].close;
+        const change = ((lastPrice - firstPrice) / firstPrice * 100).toFixed(2);
+        return { symbol: m.toUpperCase(), price: lastPrice, change };
+      }).filter(Boolean);
+    } else {
+      // Fetch single market
+      const marketDataRes = await fetch(`/api/market-data/${symbol}/${timeframe}`);
+      marketData = await marketDataRes.json();
+      displaySymbol = symbol.toUpperCase();
+    }
     
     if (!marketData.candles || marketData.candles.length === 0) {
       throw new Error('No market data available');
     }
     
     // Call AI strategy endpoint
-    const candlesToSend = Math.min(candleCount, marketData.candles.length);
+    candlesToSend = Math.min(candleCount, marketData.candles.length);
     const response = await fetch('/api/ai-strategy', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        symbol,
+        symbol: displaySymbol,
         session,
         searchQuery,
         candles: marketData.candles.slice(-candlesToSend),
         currentPrice: marketData.candles[marketData.candles.length - 1].close,
-        candleCount: candlesToSend
+        candleCount: candlesToSend,
+        multiMarket: marketData.multiMarket || null
       })
     });
     
