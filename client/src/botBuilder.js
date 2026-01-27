@@ -2176,6 +2176,9 @@ async function runAiStrategyAnalysis() {
     // Update UI with results
     updateAiStrategyUI(result);
     
+    // Save to history sidebar
+    addToAiStrategyHistory(result, symbol);
+    
   } catch (error) {
     console.error('AI Strategy error:', error);
     alert('AI Analysis failed: ' + error.message);
@@ -2192,6 +2195,67 @@ async function runAiStrategyAnalysis() {
     }
   }
 }
+
+// Store AI strategy history
+let aiStrategyHistory = [];
+
+function addToAiStrategyHistory(result, symbol) {
+  const historyItem = {
+    id: Date.now(),
+    timestamp: new Date().toLocaleString(),
+    symbol: symbol.toUpperCase(),
+    context: result.context,
+    hypotheses: result.hypotheses,
+    learning: result.learning
+  };
+  
+  aiStrategyHistory.unshift(historyItem);
+  if (aiStrategyHistory.length > 20) aiStrategyHistory.pop(); // Keep last 20
+  
+  updateAiStrategyHistorySidebar();
+}
+
+function updateAiStrategyHistorySidebar() {
+  const container = document.getElementById('aiStrategyHistoryList');
+  if (!container) return;
+  
+  if (aiStrategyHistory.length === 0) {
+    container.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400 p-2">Run AI analysis to see results here</p>';
+    return;
+  }
+  
+  container.innerHTML = aiStrategyHistory.map((item, index) => `
+    <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 cursor-pointer hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors border border-transparent hover:border-purple-300 dark:hover:border-purple-600" onclick="loadAiStrategyFromHistory(${index})">
+      <div class="flex items-center justify-between mb-1">
+        <span class="font-medium text-sm text-gray-800 dark:text-white">${item.symbol}</span>
+        <span class="text-xs text-gray-500 dark:text-gray-400">${item.context?.session || 'N/A'}</span>
+      </div>
+      <div class="text-xs text-gray-600 dark:text-gray-400 mb-2">${item.timestamp}</div>
+      <div class="flex flex-wrap gap-1">
+        ${(item.hypotheses || []).slice(0, 2).map(h => `
+          <span class="px-1.5 py-0.5 text-xs ${h.direction === 'Long' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : h.direction === 'Short' ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300' : 'bg-gray-100 dark:bg-gray-600 text-gray-600 dark:text-gray-300'} rounded">${h.direction || 'N'}</span>
+        `).join('')}
+        <span class="px-1.5 py-0.5 text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded">${item.context?.volatility || 'Normal'}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+window.loadAiStrategyFromHistory = function(index) {
+  const item = aiStrategyHistory[index];
+  if (!item) return;
+  
+  // Re-display the stored result
+  updateAiStrategyUI({
+    context: item.context,
+    hypotheses: item.hypotheses,
+    learning: item.learning
+  });
+  
+  // Switch to AI Strategy tab if not already there
+  const aiTradingTabBtn = document.getElementById('botAiTradingTabBtn');
+  if (aiTradingTabBtn) aiTradingTabBtn.click();
+};
 
 function updateAiStrategyUI(result) {
   // Update Market Context

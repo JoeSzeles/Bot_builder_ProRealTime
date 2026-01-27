@@ -51,6 +51,8 @@ function switchTab(tab) {
   
   const translationHistorySidebar = document.getElementById('translationHistorySidebar');
   const botHistorySidebar = document.getElementById('botHistorySidebar');
+  const promptsSidebar = document.getElementById('promptsSidebar');
+  const aiStrategySidebar = document.getElementById('aiStrategySidebar');
   
   if (tab === 'text') {
     elements.textTabContent.classList.remove('hidden');
@@ -62,6 +64,8 @@ function switchTab(tab) {
     
     if (translationHistorySidebar) translationHistorySidebar.classList.remove('hidden');
     if (botHistorySidebar) botHistorySidebar.classList.add('hidden');
+    if (promptsSidebar) promptsSidebar.classList.remove('hidden');
+    if (aiStrategySidebar) aiStrategySidebar.classList.add('hidden');
   } else {
     elements.textTabContent.classList.add('hidden');
     elements.botTabContent.classList.remove('hidden');
@@ -72,6 +76,8 @@ function switchTab(tab) {
     
     if (translationHistorySidebar) translationHistorySidebar.classList.add('hidden');
     if (botHistorySidebar) botHistorySidebar.classList.remove('hidden');
+    if (promptsSidebar) promptsSidebar.classList.add('hidden');
+    if (aiStrategySidebar) aiStrategySidebar.classList.remove('hidden');
     
     initBotBuilder();
     loadBotHistory();
