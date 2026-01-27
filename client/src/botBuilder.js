@@ -199,6 +199,7 @@ export async function initBotBuilder() {
   if (!container) return;
   
   await loadSavedStrategies();
+  loadAiStrategyHistoryFromStorage();
 
   if (chart) {
     chart.remove();
@@ -2196,8 +2197,37 @@ async function runAiStrategyAnalysis() {
   }
 }
 
-// Store AI strategy history
+// Store AI strategy history (persisted to localStorage)
 let aiStrategyHistory = [];
+
+function loadAiStrategyHistoryFromStorage() {
+  try {
+    const stored = localStorage.getItem('aiStrategyHistory');
+    if (stored) {
+      aiStrategyHistory = JSON.parse(stored);
+      updateAiStrategyHistorySidebar();
+      
+      // Auto-display latest result if available
+      if (aiStrategyHistory.length > 0) {
+        updateAiStrategyUI({
+          context: aiStrategyHistory[0].context,
+          hypotheses: aiStrategyHistory[0].hypotheses,
+          learning: aiStrategyHistory[0].learning
+        });
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to load AI strategy history:', e);
+  }
+}
+
+function saveAiStrategyHistoryToStorage() {
+  try {
+    localStorage.setItem('aiStrategyHistory', JSON.stringify(aiStrategyHistory));
+  } catch (e) {
+    console.warn('Failed to save AI strategy history:', e);
+  }
+}
 
 function addToAiStrategyHistory(result, symbol) {
   const historyItem = {
@@ -2213,6 +2243,7 @@ function addToAiStrategyHistory(result, symbol) {
   if (aiStrategyHistory.length > 20) aiStrategyHistory.pop(); // Keep last 20
   
   updateAiStrategyHistorySidebar();
+  saveAiStrategyHistoryToStorage();
 }
 
 function updateAiStrategyHistorySidebar() {
