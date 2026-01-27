@@ -1247,7 +1247,7 @@ Generate 2-3 realistic strategy hypotheses based on the market data. Make the Pr
 Return ONLY valid JSON, no markdown or explanation.`;
 
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250514',
+      model: 'claude-sonnet-4-5',
       max_tokens: 2000,
       messages: [{ role: 'user', content: analysisPrompt }]
     });
