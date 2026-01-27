@@ -1442,48 +1442,46 @@
                 <!-- Timeframe Selector -->
                 <div class="flex items-center gap-2 mb-4">
                   <span class="text-sm text-gray-600 dark:text-gray-400">Timeframes:</span>
-                  <div class="flex gap-1">
-                    <button class="ai-tf-btn px-3 py-1 text-xs font-medium bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded-lg">M5</button>
-                    <button class="ai-tf-btn px-3 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">M15</button>
-                    <button class="ai-tf-btn px-3 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">H1</button>
-                    <button class="ai-tf-btn px-3 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">H4</button>
+                  <div id="aiResultsTimeframeBtns" class="flex gap-1">
+                    <button data-tf="M5" class="ai-tf-btn px-3 py-1 text-xs font-medium bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded-lg">M5</button>
+                    <button data-tf="M15" class="ai-tf-btn px-3 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">M15</button>
+                    <button data-tf="H1" class="ai-tf-btn px-3 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">H1</button>
+                    <button data-tf="H4" class="ai-tf-btn px-3 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">H4</button>
+                  </div>
+                </div>
+
+                <!-- AI Projection Graph -->
+                <div class="bg-white dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600 mb-4">
+                  <div class="flex items-center justify-between mb-3">
+                    <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300">AI Price Projection</h4>
+                    <div class="flex items-center gap-2">
+                      <label class="text-xs text-gray-500 dark:text-gray-400">Forecast:</label>
+                      <select id="aiProjectionCandles" class="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded text-gray-700 dark:text-gray-200">
+                        <option value="5">5 candles</option>
+                        <option value="10" selected>10 candles</option>
+                        <option value="20">20 candles</option>
+                        <option value="50">50 candles</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div id="aiProjectionChart" class="h-48 bg-gray-900 rounded-lg"></div>
+                  <div class="flex justify-center gap-4 text-xs mt-2">
+                    <span class="flex items-center gap-1"><span class="w-3 h-0.5 bg-gray-400"></span> Historical</span>
+                    <span class="flex items-center gap-1"><span class="w-3 h-0.5 bg-green-500"></span> Bullish</span>
+                    <span class="flex items-center gap-1"><span class="w-3 h-0.5 bg-red-500"></span> Bearish</span>
+                    <span class="flex items-center gap-1"><span class="w-3 h-0.5 bg-purple-500"></span> Expected</span>
                   </div>
                 </div>
 
                 <!-- Directional Bias -->
                 <div class="bg-white dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600 mb-4">
                   <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Directional Bias</h4>
-                  <div class="space-y-2">
+                  <div id="aiDirectionalBias" class="space-y-2">
                     <div class="flex items-center justify-between">
                       <span class="text-sm text-gray-600 dark:text-gray-400">M5</span>
                       <div class="flex items-center gap-2">
-                        <span class="text-sm font-medium text-green-600 dark:text-green-400">Long</span>
-                        <span class="text-yellow-500">●●●●○</span>
-                        <span class="text-xs text-gray-500">(68%)</span>
-                      </div>
-                    </div>
-                    <div class="flex items-center justify-between">
-                      <span class="text-sm text-gray-600 dark:text-gray-400">M15</span>
-                      <div class="flex items-center gap-2">
-                        <span class="text-sm font-medium text-green-600 dark:text-green-400">Long</span>
-                        <span class="text-yellow-500">●●●○○</span>
-                        <span class="text-xs text-gray-500">(54%)</span>
-                      </div>
-                    </div>
-                    <div class="flex items-center justify-between">
-                      <span class="text-sm text-gray-600 dark:text-gray-400">H1</span>
-                      <div class="flex items-center gap-2">
-                        <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Neutral</span>
-                        <span class="text-yellow-500">●●○○○</span>
-                        <span class="text-xs text-gray-500">(42%)</span>
-                      </div>
-                    </div>
-                    <div class="flex items-center justify-between">
-                      <span class="text-sm text-gray-600 dark:text-gray-400">H4</span>
-                      <div class="flex items-center gap-2">
-                        <span class="text-sm font-medium text-blue-600 dark:text-blue-400">Range</span>
-                        <span class="text-yellow-500">●●●○○</span>
-                        <span class="text-xs text-gray-500">(57%)</span>
+                        <span class="text-sm font-medium text-gray-500">--</span>
+                        <span class="text-gray-400">○○○○○</span>
                       </div>
                     </div>
                   </div>
@@ -1491,7 +1489,7 @@
 
                 <!-- Price Targets Table -->
                 <div class="bg-white dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600 mb-4">
-                  <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Price Targets (M5)</h4>
+                  <h4 id="aiPriceTargetsTitle" class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Price Targets (M5)</h4>
                   <table class="w-full text-sm">
                     <thead>
                       <tr class="text-left text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-600">
@@ -1500,42 +1498,11 @@
                         <th class="pb-2">Outcome</th>
                       </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-100 dark:divide-gray-600">
+                    <tbody id="aiPriceTargetsBody" class="divide-y divide-gray-100 dark:divide-gray-600">
                       <tr>
-                        <td class="py-2 font-medium text-green-600 dark:text-green-400">+0.15%</td>
-                        <td class="py-2">
-                          <div class="flex items-center gap-2">
-                            <div class="w-20 bg-gray-200 dark:bg-gray-600 rounded-full h-2">
-                              <div class="bg-green-500 h-2 rounded-full" style="width: 62%"></div>
-                            </div>
-                            <span>62%</span>
-                          </div>
-                        </td>
-                        <td class="py-2"><span class="px-2 py-0.5 text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded">Primary</span></td>
-                      </tr>
-                      <tr>
-                        <td class="py-2 font-medium text-amber-600 dark:text-amber-400">+0.30%</td>
-                        <td class="py-2">
-                          <div class="flex items-center gap-2">
-                            <div class="w-20 bg-gray-200 dark:bg-gray-600 rounded-full h-2">
-                              <div class="bg-amber-500 h-2 rounded-full" style="width: 41%"></div>
-                            </div>
-                            <span>41%</span>
-                          </div>
-                        </td>
-                        <td class="py-2"><span class="px-2 py-0.5 text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded">Stretch</span></td>
-                      </tr>
-                      <tr>
-                        <td class="py-2 font-medium text-red-600 dark:text-red-400">-0.10%</td>
-                        <td class="py-2">
-                          <div class="flex items-center gap-2">
-                            <div class="w-20 bg-gray-200 dark:bg-gray-600 rounded-full h-2">
-                              <div class="bg-red-500 h-2 rounded-full" style="width: 22%"></div>
-                            </div>
-                            <span>22%</span>
-                          </div>
-                        </td>
-                        <td class="py-2"><span class="px-2 py-0.5 text-xs bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded">Risk</span></td>
+                        <td class="py-2 text-gray-500">--</td>
+                        <td class="py-2 text-gray-500">--</td>
+                        <td class="py-2 text-gray-500">--</td>
                       </tr>
                     </tbody>
                   </table>
@@ -1544,8 +1511,7 @@
                 <!-- Probability Curve -->
                 <div class="bg-white dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600 mb-4">
                   <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Probability Curve</h4>
-                  <div class="h-32 flex items-end justify-center px-8">
-                    <!-- SVG Bell Curve -->
+                  <div id="aiProbabilityCurve" class="h-32 flex items-end justify-center px-8">
                     <svg viewBox="0 0 200 80" class="w-full h-full" preserveAspectRatio="xMidYMid meet">
                       <defs>
                         <linearGradient id="curveGradient" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -1555,14 +1521,14 @@
                       </defs>
                       <path d="M 10 70 Q 50 70 70 50 Q 90 30 100 20 Q 110 30 130 50 Q 150 70 190 70" stroke="rgb(147, 51, 234)" stroke-width="2" fill="none"/>
                       <path d="M 10 70 Q 50 70 70 50 Q 90 30 100 20 Q 110 30 130 50 Q 150 70 190 70 L 190 70 L 10 70 Z" fill="url(#curveGradient)"/>
-                      <text x="20" y="78" class="text-xs fill-gray-400" style="font-size: 8px">-0.1%</text>
-                      <text x="95" y="78" class="text-xs fill-gray-400" style="font-size: 8px">0</text>
-                      <text x="170" y="78" class="text-xs fill-gray-400" style="font-size: 8px">+0.3%</text>
+                      <text x="20" y="78" class="fill-gray-400" style="font-size: 8px">--</text>
+                      <text x="95" y="78" class="fill-gray-400" style="font-size: 8px">0</text>
+                      <text x="170" y="78" class="fill-gray-400" style="font-size: 8px">--</text>
                     </svg>
                   </div>
-                  <div class="flex justify-center gap-6 text-xs text-gray-500 dark:text-gray-400 mt-2">
-                    <span>Skew: <strong class="text-green-600 dark:text-green-400">Upside</strong></span>
-                    <span>Confidence: <strong class="text-purple-600 dark:text-purple-400">0.71</strong></span>
+                  <div id="aiProbabilityStats" class="flex justify-center gap-6 text-xs text-gray-500 dark:text-gray-400 mt-2">
+                    <span>Skew: <strong id="aiProbSkew" class="text-gray-400">--</strong></span>
+                    <span>Confidence: <strong id="aiProbConfidence" class="text-purple-600 dark:text-purple-400">--</strong></span>
                   </div>
                 </div>
 

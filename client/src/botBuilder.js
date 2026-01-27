@@ -2121,6 +2121,368 @@ function setupAiTradingSubTabs() {
   if (runAiBtn) {
     runAiBtn.addEventListener('click', runAiStrategyAnalysis);
   }
+  
+  // AI Results timeframe buttons
+  setupAiResultsTimeframes();
+  
+  // AI Projection candles selector
+  const projCandles = document.getElementById('aiProjectionCandles');
+  if (projCandles) {
+    projCandles.addEventListener('change', () => {
+      if (window.lastAiResult) {
+        updateAiProjectionChart(window.lastAiResult);
+      }
+    });
+  }
+}
+
+// Current selected AI Results timeframe
+let aiResultsTimeframe = 'M5';
+
+function setupAiResultsTimeframes() {
+  const container = document.getElementById('aiResultsTimeframeBtns');
+  if (!container) return;
+  
+  const buttons = container.querySelectorAll('.ai-tf-btn');
+  buttons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      aiResultsTimeframe = btn.dataset.tf;
+      
+      // Update button styles
+      buttons.forEach(b => {
+        if (b.dataset.tf === aiResultsTimeframe) {
+          b.className = 'ai-tf-btn px-3 py-1 text-xs font-medium bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded-lg';
+        } else {
+          b.className = 'ai-tf-btn px-3 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg';
+        }
+      });
+      
+      // Update display for selected timeframe
+      if (window.lastAiResult) {
+        updateAiResultsForTimeframe(aiResultsTimeframe, window.lastAiResult);
+      }
+    });
+  });
+}
+
+function updateAiResultsForTimeframe(tf, result) {
+  // Update price targets title
+  const targetsTitle = document.getElementById('aiPriceTargetsTitle');
+  if (targetsTitle) {
+    targetsTitle.textContent = `Price Targets (${tf})`;
+  }
+  
+  // Get timeframe-specific predictions from result
+  const tfData = result.predictions?.[tf] || result.predictions?.M5 || {};
+  
+  // Update directional bias
+  updateDirectionalBias(result.predictions || {});
+  
+  // Update price targets
+  updatePriceTargets(tfData, tf);
+  
+  // Update probability curve
+  updateProbabilityCurve(tfData);
+  
+  // Update projection chart
+  updateAiProjectionChart(result);
+}
+
+function updateDirectionalBias(predictions) {
+  const container = document.getElementById('aiDirectionalBias');
+  if (!container) return;
+  
+  const timeframes = ['M5', 'M15', 'H1', 'H4'];
+  
+  container.innerHTML = timeframes.map(tf => {
+    const data = predictions[tf] || {};
+    const direction = data.direction || 'Neutral';
+    const confidence = data.confidence || 0;
+    const confDots = Math.round(confidence / 20);
+    
+    let dirClass = 'text-gray-500 dark:text-gray-400';
+    if (direction === 'Long') dirClass = 'text-green-600 dark:text-green-400';
+    else if (direction === 'Short') dirClass = 'text-red-600 dark:text-red-400';
+    else if (direction === 'Range') dirClass = 'text-blue-600 dark:text-blue-400';
+    
+    return `
+      <div class="flex items-center justify-between ${tf === aiResultsTimeframe ? 'bg-purple-50 dark:bg-purple-900/20 -mx-2 px-2 py-1 rounded' : ''}">
+        <span class="text-sm text-gray-600 dark:text-gray-400">${tf}</span>
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-medium ${dirClass}">${direction}</span>
+          <span class="text-yellow-500">${'●'.repeat(confDots)}${'○'.repeat(5 - confDots)}</span>
+          <span class="text-xs text-gray-500">(${confidence}%)</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function updatePriceTargets(tfData, tf) {
+  const tbody = document.getElementById('aiPriceTargetsBody');
+  if (!tbody) return;
+  
+  const targets = tfData.targets || [];
+  
+  if (targets.length === 0) {
+    tbody.innerHTML = `
+      <tr><td class="py-2 text-gray-500" colspan="3">No targets available for ${tf}</td></tr>
+    `;
+    return;
+  }
+  
+  tbody.innerHTML = targets.map(t => {
+    const isPositive = t.change >= 0;
+    const colorClass = t.type === 'Risk' ? 'red' : (t.type === 'Stretch' ? 'amber' : 'green');
+    
+    return `
+      <tr>
+        <td class="py-2 font-medium text-${colorClass}-600 dark:text-${colorClass}-400">${isPositive ? '+' : ''}${t.change}%</td>
+        <td class="py-2">
+          <div class="flex items-center gap-2">
+            <div class="w-20 bg-gray-200 dark:bg-gray-600 rounded-full h-2">
+              <div class="bg-${colorClass}-500 h-2 rounded-full" style="width: ${t.probability}%"></div>
+            </div>
+            <span>${t.probability}%</span>
+          </div>
+        </td>
+        <td class="py-2"><span class="px-2 py-0.5 text-xs bg-${colorClass}-100 dark:bg-${colorClass}-900/30 text-${colorClass}-700 dark:text-${colorClass}-300 rounded">${t.type}</span></td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function updateProbabilityCurve(tfData) {
+  const container = document.getElementById('aiProbabilityCurve');
+  const skewEl = document.getElementById('aiProbSkew');
+  const confEl = document.getElementById('aiProbConfidence');
+  
+  if (!container) return;
+  
+  const targets = tfData.targets || [];
+  const direction = tfData.direction || 'Neutral';
+  const confidence = (tfData.confidence || 50) / 100;
+  
+  // Calculate price range from targets
+  let minChange = -0.1, maxChange = 0.3, peakPos = 100;
+  if (targets.length > 0) {
+    const changes = targets.map(t => t.change);
+    minChange = Math.min(...changes, -0.1);
+    maxChange = Math.max(...changes, 0.1);
+    
+    // Find peak based on primary target
+    const primary = targets.find(t => t.type === 'Primary');
+    if (primary) {
+      const range = maxChange - minChange;
+      peakPos = ((primary.change - minChange) / range) * 180 + 10;
+    }
+  }
+  
+  // Determine skew based on direction
+  let skew = 'Neutral';
+  let skewClass = 'text-gray-400';
+  if (direction === 'Long') { skew = 'Upside'; skewClass = 'text-green-600 dark:text-green-400'; }
+  else if (direction === 'Short') { skew = 'Downside'; skewClass = 'text-red-600 dark:text-red-400'; }
+  
+  // Create asymmetric bell curve based on direction
+  const leftWidth = direction === 'Long' ? 40 : (direction === 'Short' ? 80 : 60);
+  const rightWidth = direction === 'Long' ? 80 : (direction === 'Short' ? 40 : 60);
+  const peakHeight = 20 + (confidence * 30);
+  
+  container.innerHTML = `
+    <svg viewBox="0 0 200 80" class="w-full h-full" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <linearGradient id="curveGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" style="stop-color:rgb(147, 51, 234);stop-opacity:0.3" />
+          <stop offset="100%" style="stop-color:rgb(147, 51, 234);stop-opacity:0.05" />
+        </linearGradient>
+      </defs>
+      <path d="M 10 70 Q ${peakPos - leftWidth} 70 ${peakPos - leftWidth/2} 50 Q ${peakPos - 10} 30 ${peakPos} ${peakHeight} Q ${peakPos + 10} 30 ${peakPos + rightWidth/2} 50 Q ${peakPos + rightWidth} 70 190 70" stroke="rgb(147, 51, 234)" stroke-width="2" fill="none"/>
+      <path d="M 10 70 Q ${peakPos - leftWidth} 70 ${peakPos - leftWidth/2} 50 Q ${peakPos - 10} 30 ${peakPos} ${peakHeight} Q ${peakPos + 10} 30 ${peakPos + rightWidth/2} 50 Q ${peakPos + rightWidth} 70 190 70 L 190 70 L 10 70 Z" fill="url(#curveGradient)"/>
+      <text x="20" y="78" class="fill-gray-400" style="font-size: 8px">${minChange.toFixed(2)}%</text>
+      <text x="95" y="78" class="fill-gray-400" style="font-size: 8px">0</text>
+      <text x="165" y="78" class="fill-gray-400" style="font-size: 8px">+${maxChange.toFixed(2)}%</text>
+      <line x1="${peakPos}" y1="${peakHeight}" x2="${peakPos}" y2="70" stroke="rgb(147, 51, 234)" stroke-width="1" stroke-dasharray="2"/>
+    </svg>
+  `;
+  
+  if (skewEl) {
+    skewEl.textContent = skew;
+    skewEl.className = skewClass;
+  }
+  if (confEl) {
+    confEl.textContent = confidence.toFixed(2);
+  }
+}
+
+// AI Projection Chart using Lightweight Charts
+let aiProjectionChart = null;
+let aiProjectionSeries = [];
+
+function updateAiProjectionChart(result) {
+  const container = document.getElementById('aiProjectionChart');
+  if (!container) return;
+  
+  const forecastCandles = parseInt(document.getElementById('aiProjectionCandles')?.value || '10');
+  const tf = aiResultsTimeframe;
+  const tfData = result.predictions?.[tf] || result.predictions?.M5 || {};
+  
+  // Get last 30 historical candles from stored data
+  const historicalCandles = (result.marketData || []).slice(-30);
+  
+  if (historicalCandles.length === 0) {
+    container.innerHTML = '<div class="h-full flex items-center justify-center text-gray-500">No market data available</div>';
+    return;
+  }
+  
+  // Clear previous chart
+  if (aiProjectionChart) {
+    aiProjectionChart.remove();
+    aiProjectionChart = null;
+  }
+  
+  // Create chart
+  aiProjectionChart = createChart(container, {
+    width: container.clientWidth,
+    height: container.clientHeight,
+    layout: {
+      background: { type: ColorType.Solid, color: '#111827' },
+      textColor: '#9ca3af',
+    },
+    grid: {
+      vertLines: { color: '#374151' },
+      horzLines: { color: '#374151' },
+    },
+    timeScale: {
+      borderColor: '#374151',
+      timeVisible: true,
+    },
+    rightPriceScale: {
+      borderColor: '#374151',
+    },
+  });
+  
+  // Historical line (gray)
+  const historicalSeries = aiProjectionChart.addLineSeries({
+    color: '#9ca3af',
+    lineWidth: 2,
+  });
+  historicalSeries.setData(historicalCandles.map(c => ({
+    time: c.time,
+    value: c.close
+  })));
+  
+  // Generate projections
+  const lastCandle = historicalCandles[historicalCandles.length - 1];
+  const lastPrice = lastCandle.close;
+  const lastTime = lastCandle.time;
+  const direction = tfData.direction || 'Neutral';
+  const volatility = (result.context?.volatility === 'High' ? 0.003 : (result.context?.volatility === 'Low' ? 0.001 : 0.002));
+  
+  // Calculate time interval based on timeframe
+  const tfIntervals = { 'M5': 300, 'M15': 900, 'H1': 3600, 'H4': 14400 };
+  const interval = tfIntervals[tf] || 300;
+  
+  // Generate bullish, bearish, and expected projections
+  const bullishData = [];
+  const bearishData = [];
+  const expectedData = [];
+  
+  for (let i = 0; i <= forecastCandles; i++) {
+    const time = lastTime + (i * interval);
+    const progress = i / forecastCandles;
+    
+    // Bullish projection (green)
+    const bullishChange = (volatility * 1.5) * progress + (Math.random() * volatility * 0.3);
+    bullishData.push({ time, value: lastPrice * (1 + bullishChange) });
+    
+    // Bearish projection (red)
+    const bearishChange = -(volatility * 1.5) * progress - (Math.random() * volatility * 0.3);
+    bearishData.push({ time, value: lastPrice * (1 + bearishChange) });
+    
+    // Expected projection based on AI direction (purple)
+    let expectedMult = 0;
+    if (direction === 'Long') expectedMult = volatility * 0.8 * progress;
+    else if (direction === 'Short') expectedMult = -volatility * 0.8 * progress;
+    else expectedMult = (Math.random() - 0.5) * volatility * 0.2 * progress;
+    expectedData.push({ time, value: lastPrice * (1 + expectedMult) });
+  }
+  
+  // Bullish line (green, dashed)
+  const bullishSeries = aiProjectionChart.addLineSeries({
+    color: '#22c55e',
+    lineWidth: 1,
+    lineStyle: 2,
+  });
+  bullishSeries.setData(bullishData);
+  
+  // Bearish line (red, dashed)
+  const bearishSeries = aiProjectionChart.addLineSeries({
+    color: '#ef4444',
+    lineWidth: 1,
+    lineStyle: 2,
+  });
+  bearishSeries.setData(bearishData);
+  
+  // Expected line (purple, solid)
+  const expectedSeries = aiProjectionChart.addLineSeries({
+    color: '#a855f7',
+    lineWidth: 2,
+  });
+  expectedSeries.setData(expectedData);
+  
+  aiProjectionChart.timeScale().fitContent();
+}
+
+// Generate multi-timeframe predictions based on context
+function generateMultiTimeframePredictions(result) {
+  const context = result.context || {};
+  const baseDirection = context.regime === 'Bullish' ? 'Long' : (context.regime === 'Bearish' ? 'Short' : 'Neutral');
+  const baseConfidence = (context.confidence || 3) * 20;
+  const volatility = context.volatility || 'Normal';
+  
+  const predictions = {};
+  const timeframes = ['M5', 'M15', 'H1', 'H4'];
+  
+  timeframes.forEach((tf, idx) => {
+    // Shorter timeframes have more noise, longer have clearer trend
+    const confAdjust = (idx - 1) * 5;
+    let direction = baseDirection;
+    let confidence = Math.min(95, Math.max(20, baseConfidence + confAdjust));
+    
+    // Higher timeframes may show different direction if market is ranging
+    if (context.structure === 'Ranging' && idx >= 2) {
+      direction = 'Range';
+      confidence = Math.min(70, confidence);
+    }
+    
+    // Generate price targets
+    const volMult = volatility === 'High' ? 1.5 : (volatility === 'Low' ? 0.5 : 1);
+    const basePct = (0.1 + (idx * 0.1)) * volMult;
+    
+    const targets = [];
+    if (direction === 'Long') {
+      targets.push({ change: +(basePct * 0.5).toFixed(2), probability: Math.round(confidence * 0.9), type: 'Primary' });
+      targets.push({ change: +(basePct * 1.2).toFixed(2), probability: Math.round(confidence * 0.6), type: 'Stretch' });
+      targets.push({ change: -(basePct * 0.3).toFixed(2), probability: Math.round(100 - confidence), type: 'Risk' });
+    } else if (direction === 'Short') {
+      targets.push({ change: -(basePct * 0.5).toFixed(2), probability: Math.round(confidence * 0.9), type: 'Primary' });
+      targets.push({ change: -(basePct * 1.2).toFixed(2), probability: Math.round(confidence * 0.6), type: 'Stretch' });
+      targets.push({ change: +(basePct * 0.3).toFixed(2), probability: Math.round(100 - confidence), type: 'Risk' });
+    } else {
+      targets.push({ change: +(basePct * 0.3).toFixed(2), probability: 45, type: 'Primary' });
+      targets.push({ change: -(basePct * 0.3).toFixed(2), probability: 40, type: 'Stretch' });
+      targets.push({ change: 0, probability: 55, type: 'Risk' });
+    }
+    
+    predictions[tf] = {
+      direction,
+      confidence,
+      targets
+    };
+  });
+  
+  return predictions;
 }
 
 // AI Strategy Analysis
@@ -2174,8 +2536,22 @@ async function runAiStrategyAnalysis() {
       throw new Error(result.error);
     }
     
+    // Add market data to result for projection chart
+    result.marketData = marketData.candles.slice(-30);
+    
+    // Generate multi-timeframe predictions if not provided by backend
+    if (!result.predictions) {
+      result.predictions = generateMultiTimeframePredictions(result);
+    }
+    
+    // Store globally for timeframe switching
+    window.lastAiResult = result;
+    
     // Update UI with results
     updateAiStrategyUI(result);
+    
+    // Update AI Results tab components
+    updateAiResultsForTimeframe(aiResultsTimeframe, result);
     
     // Save to history sidebar
     addToAiStrategyHistory(result, symbol);
@@ -2209,11 +2585,29 @@ function loadAiStrategyHistoryFromStorage() {
       
       // Auto-display latest result if available
       if (aiStrategyHistory.length > 0) {
-        updateAiStrategyUI({
-          context: aiStrategyHistory[0].context,
-          hypotheses: aiStrategyHistory[0].hypotheses,
-          learning: aiStrategyHistory[0].learning
-        });
+        const latest = aiStrategyHistory[0];
+        const result = {
+          context: latest.context,
+          hypotheses: latest.hypotheses,
+          learning: latest.learning,
+          predictions: latest.predictions,
+          marketData: latest.marketData
+        };
+        
+        // Generate predictions if not stored
+        if (!result.predictions) {
+          result.predictions = generateMultiTimeframePredictions(result);
+        }
+        
+        // Store globally
+        window.lastAiResult = result;
+        
+        updateAiStrategyUI(result);
+        
+        // Update AI Results tab components
+        setTimeout(() => {
+          updateAiResultsForTimeframe(aiResultsTimeframe, result);
+        }, 100);
       }
     }
   } catch (e) {
@@ -2236,7 +2630,9 @@ function addToAiStrategyHistory(result, symbol) {
     symbol: symbol.toUpperCase(),
     context: result.context,
     hypotheses: result.hypotheses,
-    learning: result.learning
+    learning: result.learning,
+    predictions: result.predictions,
+    marketData: result.marketData
   };
   
   aiStrategyHistory.unshift(historyItem);
@@ -2276,12 +2672,28 @@ window.loadAiStrategyFromHistory = function(index) {
   const item = aiStrategyHistory[index];
   if (!item) return;
   
-  // Re-display the stored result
-  updateAiStrategyUI({
+  // Build full result object
+  const result = {
     context: item.context,
     hypotheses: item.hypotheses,
-    learning: item.learning
-  });
+    learning: item.learning,
+    predictions: item.predictions,
+    marketData: item.marketData
+  };
+  
+  // Generate predictions if not stored
+  if (!result.predictions) {
+    result.predictions = generateMultiTimeframePredictions(result);
+  }
+  
+  // Store globally
+  window.lastAiResult = result;
+  
+  // Re-display the stored result
+  updateAiStrategyUI(result);
+  
+  // Update AI Results tab components
+  updateAiResultsForTimeframe(aiResultsTimeframe, result);
   
   // Switch to AI Strategy tab if not already there
   const aiTradingTabBtn = document.getElementById('botAiTradingTabBtn');
