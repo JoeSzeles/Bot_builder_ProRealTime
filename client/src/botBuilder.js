@@ -2478,24 +2478,30 @@ function startRealPriceUpdates() {
     clearInterval(realPriceInterval);
   }
   
-  // Update real price every 30 seconds
-  realPriceInterval = setInterval(async () => {
-    if (!window.lastAiResult || !aiProjectionChart || !window.projectionData) return;
+  // Fetch and update real prices immediately, then every 30 seconds
+  fetchAndUpdateRealPrices();
+  
+  realPriceInterval = setInterval(fetchAndUpdateRealPrices, 30000);
+}
+
+async function fetchAndUpdateRealPrices() {
+  if (!window.lastAiResult || !aiProjectionChart || !window.projectionData) return;
+  
+  try {
+    const symbol = document.getElementById('aiSymbol')?.value || 'silver';
+    // Fetch more data - 1 hour timeframe for better coverage
+    const response = await fetch(`/api/market-data/${symbol}/1h`);
+    const data = await response.json();
     
-    try {
-      const symbol = document.getElementById('aiSymbol')?.value || 'silver';
-      const response = await fetch(`/api/market-data/${symbol}/1m`);
-      const data = await response.json();
-      
-      if (data.candles && data.candles.length > 0) {
-        const realCandles = data.candles.slice(-10);
-        updateRealPriceLine(realCandles);
-        calculatePredictionAccuracy(realCandles);
-      }
-    } catch (e) {
-      console.warn('Failed to fetch real price:', e);
+    if (data.candles && data.candles.length > 0) {
+      // Use all available candles for comparison
+      const realCandles = data.candles;
+      updateRealPriceLine(realCandles);
+      calculatePredictionAccuracy(realCandles);
     }
-  }, 30000);
+  } catch (e) {
+    console.warn('Failed to fetch real price:', e);
+  }
 }
 
 function updateRealPriceLine(realCandles) {
@@ -2503,18 +2509,21 @@ function updateRealPriceLine(realCandles) {
   
   const { startTime } = window.projectionData;
   
-  // Filter candles that are after our projection start
-  const relevantCandles = realCandles.filter(c => c.time >= startTime);
+  // Show all candles that overlap with our chart view (historical + any new real data)
+  // The chart shows history from ~30 candles before startTime, so include those
+  const historyStart = startTime - (50 * 3600); // 50 hours back for H1 timeframe
+  const relevantCandles = realCandles.filter(c => c.time >= historyStart);
   
   if (relevantCandles.length === 0) return;
   
-  // Create or update real price series
+  // Create or update real price series with bright styling
   if (!realPriceSeries) {
     realPriceSeries = aiProjectionChart.addSeries(LineSeries, {
-      color: '#ff3333',
-      lineWidth: 2,
+      color: '#ef4444', // Bright red
+      lineWidth: 3,
       lastValueVisible: true,
       priceLineVisible: true,
+      title: 'Actual',
     });
   }
   
