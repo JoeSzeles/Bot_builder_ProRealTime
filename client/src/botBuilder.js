@@ -2310,17 +2310,23 @@ async function updateAiProjectionChart(result) {
   const tfData = result.predictions?.[tf] || result.predictions?.['5m'] || {};
   
   // Try to get historical candles from result, or fetch fresh data
-  let historicalCandles = (result.marketData || []).slice(-50);
+  // For projection, we need more historical data for accurate volatility calculation
+  let historicalCandles = result.marketData || [];
+  
+  // Determine how many historical candles to show based on forecast size
+  const historyToShow = Math.min(Math.max(50, Math.floor(forecastCandles / 10)), 500);
   
   if (historicalCandles.length === 0) {
-    // Fetch fresh market data
+    // Fetch fresh market data - use daily for larger forecasts to get more history
     const symbol = document.getElementById('aiSymbol')?.value || 'silver';
+    // Use longer timeframe for larger forecasts to get more data points
+    const fetchTf = forecastCandles >= 10000 ? '1d' : (forecastCandles >= 1000 ? '4h' : '1h');
     try {
-      container.innerHTML = '<div class="h-full flex items-center justify-center text-gray-500">Loading market data...</div>';
-      const response = await fetch(`/api/market-data/${symbol}/1h`);
+      container.innerHTML = '<div class="h-full flex items-center justify-center text-gray-500">Loading market data for projection...</div>';
+      const response = await fetch(`/api/market-data/${symbol}/${fetchTf}`);
       const data = await response.json();
       if (data.candles && data.candles.length > 0) {
-        historicalCandles = data.candles.slice(-50);
+        historicalCandles = data.candles;
         result.marketData = historicalCandles; // Store for future use
       }
     } catch (e) {
@@ -2328,10 +2334,16 @@ async function updateAiProjectionChart(result) {
     }
   }
   
+  // Use only the last portion for display, but keep all for volatility calc
+  const displayCandles = historicalCandles.slice(-historyToShow);
+  
   if (historicalCandles.length === 0) {
     container.innerHTML = '<div class="h-full flex items-center justify-center text-red-500 font-medium">No market data available - Please run AI analysis first</div>';
     return;
   }
+  
+  // Show data info
+  console.log(`Projection: ${forecastCandles} forecast candles, ${historicalCandles.length} historical candles available, displaying ${displayCandles.length}`);
   
   // Clear previous chart
   if (aiProjectionChart) {
@@ -2361,18 +2373,18 @@ async function updateAiProjectionChart(result) {
     },
   });
   
-  // Historical line (gray)
+  // Historical line (gray) - show only displayCandles for chart
   const historicalSeries = aiProjectionChart.addSeries(LineSeries, {
     color: '#9ca3af',
     lineWidth: 2,
   });
-  historicalSeries.setData(historicalCandles.map(c => ({
+  historicalSeries.setData(displayCandles.map(c => ({
     time: c.time,
     value: c.close
   })));
   
-  // Generate projections
-  const lastCandle = historicalCandles[historicalCandles.length - 1];
+  // Generate projections - use last candle from display for continuity
+  const lastCandle = displayCandles[displayCandles.length - 1];
   const lastPrice = lastCandle.close;
   const lastTime = lastCandle.time;
   const direction = tfData.direction || 'Neutral';
