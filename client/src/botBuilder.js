@@ -2363,7 +2363,7 @@ function updateAiProjectionChart(result) {
   });
   
   // Historical line (gray)
-  const historicalSeries = aiProjectionChart.addLineSeries({
+  const historicalSeries = aiProjectionChart.addSeries(LineSeries, {
     color: '#9ca3af',
     lineWidth: 2,
   });
@@ -2409,23 +2409,23 @@ function updateAiProjectionChart(result) {
   }
   
   // Bullish line (green, dashed)
-  const bullishSeries = aiProjectionChart.addLineSeries({
+  const bullishSeries = aiProjectionChart.addSeries(LineSeries, {
     color: '#22c55e',
     lineWidth: 1,
-    lineStyle: 2,
+    lineStyle: LineStyle.Dashed,
   });
   bullishSeries.setData(bullishData);
   
   // Bearish line (red, dashed)
-  const bearishSeries = aiProjectionChart.addLineSeries({
+  const bearishSeries = aiProjectionChart.addSeries(LineSeries, {
     color: '#ef4444',
     lineWidth: 1,
-    lineStyle: 2,
+    lineStyle: LineStyle.Dashed,
   });
   bearishSeries.setData(bearishData);
   
   // Expected line (purple, solid)
-  const expectedSeries = aiProjectionChart.addLineSeries({
+  const expectedSeries = aiProjectionChart.addSeries(LineSeries, {
     color: '#a855f7',
     lineWidth: 2,
   });
