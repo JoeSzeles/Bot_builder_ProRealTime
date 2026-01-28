@@ -488,12 +488,17 @@
               </div>
             </div>
             
+            <!-- Market Status Banner -->
+            <div class="mb-4 p-2 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 text-center">
+              <p id="forecastMarketStatus" class="text-sm text-gray-600 dark:text-gray-400">Checking market status...</p>
+            </div>
+            
             <!-- Forecast Summary -->
             <div id="forecastSummary" class="mb-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
               <div class="flex items-center gap-3">
                 <div class="text-2xl">🔮</div>
                 <div>
-                  <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Weekly Outlook</p>
+                  <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Weekly Outlook (Sydney Time)</p>
                   <p id="forecastOutlookText" class="text-lg font-semibold text-gray-800 dark:text-white">Loading forecast...</p>
                 </div>
                 <div class="ml-auto text-right">
@@ -525,7 +530,10 @@
               </div>
               
               <!-- Day Chart (Blue=Predicted, Red=Actual) -->
-              <div id="forecastDayChart" class="h-48 bg-gray-900 rounded-lg mb-4"></div>
+              <div id="forecastDayChart" class="h-48 bg-gray-900 rounded-lg mb-2"></div>
+              
+              <!-- Price Info (OHLC) -->
+              <div id="forecastPriceInfo" class="mb-4"></div>
               
               <!-- Trade Recommendations -->
               <div class="grid grid-cols-2 gap-4 mb-4">
@@ -562,6 +570,9 @@
                 <p class="text-xs text-blue-600 dark:text-blue-400 font-medium mb-1">AI Analysis</p>
                 <p id="forecastNaturalSummary" class="text-sm text-gray-700 dark:text-gray-300">--</p>
               </div>
+              
+              <!-- Backtest Simulation Results -->
+              <div id="forecastBacktestResults"></div>
             </div>
             
             <!-- Past Predictions Accuracy -->

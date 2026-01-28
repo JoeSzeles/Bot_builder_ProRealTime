@@ -8826,63 +8826,197 @@ async function generateForecast() {
   }
 }
 
-function generateMockForecast(asset, priceData, brainData) {
-  const days = [];
-  const today = new Date();
-  const prices = Array.isArray(priceData) ? priceData : (priceData?.data || []);
-  const currentPrice = prices.length > 0 ? prices[prices.length - 1].close : 30;
+// Sydney timezone utilities
+const SYDNEY_OFFSET_HOURS = 11; // AEDT (daylight saving)
+
+function toSydneyTime(date) {
+  const utc = date.getTime() + (date.getTimezoneOffset() * 60000);
+  return new Date(utc + (SYDNEY_OFFSET_HOURS * 3600000));
+}
+
+function fromSydneyTime(sydneyDate) {
+  const utc = sydneyDate.getTime() - (SYDNEY_OFFSET_HOURS * 3600000);
+  return new Date(utc);
+}
+
+function formatSydneyTime(date, format = 'time') {
+  const sydney = toSydneyTime(date);
+  if (format === 'time') {
+    return sydney.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: true });
+  } else if (format === 'date') {
+    return sydney.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
+  }
+  return sydney.toLocaleString('en-AU');
+}
+
+function isTradingHours(date) {
+  const sydney = toSydneyTime(date);
+  const day = sydney.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+  const hour = sydney.getHours();
   
-  const patterns = brainData?.patterns || [];
-  const avgWinRate = patterns.length > 0 ? patterns.reduce((sum, p) => sum + (p.successRate || 50), 0) / patterns.length : 55;
+  // Trading: Mon 10am - Sat 9am Sydney
+  // Closed: Sat 9am - Mon 10am
+  if (day === 0) return false; // Sunday - closed
+  if (day === 6 && hour >= 9) return false; // Saturday after 9am - closed
+  if (day === 1 && hour < 10) return false; // Monday before 10am - closed
+  return true;
+}
+
+function getNextTradingSession(date) {
+  const sydney = toSydneyTime(date);
+  const day = sydney.getDay();
+  const hour = sydney.getHours();
+  
+  if (day === 0 || (day === 6 && hour >= 9)) {
+    // Weekend - next session is Monday 10am
+    const daysUntilMonday = day === 0 ? 1 : 2;
+    const nextMonday = new Date(sydney);
+    nextMonday.setDate(nextMonday.getDate() + daysUntilMonday);
+    nextMonday.setHours(10, 0, 0, 0);
+    return fromSydneyTime(nextMonday);
+  }
+  if (day === 1 && hour < 10) {
+    const monday10am = new Date(sydney);
+    monday10am.setHours(10, 0, 0, 0);
+    return fromSydneyTime(monday10am);
+  }
+  return date; // Already in trading hours
+}
+
+function generateMockForecast(asset, priceData, brainData) {
+  const prices = Array.isArray(priceData) ? priceData : (priceData?.data || []);
+  if (prices.length === 0) return [];
+  
+  // Get real current price and recent data
+  const recentPrices = prices.slice(-168); // Last 7 days of hourly data
+  const currentPrice = recentPrices[recentPrices.length - 1]?.close || 30;
+  
+  // Calculate trend and volatility from actual data
+  const priceChanges = [];
+  for (let i = 1; i < recentPrices.length; i++) {
+    priceChanges.push(recentPrices[i].close - recentPrices[i-1].close);
+  }
+  const avgChange = priceChanges.reduce((a, b) => a + b, 0) / priceChanges.length;
+  const volatility = Math.sqrt(priceChanges.reduce((sum, c) => sum + c * c, 0) / priceChanges.length);
+  
+  // Get brain patterns for this asset
+  const assetPatterns = brainData?.patterns?.[asset] || {};
+  const brainAccuracy = brainData?.accuracy?.[asset] || 50;
+  const trendBias = avgChange > 0 ? 0.6 : avgChange < 0 ? 0.4 : 0.5;
+  
+  const days = [];
+  const now = new Date();
+  let lastClose = currentPrice;
   
   for (let i = 0; i < 7; i++) {
-    const date = new Date(today);
-    date.setDate(date.getDate() + i);
+    const dayDate = new Date(now);
+    dayDate.setDate(dayDate.getDate() + i);
+    const sydneyDate = toSydneyTime(dayDate);
+    const dayOfWeek = sydneyDate.getDay();
     
-    const volatility = 0.02 + Math.random() * 0.03;
-    const trend = Math.random() > 0.5 ? 1 : -1;
-    const change = trend * volatility * currentPrice;
-    const confidence = 50 + Math.random() * 40;
+    // Skip non-trading days (Sunday, Saturday after 9am)
+    if (dayOfWeek === 0) continue; // Skip Sunday
     
-    const openPrice = i === 0 ? currentPrice : days[i - 1].predictedClose;
-    const predictedHigh = openPrice + Math.abs(change) * (1 + Math.random() * 0.5);
-    const predictedLow = openPrice - Math.abs(change) * (0.5 + Math.random() * 0.5);
-    const predictedClose = openPrice + change;
+    // Calculate trading hours for this day
+    let tradingStart = new Date(sydneyDate);
+    let tradingEnd = new Date(sydneyDate);
     
-    const entryTime = `${8 + Math.floor(Math.random() * 4)}:${Math.random() > 0.5 ? '00' : '30'}`;
-    const exitTime = `${14 + Math.floor(Math.random() * 4)}:${Math.random() > 0.5 ? '00' : '30'}`;
+    if (dayOfWeek === 1) { // Monday starts at 10am
+      tradingStart.setHours(10, 0, 0, 0);
+      tradingEnd.setHours(23, 59, 59, 999);
+    } else if (dayOfWeek === 6) { // Saturday ends at 9am
+      tradingStart.setHours(0, 0, 0, 0);
+      tradingEnd.setHours(9, 0, 0, 0);
+    } else { // Tue-Fri: full day
+      tradingStart.setHours(0, 0, 0, 0);
+      tradingEnd.setHours(23, 59, 59, 999);
+    }
+    
+    // Use brain patterns and real volatility for prediction
+    const trendMultiplier = (Math.random() * 0.4 + 0.8) * (trendBias > 0.5 ? 1 : -1);
+    const dayVolatility = volatility * (1 + (Math.random() - 0.5) * 0.5);
+    const expectedChange = avgChange * 24 * trendMultiplier + (Math.random() - 0.5) * dayVolatility * 2;
+    
+    const openPrice = lastClose; // Continuity: open = previous close
+    const predictedClose = openPrice + expectedChange;
+    const predictedHigh = Math.max(openPrice, predictedClose) + dayVolatility * (1 + Math.random());
+    const predictedLow = Math.min(openPrice, predictedClose) - dayVolatility * (1 + Math.random());
+    
+    const direction = predictedClose > openPrice ? 'bullish' : 'bearish';
+    const confidence = Math.min(90, Math.max(30, 50 + brainAccuracy * 0.3 + Math.abs(expectedChange / openPrice) * 500));
+    
+    // Calculate entry/exit based on backtest-style logic
+    const entryOffset = direction === 'bullish' ? 0.3 : 0.7;
+    const exitOffset = direction === 'bullish' ? 0.8 : 0.2;
+    const entryPrice = predictedLow + (predictedHigh - predictedLow) * entryOffset;
+    const exitPrice = predictedLow + (predictedHigh - predictedLow) * exitOffset;
+    
+    // Trading hours for entry/exit (Sydney time)
+    const entryHour = dayOfWeek === 1 ? 10 + Math.floor(Math.random() * 3) : 8 + Math.floor(Math.random() * 4);
+    const exitHour = dayOfWeek === 6 ? 6 + Math.floor(Math.random() * 2) : 14 + Math.floor(Math.random() * 4);
+    
+    // Generate hourly predictions with smooth continuity
+    const tradingHours = dayOfWeek === 1 ? 14 : dayOfWeek === 6 ? 9 : 24;
+    const hourlyPrices = generateSmoothedHourlyPrices(openPrice, predictedClose, predictedHigh, predictedLow, tradingHours, dayVolatility);
+    
+    // Get actual prices for today (day 0)
+    let actualPrices = [];
+    if (i === 0 && recentPrices.length >= 24) {
+      actualPrices = recentPrices.slice(-24).map(p => p.close);
+    }
     
     days.push({
-      date: date.toISOString(),
-      dayName: date.toLocaleDateString('en-US', { weekday: 'short' }),
-      direction: trend > 0 ? 'bullish' : 'bearish',
+      date: fromSydneyTime(sydneyDate).toISOString(),
+      dayName: sydneyDate.toLocaleDateString('en-AU', { weekday: 'short' }),
+      dayOfWeek,
+      direction,
       confidence,
       predictedOpen: openPrice,
       predictedHigh,
       predictedLow,
       predictedClose,
       expectedMove: ((predictedClose - openPrice) / openPrice * 100).toFixed(2),
-      entryPrice: trend > 0 ? predictedLow + (predictedHigh - predictedLow) * 0.2 : predictedHigh - (predictedHigh - predictedLow) * 0.2,
-      exitPrice: trend > 0 ? predictedHigh - (predictedHigh - predictedLow) * 0.1 : predictedLow + (predictedHigh - predictedLow) * 0.1,
-      entryTime,
-      exitTime,
-      summary: generateDaySummary(trend, confidence, asset, change, openPrice),
-      predictedPrices: generateHourlyPrediction(openPrice, predictedClose, 24),
-      actualPrices: i === 0 ? priceData.slice(-24).map(p => p.close) : []
+      entryPrice,
+      exitPrice,
+      entryTime: `${entryHour}:00 AEDT`,
+      exitTime: `${exitHour}:00 AEDT`,
+      tradingStart: formatSydneyTime(fromSydneyTime(tradingStart)),
+      tradingEnd: formatSydneyTime(fromSydneyTime(tradingEnd)),
+      summary: generateDaySummary(direction === 'bullish' ? 1 : -1, confidence, asset, expectedChange, openPrice),
+      predictedPrices: hourlyPrices,
+      actualPrices,
+      backtestResult: null // Will be populated by runForecastBacktest
     });
+    
+    lastClose = predictedClose; // Continuity for next day
   }
   
   return days;
 }
 
-function generateHourlyPrediction(open, close, hours) {
+function generateSmoothedHourlyPrices(open, close, high, low, hours, volatility) {
   const prices = [];
-  const diff = close - open;
-  for (let i = 0; i < hours; i++) {
-    const progress = i / hours;
-    const noise = (Math.random() - 0.5) * Math.abs(diff) * 0.3;
-    prices.push(open + diff * progress + noise);
+  const range = high - low;
+  const trend = close - open;
+  
+  // Create smooth path from open to close with realistic volatility
+  for (let h = 0; h < hours; h++) {
+    const progress = h / (hours - 1);
+    // Use sine wave for natural price movement
+    const basePrice = open + trend * progress;
+    const oscillation = Math.sin(progress * Math.PI * 2) * range * 0.2;
+    const noise = (Math.random() - 0.5) * volatility * 0.5;
+    
+    let price = basePrice + oscillation + noise;
+    // Keep within high/low bounds
+    price = Math.max(low, Math.min(high, price));
+    prices.push(price);
   }
+  
+  // Ensure first and last match open/close
+  prices[0] = open;
+  prices[prices.length - 1] = close;
+  
   return prices;
 }
 
@@ -8893,45 +9027,140 @@ function generateDaySummary(trend, confidence, asset, change, price) {
   
   const templates = {
     bullish: [
-      `${asset.toUpperCase()} shows ${strength} bullish momentum with ${confidence.toFixed(0)}% confidence. Expected upward move of ${movePercent}%.`,
-      `Price action suggests buying opportunity. Target gain of ${movePercent}% with ${strength} conviction.`,
-      `Technical patterns indicate ${strength} uptrend potential. Consider long positions during morning session.`
+      `${asset.toUpperCase()} shows ${strength} bullish momentum. Expected +${movePercent}% move.`,
+      `Buying opportunity with ${confidence.toFixed(0)}% confidence. Target: +${movePercent}%.`,
+      `Technical patterns favor longs. ${strength} uptrend expected.`
     ],
     bearish: [
-      `${asset.toUpperCase()} displays ${strength} bearish pressure with ${confidence.toFixed(0)}% confidence. Potential decline of ${movePercent}%.`,
-      `Selling pressure expected. Consider short positions or hedging existing longs.`,
-      `Technical indicators point to ${strength} downward movement. Exercise caution with new long entries.`
+      `${asset.toUpperCase()} shows ${strength} bearish pressure. Expected -${movePercent}% move.`,
+      `Selling pressure likely. Consider shorts or hedging.`,
+      `Downward momentum detected. ${strength} decline expected.`
     ]
   };
   
   return templates[direction][Math.floor(Math.random() * templates[direction].length)];
 }
 
-function updateForecastUI() {
+// Run backtest simulation on forecast day
+async function runForecastBacktest(dayIndex) {
+  if (!forecastData.days || !forecastData.days[dayIndex]) return null;
+  
+  const day = forecastData.days[dayIndex];
+  const hourlyPrices = day.predictedPrices;
+  
+  if (!hourlyPrices || hourlyPrices.length < 2) return null;
+  
+  // Create candle-like data from hourly prices
+  const candles = hourlyPrices.map((close, i, arr) => ({
+    time: i,
+    open: i === 0 ? day.predictedOpen : arr[i-1],
+    high: Math.max(close, i === 0 ? day.predictedOpen : arr[i-1]) * 1.002,
+    low: Math.min(close, i === 0 ? day.predictedOpen : arr[i-1]) * 0.998,
+    close
+  }));
+  
+  // Simple backtest simulation
+  const settings = {
+    initialCapital: parseFloat(document.getElementById('initialCapital')?.value) || 2000,
+    stopLoss: parseFloat(document.getElementById('stopLossPercent')?.value) || 2,
+    takeProfit: parseFloat(document.getElementById('takeProfitPercent')?.value) || 5,
+    orderFee: parseFloat(document.getElementById('orderFee')?.value) || 7
+  };
+  
+  const trades = [];
+  let capital = settings.initialCapital;
+  let inPosition = false;
+  let entryPrice = 0;
+  let entryIdx = 0;
+  
+  for (let i = 2; i < candles.length - 1; i++) {
+    const c = candles[i];
+    const prev = candles[i-1];
+    const prev2 = candles[i-2];
+    
+    if (!inPosition) {
+      // Entry signal: momentum confirmation
+      const momentum = (c.close - prev2.close) / prev2.close * 100;
+      if (Math.abs(momentum) > 0.1) {
+        inPosition = true;
+        entryPrice = c.close;
+        entryIdx = i;
+        trades.push({
+          type: momentum > 0 ? 'long' : 'short',
+          entryIdx: i,
+          entryPrice: c.close,
+          entryTime: `Hour ${i}`
+        });
+      }
+    } else {
+      // Exit logic
+      const trade = trades[trades.length - 1];
+      const pnlPercent = trade.type === 'long' 
+        ? (c.close - entryPrice) / entryPrice * 100
+        : (entryPrice - c.close) / entryPrice * 100;
+      
+      const shouldExit = pnlPercent >= settings.takeProfit || 
+                         pnlPercent <= -settings.stopLoss || 
+                         i >= candles.length - 2;
+      
+      if (shouldExit) {
+        trade.exitIdx = i;
+        trade.exitPrice = c.close;
+        trade.exitTime = `Hour ${i}`;
+        trade.pnl = (pnlPercent / 100) * capital - settings.orderFee * 2;
+        trade.pnlPercent = pnlPercent;
+        capital += trade.pnl;
+        inPosition = false;
+      }
+    }
+  }
+  
+  const completedTrades = trades.filter(t => t.exitPrice);
+  const winningTrades = completedTrades.filter(t => t.pnl > 0);
+  
+  return {
+    trades: completedTrades,
+    totalPnL: completedTrades.reduce((sum, t) => sum + t.pnl, 0),
+    winRate: completedTrades.length > 0 ? (winningTrades.length / completedTrades.length * 100) : 0,
+    tradeCount: completedTrades.length
+  };
+}
+
+async function updateForecastUI() {
   const container = document.getElementById('forecastCardsContainer');
   const outlookText = document.getElementById('forecastOutlookText');
   const accuracyScore = document.getElementById('forecastAccuracyScore');
   
   if (!forecastData.days || forecastData.days.length === 0) {
-    if (container) container.innerHTML = '<div class="col-span-7 text-center py-8 text-gray-500">No forecast data available</div>';
+    if (container) container.innerHTML = '<div class="col-span-7 text-center py-8 text-gray-500">No forecast data available. Click Refresh to generate.</div>';
     return;
+  }
+  
+  // Run backtest on each day
+  for (let i = 0; i < forecastData.days.length; i++) {
+    if (!forecastData.days[i].backtestResult) {
+      forecastData.days[i].backtestResult = await runForecastBacktest(i);
+    }
   }
   
   const bullishDays = forecastData.days.filter(d => d.direction === 'bullish').length;
   const bearishDays = forecastData.days.filter(d => d.direction === 'bearish').length;
-  const avgConfidence = forecastData.days.reduce((sum, d) => sum + d.confidence, 0) / forecastData.days.length;
+  const totalDays = forecastData.days.length;
+  const avgConfidence = forecastData.days.reduce((sum, d) => sum + d.confidence, 0) / totalDays;
+  
+  // Calculate total simulated P/L
+  const totalSimPnL = forecastData.days.reduce((sum, d) => sum + (d.backtestResult?.totalPnL || 0), 0);
   
   if (outlookText) {
+    const pnlStr = totalSimPnL >= 0 ? `+$${totalSimPnL.toFixed(2)}` : `-$${Math.abs(totalSimPnL).toFixed(2)}`;
     if (bullishDays > bearishDays) {
-      outlookText.textContent = `Bullish (${bullishDays}/7 days) - Avg Confidence: ${avgConfidence.toFixed(0)}%`;
-      outlookText.className = 'text-lg font-semibold text-green-600 dark:text-green-400';
+      outlookText.innerHTML = `<span class="text-green-600 dark:text-green-400">Bullish (${bullishDays}/${totalDays} days)</span> - Sim P/L: <span class="${totalSimPnL >= 0 ? 'text-green-600' : 'text-red-600'}">${pnlStr}</span>`;
     } else if (bearishDays > bullishDays) {
-      outlookText.textContent = `Bearish (${bearishDays}/7 days) - Avg Confidence: ${avgConfidence.toFixed(0)}%`;
-      outlookText.className = 'text-lg font-semibold text-red-600 dark:text-red-400';
+      outlookText.innerHTML = `<span class="text-red-600 dark:text-red-400">Bearish (${bearishDays}/${totalDays} days)</span> - Sim P/L: <span class="${totalSimPnL >= 0 ? 'text-green-600' : 'text-red-600'}">${pnlStr}</span>`;
     } else {
-      outlookText.textContent = `Mixed - Avg Confidence: ${avgConfidence.toFixed(0)}%`;
-      outlookText.className = 'text-lg font-semibold text-yellow-600 dark:text-yellow-400';
+      outlookText.innerHTML = `<span class="text-yellow-600 dark:text-yellow-400">Mixed</span> - Sim P/L: <span class="${totalSimPnL >= 0 ? 'text-green-600' : 'text-red-600'}">${pnlStr}</span>`;
     }
+    outlookText.className = 'text-lg font-semibold';
   }
   
   const avgAccuracy = forecastData.history.length > 0 
@@ -8943,6 +9172,10 @@ function updateForecastUI() {
   }
   
   if (container) {
+    const now = new Date();
+    const sydneyNow = toSydneyTime(now);
+    const isMarketOpen = isTradingHours(now);
+    
     container.innerHTML = forecastData.days.map((day, i) => {
       const date = new Date(day.date);
       const isToday = i === 0;
@@ -8951,21 +9184,48 @@ function updateForecastUI() {
         ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' 
         : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800';
       
+      const bt = day.backtestResult;
+      const btPnL = bt?.totalPnL || 0;
+      const btWinRate = bt?.winRate || 0;
+      const btTrades = bt?.tradeCount || 0;
+      
+      // Show trading status for today
+      let statusBadge = '';
+      if (isToday) {
+        if (isMarketOpen) {
+          statusBadge = '<span class="inline-block mt-1 px-1.5 py-0.5 text-xs bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300 rounded animate-pulse">LIVE</span>';
+        } else {
+          statusBadge = '<span class="inline-block mt-1 px-1.5 py-0.5 text-xs bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-300 rounded">CLOSED</span>';
+        }
+      }
+      
       return `
         <div class="forecast-day-card cursor-pointer p-3 rounded-lg border ${bgColor} ${isToday ? 'ring-2 ring-blue-500' : ''} hover:shadow-lg transition-all" data-day-index="${i}">
           <div class="text-center">
             <p class="text-xs font-medium text-gray-500 dark:text-gray-400">${day.dayName}</p>
-            <p class="text-xs text-gray-400">${date.getDate()}/${date.getMonth() + 1}</p>
-            <div class="text-2xl my-2">${directionIcon}</div>
-            <div class="h-12 mb-2" id="miniChart${i}"></div>
-            <p class="text-xs font-semibold ${day.direction === 'bullish' ? 'text-green-600' : 'text-red-600'}">${day.expectedMove > 0 ? '+' : ''}${day.expectedMove}%</p>
-            <p class="text-xs text-gray-500">${day.confidence.toFixed(0)}%</p>
-            ${isToday ? '<span class="inline-block mt-1 px-1.5 py-0.5 text-xs bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 rounded">Today</span>' : ''}
+            <p class="text-xs text-gray-400">${toSydneyTime(date).getDate()}/${toSydneyTime(date).getMonth() + 1}</p>
+            <div class="text-2xl my-1">${directionIcon}</div>
+            <div class="h-12 mb-1" id="miniChart${i}"></div>
+            <p class="text-xs font-semibold ${day.direction === 'bullish' ? 'text-green-600' : 'text-red-600'}">${parseFloat(day.expectedMove) > 0 ? '+' : ''}${day.expectedMove}%</p>
+            <p class="text-xs text-gray-500">${day.confidence.toFixed(0)}% conf</p>
+            ${btTrades > 0 ? `<p class="text-xs mt-1 ${btPnL >= 0 ? 'text-green-600' : 'text-red-600'}">${btPnL >= 0 ? '+' : ''}$${btPnL.toFixed(0)} (${btTrades} trades)</p>` : ''}
+            ${statusBadge}
           </div>
-          <p class="text-xs text-gray-600 dark:text-gray-400 mt-2 line-clamp-2">${day.summary}</p>
+          <p class="text-xs text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">${day.summary}</p>
         </div>
       `;
     }).join('');
+    
+    // Add market status header
+    const marketStatusDiv = document.getElementById('forecastMarketStatus');
+    if (marketStatusDiv) {
+      if (isMarketOpen) {
+        marketStatusDiv.innerHTML = `<span class="text-green-600">Market Open</span> - Sydney: ${sydneyNow.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })} AEDT`;
+      } else {
+        const nextSession = getNextTradingSession(now);
+        marketStatusDiv.innerHTML = `<span class="text-red-600">Market Closed</span> - Opens: ${formatSydneyTime(nextSession, 'date')} ${formatSydneyTime(nextSession)}`;
+      }
+    }
     
     container.querySelectorAll('.forecast-day-card').forEach(card => {
       card.addEventListener('click', () => {
@@ -8979,6 +9239,22 @@ function updateForecastUI() {
 }
 
 function renderMiniCharts() {
+  // Calculate global min/max across all days for consistent scale
+  let globalMin = Infinity;
+  let globalMax = -Infinity;
+  
+  forecastData.days.forEach(day => {
+    const predicted = day.predictedPrices || [];
+    const actual = day.actualPrices || [];
+    const allPrices = [...predicted, ...actual].filter(p => p != null);
+    if (allPrices.length > 0) {
+      globalMin = Math.min(globalMin, ...allPrices);
+      globalMax = Math.max(globalMax, ...allPrices);
+    }
+  });
+  
+  const globalRange = globalMax - globalMin || 1;
+  
   forecastData.days.forEach((day, i) => {
     const container = document.getElementById(`miniChart${i}`);
     if (!container) return;
@@ -8988,18 +9264,14 @@ function renderMiniCharts() {
     
     if (predicted.length === 0) return;
     
-    const allPrices = [...predicted, ...actual];
-    const min = Math.min(...allPrices);
-    const max = Math.max(...allPrices);
-    const range = max - min || 1;
-    
     const width = container.clientWidth || 60;
     const height = 48;
     
+    // Use global scale for consistency across days
     let predictedPath = '';
     predicted.forEach((p, j) => {
       const x = (j / (predicted.length - 1)) * width;
-      const y = height - ((p - min) / range) * height;
+      const y = height - ((p - globalMin) / globalRange) * height;
       predictedPath += j === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`;
     });
     
@@ -9007,13 +9279,25 @@ function renderMiniCharts() {
     if (actual.length > 0) {
       actual.forEach((p, j) => {
         const x = (j / (actual.length - 1)) * width;
-        const y = height - ((p - min) / range) * height;
+        const y = height - ((p - globalMin) / globalRange) * height;
         actualPath += j === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`;
       });
     }
     
+    // Draw connection point from previous day if exists
+    let connectorCircle = '';
+    if (i > 0) {
+      const prevDay = forecastData.days[i - 1];
+      const prevClose = prevDay.predictedClose;
+      const currOpen = day.predictedOpen;
+      // Small dot at start showing continuity
+      const startY = height - ((currOpen - globalMin) / globalRange) * height;
+      connectorCircle = `<circle cx="0" cy="${startY}" r="2" fill="#60a5fa"/>`;
+    }
+    
     container.innerHTML = `
       <svg width="${width}" height="${height}" class="w-full h-full">
+        ${connectorCircle}
         <path d="${predictedPath}" fill="none" stroke="#3b82f6" stroke-width="1.5" />
         ${actualPath ? `<path d="${actualPath}" fill="none" stroke="#ef4444" stroke-width="1.5" />` : ''}
       </svg>
@@ -9031,29 +9315,89 @@ function showDayDetails(dayIndex) {
   detailsEl.classList.remove('hidden');
   
   const date = new Date(day.date);
-  document.getElementById('forecastDayTitle').textContent = `${day.dayName}, ${date.toLocaleDateString()}`;
+  const sydneyDate = toSydneyTime(date);
+  
+  document.getElementById('forecastDayTitle').textContent = `${day.dayName}, ${sydneyDate.getDate()}/${sydneyDate.getMonth() + 1} (AEDT)`;
   document.getElementById('forecastEntryPrice').textContent = `$${day.entryPrice.toFixed(2)}`;
-  document.getElementById('forecastEntryTime').textContent = `Around ${day.entryTime}`;
+  document.getElementById('forecastEntryTime').textContent = day.entryTime;
   document.getElementById('forecastExitPrice').textContent = `$${day.exitPrice.toFixed(2)}`;
-  document.getElementById('forecastExitTime').textContent = `Around ${day.exitTime}`;
+  document.getElementById('forecastExitTime').textContent = day.exitTime;
   document.getElementById('forecastDirection').textContent = day.direction === 'bullish' ? '📈 Bullish' : '📉 Bearish';
   document.getElementById('forecastDirection').className = `text-lg font-bold ${day.direction === 'bullish' ? 'text-green-600' : 'text-red-600'}`;
   document.getElementById('forecastConfidence').textContent = `${day.confidence.toFixed(0)}%`;
-  document.getElementById('forecastExpectedMove').textContent = `${day.expectedMove > 0 ? '+' : ''}${day.expectedMove}%`;
+  document.getElementById('forecastExpectedMove').textContent = `${parseFloat(day.expectedMove) > 0 ? '+' : ''}${day.expectedMove}%`;
   document.getElementById('forecastExpectedMove').className = `text-lg font-bold ${parseFloat(day.expectedMove) >= 0 ? 'text-green-600' : 'text-red-600'}`;
   document.getElementById('forecastNaturalSummary').textContent = day.summary;
   
-  renderDayChart(day);
+  // Show backtest results
+  const btResultsEl = document.getElementById('forecastBacktestResults');
+  if (btResultsEl) {
+    const bt = day.backtestResult;
+    if (bt && bt.tradeCount > 0) {
+      btResultsEl.innerHTML = `
+        <div class="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <h4 class="font-semibold text-sm mb-2">Simulation Results</h4>
+          <div class="grid grid-cols-3 gap-2 text-sm">
+            <div>
+              <span class="text-gray-500">P/L:</span>
+              <span class="${bt.totalPnL >= 0 ? 'text-green-600' : 'text-red-600'} font-bold">${bt.totalPnL >= 0 ? '+' : ''}$${bt.totalPnL.toFixed(2)}</span>
+            </div>
+            <div>
+              <span class="text-gray-500">Win Rate:</span>
+              <span class="${bt.winRate >= 50 ? 'text-green-600' : 'text-red-600'} font-bold">${bt.winRate.toFixed(0)}%</span>
+            </div>
+            <div>
+              <span class="text-gray-500">Trades:</span>
+              <span class="font-bold">${bt.tradeCount}</span>
+            </div>
+          </div>
+          ${bt.trades.length > 0 ? `
+            <div class="mt-2 text-xs">
+              <div class="font-medium text-gray-600 dark:text-gray-400">Trade Log:</div>
+              ${bt.trades.slice(0, 3).map(t => `
+                <div class="flex justify-between py-0.5 ${t.pnl >= 0 ? 'text-green-600' : 'text-red-600'}">
+                  <span>${t.type.toUpperCase()} ${t.entryTime} → ${t.exitTime}</span>
+                  <span>${t.pnl >= 0 ? '+' : ''}$${t.pnl.toFixed(2)}</span>
+                </div>
+              `).join('')}
+              ${bt.trades.length > 3 ? `<div class="text-gray-400">+${bt.trades.length - 3} more trades</div>` : ''}
+            </div>
+          ` : ''}
+        </div>
+      `;
+    } else {
+      btResultsEl.innerHTML = `
+        <div class="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <p class="text-sm text-gray-500">No trades simulated for this day</p>
+        </div>
+      `;
+    }
+  }
+  
+  // Show price continuity info
+  const priceInfoEl = document.getElementById('forecastPriceInfo');
+  if (priceInfoEl) {
+    priceInfoEl.innerHTML = `
+      <div class="grid grid-cols-4 gap-2 text-xs mt-2">
+        <div><span class="text-gray-500">Open:</span> $${day.predictedOpen.toFixed(2)}</div>
+        <div><span class="text-gray-500">High:</span> $${day.predictedHigh.toFixed(2)}</div>
+        <div><span class="text-gray-500">Low:</span> $${day.predictedLow.toFixed(2)}</div>
+        <div><span class="text-gray-500">Close:</span> $${day.predictedClose.toFixed(2)}</div>
+      </div>
+    `;
+  }
+  
+  renderDayChart(day, dayIndex);
 }
 
-function renderDayChart(day) {
+function renderDayChart(day, dayIndex) {
   const container = document.getElementById('forecastDayChart');
   if (!container) return;
   
   const predicted = day.predictedPrices || [];
   const actual = day.actualPrices || [];
   
-  const allPrices = [...predicted, ...actual];
+  const allPrices = [...predicted, ...actual].filter(p => p != null);
   if (allPrices.length === 0) {
     container.innerHTML = '<div class="flex items-center justify-center h-full text-gray-500 text-sm">No price data</div>';
     return;
@@ -9067,6 +9411,7 @@ function renderDayChart(day) {
   const height = 180;
   const padding = 40;
   
+  // Draw predicted path
   let predictedPath = '';
   predicted.forEach((p, j) => {
     const x = padding + (j / (predicted.length - 1)) * (width - padding * 2);
@@ -9074,6 +9419,7 @@ function renderDayChart(day) {
     predictedPath += j === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`;
   });
   
+  // Draw actual path if available
   let actualPath = '';
   if (actual.length > 0) {
     actual.forEach((p, j) => {
@@ -9082,6 +9428,28 @@ function renderDayChart(day) {
       actualPath += j === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`;
     });
   }
+  
+  // Mark entry and exit points from backtest
+  let tradeMarkers = '';
+  const bt = day.backtestResult;
+  if (bt && bt.trades.length > 0) {
+    bt.trades.forEach(trade => {
+      const entryX = padding + (trade.entryIdx / (predicted.length - 1)) * (width - padding * 2);
+      const entryY = height - padding - ((trade.entryPrice - min) / range) * (height - padding * 2);
+      const exitX = padding + (trade.exitIdx / (predicted.length - 1)) * (width - padding * 2);
+      const exitY = height - padding - ((trade.exitPrice - min) / range) * (height - padding * 2);
+      
+      const color = trade.pnl >= 0 ? '#10b981' : '#ef4444';
+      tradeMarkers += `
+        <line x1="${entryX}" y1="${entryY}" x2="${exitX}" y2="${exitY}" stroke="${color}" stroke-width="1" stroke-dasharray="3,2"/>
+        <circle cx="${entryX}" cy="${entryY}" r="4" fill="#3b82f6" stroke="white" stroke-width="1"/>
+        <circle cx="${exitX}" cy="${exitY}" r="4" fill="${color}" stroke="white" stroke-width="1"/>
+      `;
+    });
+  }
+  
+  // Time labels for trading hours
+  const tradingHours = day.dayOfWeek === 1 ? '10:00-24:00' : day.dayOfWeek === 6 ? '00:00-09:00' : '00:00-24:00';
   
   container.innerHTML = `
     <svg width="${width}" height="${height}" class="w-full h-full">
@@ -9093,11 +9461,14 @@ function renderDayChart(day) {
       </defs>
       <text x="${padding}" y="15" fill="#9ca3af" font-size="10">$${max.toFixed(2)}</text>
       <text x="${padding}" y="${height - 5}" fill="#9ca3af" font-size="10">$${min.toFixed(2)}</text>
+      <text x="${width / 2}" y="${height - 5}" fill="#9ca3af" font-size="9" text-anchor="middle">${tradingHours} AEDT</text>
       <path d="${predictedPath}" fill="none" stroke="#3b82f6" stroke-width="2" />
       ${actualPath ? `<path d="${actualPath}" fill="none" stroke="#ef4444" stroke-width="2" />` : ''}
+      ${tradeMarkers}
       <circle cx="${width - 80}" cy="15" r="4" fill="#3b82f6"/>
       <text x="${width - 70}" y="18" fill="#9ca3af" font-size="10">Predicted</text>
       ${actual.length > 0 ? `<circle cx="${width - 80}" cy="30" r="4" fill="#ef4444"/><text x="${width - 70}" y="33" fill="#9ca3af" font-size="10">Actual</text>` : ''}
+      ${bt && bt.trades.length > 0 ? `<circle cx="${width - 80}" cy="${actual.length > 0 ? 45 : 30}" r="4" fill="#10b981"/><text x="${width - 70}" y="${actual.length > 0 ? 48 : 33}" fill="#9ca3af" font-size="10">Trades</text>` : ''}
     </svg>
   `;
 }
