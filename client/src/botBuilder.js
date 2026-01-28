@@ -7371,13 +7371,23 @@ function renderBacktestSimChart() {
     },
   });
   
-  // Add price line with gradient blue color
-  const priceSeries = backtestChart.addSeries(LineSeries, {
-    color: '#3b82f6',
-    lineWidth: 2,
+  // Add candlestick series for proper marker support
+  const priceSeries = backtestChart.addSeries(CandlestickSeries, {
+    upColor: '#22c55e',
+    downColor: '#ef4444',
+    borderUpColor: '#22c55e',
+    borderDownColor: '#ef4444',
+    wickUpColor: '#22c55e',
+    wickDownColor: '#ef4444',
     priceLineVisible: false,
   });
-  priceSeries.setData(BACKTEST_DATA.candles.map(c => ({ time: c.time, value: c.close })));
+  priceSeries.setData(BACKTEST_DATA.candles.map(c => ({ 
+    time: c.time, 
+    open: c.open, 
+    high: c.high, 
+    low: c.low, 
+    close: c.close 
+  })));
   
   // Add trade markers
   const markers = [];
