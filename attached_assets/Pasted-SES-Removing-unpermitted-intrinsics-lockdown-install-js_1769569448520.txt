@@ -1,0 +1,49 @@
+SES Removing unpermitted intrinsics lockdown-install.js:1:203117
+  Removing intrinsics.%MapPrototype%.getOrInsert lockdown-install.js:1:202962
+  Removing intrinsics.%MapPrototype%.getOrInsertComputed lockdown-install.js:1:202962
+  Removing intrinsics.%WeakMapPrototype%.getOrInsert lockdown-install.js:1:202962
+  Removing intrinsics.%WeakMapPrototype%.getOrInsertComputed lockdown-install.js:1:202962
+  Removing intrinsics.%DatePrototype%.toTemporalInstant lockdown-install.js:1:202962
+[vite] connecting... client:495:9
+updateAiProjectionChart called with result: 
+Object { context: {…}, hypotheses: (3) […], learning: {…}, predictions: {…}, marketData: (30) […] }
+botBuilder.js:2888:11
+Container dimensions: 
+Object { width: 0, height: 0 }
+botBuilder.js:2899:13
+[vite] connected. client:618:15
+updateAiProjectionChart called with result: 
+Object { context: {…}, hypotheses: (3) […], learning: {…}, predictions: {…}, marketData: (30) […] }
+botBuilder.js:2888:11
+Container dimensions: 
+Object { width: 1020, height: 288 }
+botBuilder.js:2899:13
+Projection params: 
+Object { forecastCandles: 10000, tf: "5m", tfData: {…}, hasPredictions: true }
+botBuilder.js:2912:13
+Fetching 10000 candles for silver/5m (API: 5m) botBuilder.js:2928:11
+Market data response: 
+Object { status: 200, candleCount: 1078, timeframe: "5m" }
+botBuilder.js:2939:13
+Using 1078 candles (requested 10000, available 1078) botBuilder.js:2943:15
+Data status: 
+Object { historicalCandles: 1078, displayCandles: 1078 }
+botBuilder.js:2960:11
+Projection: 10000 forecast candles, 1078 historical candles available, displaying 1078 botBuilder.js:2969:11
+Creating chart with dimensions: 
+Object { chartWidth: 1020, chartHeight: 288 }
+botBuilder.js:2994:11
+Generating AI projection with learned patterns... botBuilder.js:2592:11
+AI projection response: 
+Object { expected: (100) […], bullish: (85) […], bearish: (80) […], reasoning: "Based on the current neutral bias and the recent price movements, the predictions reflect a slight upward trend in the expected prices while also considering scenarios for both bullish and bearish outcomes. The expected prices indicate a struggle around the current levels with minimal upward momentum, consistent with typical price behavior in a neutral market condition." }
+botBuilder.js:2677:15
+Chart created successfully with 
+Object { bullishDataLength: 101, bearishDataLength: 101, expectedDataLength: 101 }
+botBuilder.js:3129:11
+Updating list view... botBuilder.js:3141:11
+updateProjectionListView called with: 
+Object { expectedLen: 101, bullishLen: 101, bearishLen: 101 }
+botBuilder.js:3529:11
+updateProjectionListView called with: 
+Object { expectedLen: 101, bullishLen: 101, bearishLen: 101 }
+botBuilder.js:3529:11

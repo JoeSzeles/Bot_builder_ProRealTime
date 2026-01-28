@@ -3000,6 +3000,31 @@ async function updateAiProjectionChart(result) {
   const useSecondsFormat = interval <= 60;
   const useDayFormat = interval >= 86400;
   
+  // Generate projections first - use last candle from display for continuity
+  const lastCandle = displayCandles[displayCandles.length - 1];
+  const lastPrice = lastCandle.close;
+  const lastTime = lastCandle.time;
+  const direction = tfData.direction || 'Neutral';
+  
+  // Show loading state before AI generation
+  container.innerHTML = '<div class="h-full flex items-center justify-center text-purple-400"><div class="text-center"><div class="animate-spin h-8 w-8 border-4 border-purple-500 border-t-transparent rounded-full mx-auto mb-2"></div>AI analyzing patterns and generating projection...</div></div>';
+  
+  // Use AI to generate intelligent price projection based on learned patterns
+  const { bullishData, bearishData, expectedData } = await generateAiProjection(
+    symbol,
+    tf,
+    historicalCandles,
+    lastPrice,
+    lastTime,
+    interval,
+    Math.min(forecastCandles, 100), // Limit projection points for AI
+    direction,
+    result
+  );
+  
+  // Clear loading state and create chart AFTER AI projection is ready
+  container.innerHTML = '';
+  
   // Create chart with scroll/zoom enabled
   aiProjectionChart = createChart(container, {
     width: chartWidth,
@@ -3058,30 +3083,6 @@ async function updateAiProjectionChart(result) {
     time: c.time,
     value: c.close
   })));
-  
-  // Generate projections - use last candle from display for continuity
-  const lastCandle = displayCandles[displayCandles.length - 1];
-  const lastPrice = lastCandle.close;
-  const lastTime = lastCandle.time;
-  const direction = tfData.direction || 'Neutral';
-  
-  // Use AI to generate intelligent price projection based on learned patterns
-  container.innerHTML = '<div class="h-full flex items-center justify-center text-purple-400"><div class="text-center"><div class="animate-spin h-8 w-8 border-4 border-purple-500 border-t-transparent rounded-full mx-auto mb-2"></div>AI analyzing patterns and generating projection...</div></div>';
-  
-  const { bullishData, bearishData, expectedData } = await generateAiProjection(
-    symbol,
-    tf,
-    historicalCandles,
-    lastPrice,
-    lastTime,
-    interval,
-    Math.min(forecastCandles, 100), // Limit projection points for AI
-    direction,
-    result
-  );
-  
-  // Clear loading state
-  container.innerHTML = '';
   
   // Bullish line (green, dashed)
   const bullishSeries = aiProjectionChart.addSeries(LineSeries, {
