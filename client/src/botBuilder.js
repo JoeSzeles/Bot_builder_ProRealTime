@@ -2615,11 +2615,24 @@ function generateWaveProjections(historicalCandles, lastPrice, lastTime, interva
   };
   
   // Wave parameters based on analysis with proper fallbacks
-  // Use volatility-based fallback when swing detection is insufficient
-  const minWaveHeight = lastPrice * volatility * 5; // At least 5x volatility
-  const avgWaveLength = waveInfo?.avgWaveLength > 5 ? waveInfo.avgWaveLength : 50;
-  const avgWaveHeight = waveInfo?.avgWaveHeight > minWaveHeight ? waveInfo.avgWaveHeight : minWaveHeight;
+  // Calculate price range from historical data for realistic wave amplitude
+  const priceHigh = Math.max(...historicalCandles.map(c => c.high));
+  const priceLow = Math.min(...historicalCandles.map(c => c.low));
+  const priceRange = priceHigh - priceLow;
+  
+  // Use price range as baseline for wave height (more realistic than volatility alone)
+  const minWaveHeight = Math.max(priceRange * 0.3, lastPrice * volatility * 20);
+  const avgWaveLength = waveInfo?.avgWaveLength > 10 ? waveInfo.avgWaveLength : Math.max(30, historicalCandles.length / 10);
+  const avgWaveHeight = waveInfo?.avgWaveHeight > minWaveHeight * 0.5 ? waveInfo.avgWaveHeight : minWaveHeight;
   const positionInCycle = waveInfo?.positionInCycle ?? 0.5;
+  
+  console.log('Wave amplitude calculation:', {
+    priceRange: priceRange.toFixed(2),
+    minWaveHeight: minWaveHeight.toFixed(4),
+    avgWaveHeight: avgWaveHeight.toFixed(4),
+    avgWaveLength: avgWaveLength.toFixed(1),
+    detectedWaves: waveInfo?.waveCount || 0
+  });
   
   // Determine primary wave frequency (longer cycle) - scale with forecast length
   const scaleFactor = Math.max(1, forecastCandles / 500);
@@ -2630,12 +2643,16 @@ function generateWaveProjections(historicalCandles, lastPrice, lastTime, interva
   // Combined trend from local + higher TF (higher TF weighted more heavily)
   const combinedTrend = (trend * 0.3 + higherTFTrend * 0.7);
   
-  // Trend-based drift incorporating higher TF
-  const trendDrift = combinedTrend * volatility * 0.3;
-  const longTermDrift = higherTFLongTermTrend > 0.01 ? 0.0002 : (higherTFLongTermTrend < -0.01 ? -0.0002 : 0);
+  // Scale drift based on forecast length - longer forecasts need smaller per-candle drift
+  // to prevent runaway diagonal lines
+  const driftScaleFactor = Math.min(1, 100 / forecastCandles);
   
-  // Direction bias from AI prediction
-  const directionBias = direction === 'Long' ? 0.0003 : (direction === 'Short' ? -0.0003 : 0);
+  // Trend-based drift incorporating higher TF (reduced to prevent diagonal dominance)
+  const trendDrift = combinedTrend * volatility * 0.05 * driftScaleFactor;
+  const longTermDrift = (higherTFLongTermTrend > 0.01 ? 0.00005 : (higherTFLongTermTrend < -0.01 ? -0.00005 : 0)) * driftScaleFactor;
+  
+  // Direction bias from AI prediction (reduced)
+  const directionBias = (direction === 'Long' ? 0.00005 : (direction === 'Short' ? -0.00005 : 0)) * driftScaleFactor;
   
   // Initialize prices
   let bullPrice = lastPrice;
@@ -2673,22 +2690,24 @@ function generateWaveProjections(historicalCandles, lastPrice, lastTime, interva
     const noise = seededRandom() * 0.2;
     const combinedWave = primaryWave + secondaryWave + tertiaryWave + noise;
     
-    // Calculate wave amplitude based on volatility and time
-    const waveAmplitude = avgWaveHeight * 0.5;
+    // Calculate wave amplitude based on volatility - make waves visible
+    const waveAmplitude = avgWaveHeight;
     
-    // Bullish projection (higher highs, trend up)
+    // Calculate position-based wave value (oscillates around 0)
     const bullWaveOffset = Math.sin((t / primaryWaveLength) * Math.PI * 2 + basePhase + bullPhaseOffset);
-    const bullChange = (combinedWave * 0.5 + bullWaveOffset * 0.5 + 0.3) * waveAmplitude / lastPrice * 0.01;
-    bullPrice = bullPrice * (1 + bullChange + trendDrift * 1.5 + longTermDrift * 2 + directionBias);
-    
-    // Bearish projection (lower lows, trend down)
     const bearWaveOffset = Math.sin((t / primaryWaveLength) * Math.PI * 2 + basePhase + bearPhaseOffset);
-    const bearChange = (combinedWave * 0.5 + bearWaveOffset * 0.5 - 0.3) * waveAmplitude / lastPrice * 0.01;
-    bearPrice = bearPrice * (1 + bearChange - trendDrift * 1.5 + longTermDrift * 0.5 - directionBias);
     
-    // Expected projection (follows trend + waves)
-    const expChange = combinedWave * waveAmplitude / lastPrice * 0.008 + trendDrift + longTermDrift + directionBias;
-    expPrice = expPrice * (1 + expChange);
+    // Bullish projection: oscillates with upward bias
+    const bullWaveValue = (primaryWave + secondaryWave + tertiaryWave + noise) * 0.6 + bullWaveOffset * 0.4;
+    bullPrice = lastPrice + (bullWaveValue * waveAmplitude * 0.5) + (i * trendDrift * lastPrice) + (i * directionBias * lastPrice);
+    
+    // Bearish projection: oscillates with downward bias  
+    const bearWaveValue = (primaryWave + secondaryWave + tertiaryWave + noise) * 0.6 + bearWaveOffset * 0.4;
+    bearPrice = lastPrice + (bearWaveValue * waveAmplitude * 0.5) - (i * trendDrift * lastPrice) - (i * directionBias * lastPrice);
+    
+    // Expected projection: oscillates with slight trend
+    const expWaveValue = primaryWave + secondaryWave * 0.5 + tertiaryWave * 0.3 + noise * 0.5;
+    expPrice = lastPrice + (expWaveValue * waveAmplitude * 0.4) + (i * (trendDrift + longTermDrift + directionBias) * lastPrice * 0.5);
     
     // Occasional spike/dip (5% chance) based on volatility
     if (Math.abs(seededRandom()) > 0.95) {
