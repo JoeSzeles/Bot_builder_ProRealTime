@@ -2139,8 +2139,9 @@ function setupAiResultsTimeframes() {
         }
       });
       
-      // Update display for selected timeframe
+      // Clear cached market data to force re-fetch with new timeframe
       if (window.lastAiResult) {
+        window.lastAiResult.marketData = null;
         updateAiResultsForTimeframe(aiResultsTimeframe, window.lastAiResult);
       }
     });
@@ -2319,8 +2320,35 @@ async function updateAiProjectionChart(result) {
   if (historicalCandles.length === 0) {
     const symbol = document.getElementById('aiSymbol')?.value || 'silver';
     
-    // For large projections (1k+), try to use historical database first
-    if (forecastCandles >= 1000) {
+    // Map timeframe to appropriate data fetch timeframe
+    // Short timeframes (seconds, 1m, 5m) need intraday data
+    // Longer timeframes can use historical database
+    const tfSeconds = { '1s': 1, '2s': 2, '3s': 3, '5s': 5, '10s': 10, '30s': 30, '1m': 60, '5m': 300, '15m': 900, '1h': 3600, '4h': 14400, '1d': 86400 };
+    const selectedTfSeconds = tfSeconds[tf] || 300;
+    const isIntradayTf = selectedTfSeconds < 3600; // Less than 1 hour
+    
+    // For intraday timeframes, always use live data from Yahoo Finance
+    if (isIntradayTf) {
+      // Use appropriate fetch timeframe based on selection
+      let fetchTf = '1m';
+      if (selectedTfSeconds >= 300) fetchTf = '5m';
+      if (selectedTfSeconds >= 900) fetchTf = '15m';
+      
+      try {
+        container.innerHTML = '<div class="h-full flex items-center justify-center text-gray-500">Loading live market data...</div>';
+        const response = await fetch(`/api/market-data/${symbol}/${fetchTf}`);
+        const data = await response.json();
+        if (data.candles && data.candles.length > 0) {
+          historicalCandles = data.candles;
+          result.marketData = historicalCandles;
+          console.log(`Loaded ${historicalCandles.length} candles for ${tf} timeframe`);
+        }
+      } catch (e) {
+        console.warn('Failed to fetch live market data:', e);
+      }
+    }
+    // For daily/4h timeframes with large projections, try historical database
+    else if (forecastCandles >= 1000 && !isIntradayTf) {
       try {
         container.innerHTML = '<div class="h-full flex items-center justify-center text-gray-500">Loading historical database...</div>';
         const metal = symbol.toLowerCase().includes('gold') ? 'gold' : 'silver';
@@ -2336,9 +2364,13 @@ async function updateAiProjectionChart(result) {
       }
     }
     
-    // Fallback to live Yahoo Finance data
+    // Fallback to live Yahoo Finance data for longer timeframes
     if (historicalCandles.length === 0) {
-      const fetchTf = forecastCandles >= 10000 ? '1d' : (forecastCandles >= 1000 ? '4h' : '1h');
+      let fetchTf = tf;
+      // Map to supported Yahoo Finance intervals
+      if (['1s', '2s', '3s', '5s', '10s', '30s'].includes(tf)) fetchTf = '1m';
+      if (!['1m', '5m', '15m', '1h', '4h', '1d'].includes(fetchTf)) fetchTf = '1h';
+      
       try {
         container.innerHTML = '<div class="h-full flex items-center justify-center text-gray-500">Loading market data...</div>';
         const response = await fetch(`/api/market-data/${symbol}/${fetchTf}`);
