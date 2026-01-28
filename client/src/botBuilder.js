@@ -7410,10 +7410,10 @@ function renderBacktestSimChart() {
     });
   });
   
-  // Sort markers by time
+  // Sort markers by time and add to chart
   markers.sort((a, b) => a.time - b.time);
   console.log('Setting chart markers:', markers.length, 'first:', markers[0]);
-  priceSeries.setMarkers(markers);
+  createSeriesMarkers(priceSeries, markers);
   
   backtestChart.timeScale().fitContent();
   console.log('Chart rendered successfully');
