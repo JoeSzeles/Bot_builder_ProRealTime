@@ -2619,7 +2619,9 @@ async function generateAiProjection(symbol, tf, historicalCandles, lastPrice, la
   const assetPatterns = brainData?.patterns?.[symbol] || {};
   const accuracy = brainData?.accuracy?.[symbol] || 0;
   const predictions = brainData?.predictions?.[symbol] || 0;
-  const recentEvents = (eventsData || []).slice(-10);
+  // Handle both array and object with events property
+  const eventsArray = Array.isArray(eventsData) ? eventsData : (eventsData?.events || []);
+  const recentEvents = eventsArray.slice(-10);
   
   // Build AI prompt
   const prompt = `You are analyzing ${symbol} on the ${tf} timeframe to predict future price movement.
