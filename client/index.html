@@ -1471,15 +1471,60 @@
                 <div class="bg-white dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600 mb-4">
                   <div class="flex items-center justify-between mb-3">
                     <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300">AI Price Projection</h4>
-                    <div class="flex items-center gap-2">
-                      <label class="text-xs text-gray-500 dark:text-gray-400">Forecast:</label>
-                      <select id="aiProjectionCandles" class="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded text-gray-700 dark:text-gray-200">
-                        <option value="100">100 candles</option>
-                        <option value="1000">1k candles</option>
-                        <option value="10000" selected>10k candles</option>
-                        <option value="100000">100k candles</option>
-                        <option value="200000">200k candles</option>
-                      </select>
+                    <div class="flex items-center gap-4">
+                      <!-- Back-Simulation Selector -->
+                      <div class="flex items-center gap-2">
+                        <label class="text-xs text-gray-500 dark:text-gray-400">Backtest:</label>
+                        <select id="aiBacktestOffset" class="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded text-gray-700 dark:text-gray-200">
+                          <option value="0" selected>Live (now)</option>
+                          <option value="60">-1 min ago</option>
+                          <option value="600">-10 min ago</option>
+                          <option value="1800">-30 min ago</option>
+                          <option value="3600">-1 hour ago</option>
+                          <option value="14400">-4 hours ago</option>
+                          <option value="43200">-12 hours ago</option>
+                          <option value="86400">-1 day ago</option>
+                          <option value="604800">-1 week ago</option>
+                        </select>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <label class="text-xs text-gray-500 dark:text-gray-400">Forecast:</label>
+                        <select id="aiProjectionCandles" class="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded text-gray-700 dark:text-gray-200">
+                          <option value="100">100 candles</option>
+                          <option value="1000">1k candles</option>
+                          <option value="10000" selected>10k candles</option>
+                          <option value="100000">100k candles</option>
+                          <option value="200000">200k candles</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- Backtest Accuracy Summary -->
+                  <div id="backtestAccuracySummary" class="hidden mb-3 p-3 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 rounded-lg border border-yellow-300 dark:border-yellow-700">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <span class="text-yellow-600 dark:text-yellow-400">Backtest Mode:</span> Analyzing from <span id="backtestFromTime" class="font-bold">--</span>
+                      </span>
+                      <span id="backtestAccuracyBadge" class="px-3 py-1 rounded-full text-sm font-bold bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300">--</span>
+                    </div>
+                    <div class="grid grid-cols-4 gap-4 mt-2 text-xs">
+                      <div class="text-center">
+                        <div class="text-gray-500 dark:text-gray-400">Direction</div>
+                        <div id="backtestDirResult" class="font-bold text-gray-700 dark:text-gray-300">--</div>
+                      </div>
+                      <div class="text-center">
+                        <div class="text-gray-500 dark:text-gray-400">Predicted</div>
+                        <div id="backtestPredicted" class="font-bold text-blue-600 dark:text-blue-400">--</div>
+                      </div>
+                      <div class="text-center">
+                        <div class="text-gray-500 dark:text-gray-400">Actual</div>
+                        <div id="backtestActual" class="font-bold text-green-600 dark:text-green-400">--</div>
+                      </div>
+                      <div class="text-center">
+                        <div class="text-gray-500 dark:text-gray-400">Error</div>
+                        <div id="backtestError" class="font-bold text-red-600 dark:text-red-400">--</div>
+                      </div>
                     </div>
                   </div>
                   <div id="aiProjectionChart" class="h-72 bg-gray-900 rounded-lg border border-gray-700 relative z-0 overflow-hidden"></div>

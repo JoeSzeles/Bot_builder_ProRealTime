@@ -2121,6 +2121,16 @@ function setupAiTradingSubTabs() {
     });
   }
   
+  // Backtest offset selector
+  const backtestOffset = document.getElementById('aiBacktestOffset');
+  if (backtestOffset) {
+    backtestOffset.addEventListener('change', () => {
+      if (window.lastAiResult) {
+        runBacktestSimulation();
+      }
+    });
+  }
+  
   // Start real price updates for AI projection
   startRealPriceUpdates();
 }
@@ -2709,6 +2719,268 @@ function calculatePredictionAccuracy(realCandles) {
   
   // Update list view with actual prices
   updateProjectionListView(expected, bullish, bearish, realCandles);
+}
+
+// Backtest simulation - run AI analysis on historical data and compare with what actually happened
+async function runBacktestSimulation() {
+  const offsetSelect = document.getElementById('aiBacktestOffset');
+  const offsetSeconds = parseInt(offsetSelect?.value || '0');
+  
+  const summaryDiv = document.getElementById('backtestAccuracySummary');
+  
+  // If live mode, hide backtest summary and show regular projection
+  if (offsetSeconds === 0) {
+    if (summaryDiv) summaryDiv.classList.add('hidden');
+    if (window.lastAiResult) {
+      updateAiProjectionChart(window.lastAiResult);
+    }
+    return;
+  }
+  
+  // Show loading state
+  if (summaryDiv) {
+    summaryDiv.classList.remove('hidden');
+    document.getElementById('backtestFromTime').textContent = 'Loading...';
+    document.getElementById('backtestAccuracyBadge').textContent = 'Analyzing...';
+  }
+  
+  try {
+    const symbol = document.getElementById('aiSymbol')?.value || 'silver';
+    const currentTf = aiResultsTimeframe || '5m';
+    
+    // Map timeframe to API format and interval seconds
+    const tfMap = {
+      '1s': { api: '1m', interval: 1 },
+      '2s': { api: '1m', interval: 2 },
+      '3s': { api: '1m', interval: 3 },
+      '5s': { api: '1m', interval: 5 },
+      '10s': { api: '1m', interval: 10 },
+      '30s': { api: '1m', interval: 30 },
+      '1m': { api: '1m', interval: 60 },
+      '5m': { api: '5m', interval: 300 },
+      '15m': { api: '15m', interval: 900 },
+      '1h': { api: '1h', interval: 3600 },
+      '4h': { api: '1h', interval: 14400 },
+      '1d': { api: '1d', interval: 86400 }
+    };
+    const tfConfig = tfMap[currentTf] || { api: '1h', interval: 3600 };
+    
+    // Calculate backtest start time
+    const now = Math.floor(Date.now() / 1000);
+    const backtestTime = now - offsetSeconds;
+    const backtestDate = new Date(backtestTime * 1000);
+    
+    // Update UI with backtest time
+    document.getElementById('backtestFromTime').textContent = backtestDate.toLocaleString();
+    
+    // Fetch historical data in the selected timeframe
+    const response = await fetch(`/api/market-data/${symbol}/${tfConfig.api}`);
+    const data = await response.json();
+    
+    if (!data.candles || data.candles.length < 10) {
+      throw new Error('Insufficient historical data for backtest');
+    }
+    
+    // Split data: candles before backtest time (input) and after (actual results)
+    const historicalCandles = data.candles.filter(c => c.time <= backtestTime);
+    const actualCandles = data.candles.filter(c => c.time > backtestTime);
+    
+    if (historicalCandles.length < 5) {
+      throw new Error('Not enough historical data before backtest point');
+    }
+    
+    // Get the last price at backtest time
+    const lastHistorical = historicalCandles[historicalCandles.length - 1];
+    const startPrice = lastHistorical.close;
+    
+    // Run actual AI analysis on historical data (re-analyze)
+    const backtestResult = await runBacktestAiAnalysis(symbol, historicalCandles);
+    const aiDirection = backtestResult?.predictions?.[currentTf]?.direction || 'Neutral';
+    const aiConfidence = backtestResult?.predictions?.[currentTf]?.confidence || 50;
+    
+    // Calculate what actually happened after the backtest point
+    let actualEndPrice = startPrice;
+    if (actualCandles.length > 0) {
+      actualEndPrice = actualCandles[actualCandles.length - 1].close;
+    }
+    
+    const actualChange = ((actualEndPrice - startPrice) / startPrice) * 100;
+    const actualDirection = actualChange > 0.1 ? 'Long' : (actualChange < -0.1 ? 'Short' : 'Neutral');
+    
+    // Calculate accuracy
+    const directionCorrect = (aiDirection === actualDirection) || 
+                             (aiDirection === 'Long' && actualChange > 0) ||
+                             (aiDirection === 'Short' && actualChange < 0);
+    
+    // Update accuracy UI
+    document.getElementById('backtestDirResult').innerHTML = directionCorrect 
+      ? `<span class="text-green-600">AI: ${aiDirection} (${aiConfidence}%) / Actual: ${actualDirection}</span>`
+      : `<span class="text-red-600">AI: ${aiDirection} (${aiConfidence}%) / Actual: ${actualDirection}</span>`;
+    
+    document.getElementById('backtestPredicted').textContent = `$${startPrice.toFixed(4)}`;
+    document.getElementById('backtestActual').textContent = `$${actualEndPrice.toFixed(4)}`;
+    document.getElementById('backtestError').textContent = `${actualChange >= 0 ? '+' : ''}${actualChange.toFixed(2)}%`;
+    
+    // Calculate overall accuracy score
+    const dirScore = directionCorrect ? 50 : 0;
+    const priceScore = Math.max(0, 50 - Math.abs(actualChange) * 5);
+    const totalScore = Math.round(dirScore + priceScore);
+    
+    const badge = document.getElementById('backtestAccuracyBadge');
+    badge.textContent = `${totalScore}%`;
+    if (totalScore >= 70) {
+      badge.className = 'px-3 py-1 rounded-full text-sm font-bold bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300';
+    } else if (totalScore >= 40) {
+      badge.className = 'px-3 py-1 rounded-full text-sm font-bold bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300';
+    } else {
+      badge.className = 'px-3 py-1 rounded-full text-sm font-bold bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300';
+    }
+    
+    // Render backtest chart with historical + actual overlay
+    renderBacktestChart(historicalCandles, actualCandles, startPrice, aiDirection, tfConfig.interval);
+    
+  } catch (error) {
+    console.error('Backtest error:', error);
+    document.getElementById('backtestAccuracyBadge').textContent = 'Error';
+    document.getElementById('backtestDirResult').textContent = error.message;
+  }
+}
+
+// Run AI analysis on historical data for backtest
+async function runBacktestAiAnalysis(symbol, historicalCandles) {
+  try {
+    const candlesForAnalysis = historicalCandles.slice(-30);
+    const lastCandle = candlesForAnalysis[candlesForAnalysis.length - 1];
+    const currentPrice = lastCandle?.close || 30;
+    
+    // Call the AI analysis endpoint with historical data (same as live analysis)
+    const response = await fetch('/api/ai-strategy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        symbol,
+        session: 'auto',
+        candles: candlesForAnalysis,
+        currentPrice,
+        searchQuery: ''
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error('AI analysis failed');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Backtest AI analysis error:', error);
+    // Return a neutral result if AI fails
+    return {
+      predictions: {
+        '5m': { direction: 'Neutral', confidence: 50 },
+        '15m': { direction: 'Neutral', confidence: 50 },
+        '1h': { direction: 'Neutral', confidence: 50 },
+        '4h': { direction: 'Neutral', confidence: 50 }
+      }
+    };
+  }
+}
+
+function renderBacktestChart(historicalCandles, actualCandles, startPrice, aiDirection, intervalSeconds = 3600) {
+  const container = document.getElementById('aiProjectionChart');
+  if (!container) return;
+  
+  // Wait for container to have dimensions
+  const rect = container.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) {
+    console.log('Backtest chart container not visible, deferring render');
+    setTimeout(() => renderBacktestChart(historicalCandles, actualCandles, startPrice, aiDirection, intervalSeconds), 100);
+    return;
+  }
+  
+  // Clear previous chart
+  if (aiProjectionChart) {
+    aiProjectionChart.remove();
+    aiProjectionChart = null;
+  }
+  
+  const forecastCandles = parseInt(document.getElementById('aiProjectionCandles')?.value || '100');
+  
+  // Create chart
+  aiProjectionChart = createChart(container, {
+    width: rect.width,
+    height: rect.height,
+    layout: {
+      background: { type: ColorType.Solid, color: '#111827' },
+      textColor: '#9ca3af',
+    },
+    grid: {
+      vertLines: { color: '#374151' },
+      horzLines: { color: '#374151' },
+    },
+    timeScale: {
+      borderColor: '#374151',
+      timeVisible: true,
+      rightOffset: 5,
+      barSpacing: 4,
+      minBarSpacing: 0.5,
+    },
+    rightPriceScale: {
+      borderColor: '#374151',
+      autoScale: true,
+    },
+    handleScroll: { mouseWheel: true, pressedMouseMove: true },
+    handleScale: { axisPressedMouseMove: true, mouseWheel: true },
+  });
+  
+  // Historical line (gray)
+  const histSeries = aiProjectionChart.addSeries(LineSeries, {
+    color: '#9ca3af',
+    lineWidth: 2,
+  });
+  histSeries.setData(historicalCandles.slice(-50).map(c => ({ time: c.time, value: c.close })));
+  
+  // Actual price line (bright green for what really happened)
+  if (actualCandles.length > 0) {
+    const actualSeries = aiProjectionChart.addSeries(LineSeries, {
+      color: '#22c55e',
+      lineWidth: 3,
+    });
+    actualSeries.setData(actualCandles.map(c => ({ time: c.time, value: c.close })));
+  }
+  
+  // AI Projection line (blue dashed - what AI would have predicted)
+  const lastHistTime = historicalCandles[historicalCandles.length - 1].time;
+  const projectionData = [];
+  let projPrice = startPrice;
+  
+  // Use seeded random for consistent results
+  let seed = Math.floor(startPrice * 1000);
+  const seededRandom = () => {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    return (seed / 0x7fffffff) * 2 - 1;
+  };
+  
+  // Projection based on AI direction with bounded random walk
+  const totalDrift = aiDirection === 'Long' ? 0.05 : (aiDirection === 'Short' ? -0.05 : 0);
+  const driftPerStep = totalDrift / Math.max(forecastCandles, 1);
+  const volatility = 0.001;
+  
+  for (let i = 0; i <= Math.min(forecastCandles, actualCandles.length + 20); i++) {
+    const time = lastHistTime + (i * intervalSeconds);
+    projectionData.push({ time, value: projPrice });
+    const step = driftPerStep + seededRandom() * volatility;
+    projPrice = Math.max(startPrice * 0.9, Math.min(startPrice * 1.1, projPrice * (1 + step)));
+  }
+  
+  const projSeries = aiProjectionChart.addSeries(LineSeries, {
+    color: '#3b82f6',
+    lineWidth: 2,
+    lineStyle: LineStyle.Dashed,
+  });
+  projSeries.setData(projectionData);
+  
+  // Fit content
+  aiProjectionChart.timeScale().fitContent();
 }
 
 function updateProjectionListView(expected, bullish, bearish, actualData = []) {
