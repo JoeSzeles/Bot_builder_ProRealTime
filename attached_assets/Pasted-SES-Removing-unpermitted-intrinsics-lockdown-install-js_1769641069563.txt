@@ -1,0 +1,62 @@
+SES Removing unpermitted intrinsics lockdown-install.js:1:203117
+  Removing intrinsics.%MapPrototype%.getOrInsert lockdown-install.js:1:202962
+  Removing intrinsics.%MapPrototype%.getOrInsertComputed lockdown-install.js:1:202962
+  Removing intrinsics.%WeakMapPrototype%.getOrInsert lockdown-install.js:1:202962
+  Removing intrinsics.%WeakMapPrototype%.getOrInsertComputed lockdown-install.js:1:202962
+  Removing intrinsics.%DatePrototype%.toTemporalInstant lockdown-install.js:1:202962
+[vite] connecting... client:495:9
+updateAiProjectionChart called with result: 
+Object { context: {…}, hypotheses: (3) […], learning: {…}, predictions: {…}, marketData: (30) […] }
+botBuilder.js:2937:11
+Container dimensions: 
+Object { width: 0, height: 0 }
+botBuilder.js:2948:13
+[vite] connected. client:618:15
+Daily news already checked today botBuilder.js:6371:13
+Loaded last bot session: bot_1769572834460_urbb58lns botBuilder.js:8626:17
+Forecast generation failed: TypeError: priceData.slice is not a function
+    generateForecast botBuilder.js:8774
+botBuilder.js:8800:13
+updateAiProjectionChart called with result: 
+Object { context: {…}, hypotheses: (3) […], learning: {…}, predictions: {…}, marketData: (30) […] }
+botBuilder.js:2937:11
+Container dimensions: 
+Object { width: 1019, height: 288 }
+botBuilder.js:2948:13
+Projection params: 
+Object { forecastCandles: 10000, tf: "5m", tfData: {…}, hasPredictions: true }
+botBuilder.js:2961:13
+Fetching 10000 candles for silver/5m (API: 5m) botBuilder.js:2977:11
+Market data response: 
+Object { status: 200, candleCount: 1031, timeframe: "5m" }
+botBuilder.js:2988:13
+Using 1031 candles (requested 10000, available 1031) botBuilder.js:2992:15
+Data status: 
+Object { historicalCandles: 1031, displayCandles: 1031 }
+botBuilder.js:3009:11
+Projection: 10000 forecast candles, 1031 historical candles available, displaying 1031 botBuilder.js:3018:11
+Creating chart with dimensions: 
+Object { chartWidth: 1019, chartHeight: 288 }
+botBuilder.js:3043:11
+Generating AI projection with learned patterns... botBuilder.js:2599:11
+Forecast generation failed: TypeError: priceData.slice is not a function
+    generateForecast botBuilder.js:8774
+botBuilder.js:8800:13
+    generateForecast botBuilder.js:8800
+Forecast generation failed: TypeError: priceData.slice is not a function
+    generateForecast botBuilder.js:8774
+botBuilder.js:8800:13
+Using fallback projection botBuilder.js:2736:11
+Chart created successfully with 
+Object { bullishDataLength: 501, bearishDataLength: 501, expectedDataLength: 501 }
+botBuilder.js:3179:11
+Updating list view... botBuilder.js:3191:11
+updateProjectionListView called with: 
+Object { expectedLen: 501, bullishLen: 501, bearishLen: 501 }
+botBuilder.js:3581:11
+Forecast generation failed: TypeError: priceData.slice is not a function
+    generateForecast botBuilder.js:8774
+botBuilder.js:8800:13
+Forecast generation failed: TypeError: priceData.slice is not a function
+    generateForecast botBuilder.js:8774
+botBuilder.js:8800:13

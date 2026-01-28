@@ -8763,7 +8763,8 @@ async function generateForecast() {
     ]);
     
     const brainData = await brainRes.json();
-    const priceData = await priceRes.json();
+    const priceResponse = await priceRes.json();
+    const priceData = Array.isArray(priceResponse) ? priceResponse : (priceResponse.data || []);
     
     const response = await fetch('/api/ai/forecast', {
       method: 'POST',
@@ -8801,7 +8802,8 @@ async function generateForecast() {
     const asset = document.getElementById('forecastAssetSelect')?.value || 'silver';
     try {
       const priceRes = await fetch(`/api/market-data/${asset}/1h`);
-      const priceData = await priceRes.json();
+      const priceResponse = await priceRes.json();
+      const priceData = Array.isArray(priceResponse) ? priceResponse : (priceResponse.data || []);
       const brainRes = await fetch('/api/ai-memory/brain');
       const brainData = await brainRes.json();
       
@@ -8827,7 +8829,8 @@ async function generateForecast() {
 function generateMockForecast(asset, priceData, brainData) {
   const days = [];
   const today = new Date();
-  const currentPrice = priceData.length > 0 ? priceData[priceData.length - 1].close : 30;
+  const prices = Array.isArray(priceData) ? priceData : (priceData?.data || []);
+  const currentPrice = prices.length > 0 ? prices[prices.length - 1].close : 30;
   
   const patterns = brainData?.patterns || [];
   const avgWinRate = patterns.length > 0 ? patterns.reduce((sum, p) => sum + (p.successRate || 50), 0) / patterns.length : 55;
