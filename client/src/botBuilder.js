@@ -2434,42 +2434,74 @@ async function updateAiProjectionChart(result) {
   const avgChange = priceChanges.reduce((a, b) => a + b, 0) / priceChanges.length;
   const volatility = Math.sqrt(priceChanges.reduce((sum, c) => sum + Math.pow(c - avgChange, 2), 0) / priceChanges.length) || 0.002;
   
-  // Generate bullish, bearish, and expected projections with realistic movement
+  // Generate realistic projections using random walk with drift
   const bullishData = [];
   const bearishData = [];
   const expectedData = [];
   
+  // Seeded pseudo-random number generator for consistent but random-looking results
+  let seed = Math.floor(lastPrice * 1000 + lastTime);
+  const seededRandom = () => {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    return (seed / 0x7fffffff) * 2 - 1; // Returns -1 to 1
+  };
+  
+  // Scale volatility for more dramatic swings (multiply by sqrt of forecast length)
+  const scaledVol = volatility * Math.sqrt(forecastCandles / 100) * 3;
+  
+  // Initialize prices at last known price
   let bullPrice = lastPrice;
   let bearPrice = lastPrice;
   let expPrice = lastPrice;
   
-  // Seed for consistent random-like behavior based on last price
-  const seed = lastPrice * 1000;
+  // Trend bias per step
+  const bullDrift = scaledVol * 0.02;  // Upward bias
+  const bearDrift = -scaledVol * 0.02; // Downward bias
+  let expDrift = 0;
+  if (direction === 'Long') expDrift = scaledVol * 0.012;
+  else if (direction === 'Short') expDrift = -scaledVol * 0.012;
+  
+  // Track momentum for more realistic swings
+  let bullMomentum = 0, bearMomentum = 0, expMomentum = 0;
   
   for (let i = 0; i <= forecastCandles; i++) {
     const time = lastTime + (i * interval);
-    const progress = i / forecastCandles;
     
-    // Use sine waves and noise for more realistic price movement
-    const noise1 = Math.sin(seed + i * 0.5) * 0.3 + Math.sin(seed + i * 0.17) * 0.2;
-    const noise2 = Math.sin(seed + i * 0.7) * 0.25 + Math.sin(seed + i * 0.23) * 0.15;
-    const noise3 = Math.sin(seed + i * 0.3) * 0.2 + Math.sin(seed + i * 0.13) * 0.3;
+    if (i === 0) {
+      // First point is the last known price
+      bullishData.push({ time, value: bullPrice });
+      bearishData.push({ time, value: bearPrice });
+      expectedData.push({ time, value: expPrice });
+      continue;
+    }
     
-    // Bullish projection with upward trend + volatility waves
-    const bullTrend = volatility * 2 * progress;
-    bullPrice = lastPrice * (1 + bullTrend + volatility * noise1);
+    // Random components with occasional larger moves
+    const rand1 = seededRandom();
+    const rand2 = seededRandom();
+    const rand3 = seededRandom();
+    
+    // Occasional spike (5% chance of 3x normal move)
+    const spike1 = seededRandom() > 0.95 ? 3 : 1;
+    const spike2 = seededRandom() > 0.95 ? 3 : 1;
+    const spike3 = seededRandom() > 0.95 ? 3 : 1;
+    
+    // Update momentum (smooths out jagged movements, creates trends)
+    bullMomentum = bullMomentum * 0.9 + rand1 * 0.1;
+    bearMomentum = bearMomentum * 0.9 + rand2 * 0.1;
+    expMomentum = expMomentum * 0.9 + rand3 * 0.1;
+    
+    // Calculate step changes as percentage
+    const bullStep = bullDrift + scaledVol * (rand1 * 0.7 + bullMomentum * 0.3) * spike1 / Math.sqrt(forecastCandles);
+    const bearStep = bearDrift + scaledVol * (rand2 * 0.7 + bearMomentum * 0.3) * spike2 / Math.sqrt(forecastCandles);
+    const expStep = expDrift + scaledVol * (rand3 * 0.7 + expMomentum * 0.3) * spike3 / Math.sqrt(forecastCandles);
+    
+    // Apply changes (random walk - accumulates over time)
+    bullPrice = bullPrice * (1 + bullStep);
+    bearPrice = bearPrice * (1 + bearStep);
+    expPrice = expPrice * (1 + expStep);
+    
     bullishData.push({ time, value: bullPrice });
-    
-    // Bearish projection with downward trend + volatility waves
-    const bearTrend = -volatility * 2 * progress;
-    bearPrice = lastPrice * (1 + bearTrend + volatility * noise2);
     bearishData.push({ time, value: bearPrice });
-    
-    // Expected projection based on AI direction with realistic movement
-    let expTrend = 0;
-    if (direction === 'Long') expTrend = volatility * 1.2 * progress;
-    else if (direction === 'Short') expTrend = -volatility * 1.2 * progress;
-    expPrice = lastPrice * (1 + expTrend + volatility * 0.5 * noise3);
     expectedData.push({ time, value: expPrice });
   }
   
