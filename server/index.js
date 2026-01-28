@@ -2918,6 +2918,237 @@ app.post('/api/ai-memory/brain/prediction', (req, res) => {
   }
 });
 
+// Save backtest results to brain for learning
+app.post('/api/ai-memory/brain/backtest', (req, res) => {
+  const { asset, trades, summary, timeframe, patterns } = req.body;
+  
+  // Validate required inputs
+  if (!asset || !trades || !summary) {
+    return res.status(400).json({ error: 'Missing required fields: asset, trades, or summary' });
+  }
+  
+  try {
+    const brain = readAIMemory('brain.json') || { assets: {}, globalStats: { totalAnalyses: 0, totalPatterns: 0, overallAccuracy: 0 } };
+    
+    if (!brain.assets[asset]) {
+      brain.assets[asset] = {
+        symbol: asset.toUpperCase(),
+        totalPredictions: 0,
+        correctPredictions: 0,
+        accuracy: 0,
+        learnedPatterns: [],
+        sessionMemory: [],
+        backtestHistory: [],
+        lastUpdated: null,
+        confidenceLevel: 0,
+        correlatedAssets: []
+      };
+    }
+    
+    const assetData = brain.assets[asset];
+    
+    // Initialize backtestHistory if not exists
+    if (!assetData.backtestHistory) {
+      assetData.backtestHistory = [];
+    }
+    
+    // Add backtest results
+    const backtestEntry = {
+      timestamp: new Date().toISOString(),
+      timeframe,
+      totalTrades: summary.totalTrades,
+      winRate: summary.winRate,
+      totalPnL: summary.totalPnL,
+      avgTrade: summary.avgTrade,
+      cycles: summary.cycles
+    };
+    
+    assetData.backtestHistory.unshift(backtestEntry);
+    if (assetData.backtestHistory.length > 50) {
+      assetData.backtestHistory = assetData.backtestHistory.slice(0, 50);
+    }
+    
+    // Learn from winning trades - identify patterns
+    const winningTrades = trades.filter(t => t.win);
+    const losingTrades = trades.filter(t => !t.win);
+    
+    // Analyze patterns from trades
+    const patternStats = {};
+    trades.forEach(trade => {
+      const hour = new Date(trade.entryTime * 1000).getHours();
+      const session = hour >= 22 || hour < 6 ? 'Asian' : (hour >= 6 && hour < 14 ? 'London' : 'NY');
+      const pattern = `${session}_${trade.type}_${trade.rsi > 50 ? 'highRSI' : 'lowRSI'}`;
+      
+      if (!patternStats[pattern]) {
+        patternStats[pattern] = { wins: 0, losses: 0, totalPnL: 0 };
+      }
+      if (trade.win) {
+        patternStats[pattern].wins++;
+      } else {
+        patternStats[pattern].losses++;
+      }
+      patternStats[pattern].totalPnL += trade.pnl;
+    });
+    
+    // Save patterns with minimum sample size and meaningful success rates
+    const MIN_OCCURRENCES = 3; // Require at least 3 trades to store pattern
+    const MIN_SUCCESS_RATE = 50; // Require at least 50% win rate
+    
+    Object.entries(patternStats).forEach(([name, stats]) => {
+      const totalTrades = stats.wins + stats.losses;
+      const successRate = totalTrades > 0 ? (stats.wins / totalTrades * 100) : 0;
+      
+      // Only store statistically meaningful patterns
+      if (totalTrades >= MIN_OCCURRENCES && (successRate >= MIN_SUCCESS_RATE || stats.totalPnL > 50)) {
+        const existing = assetData.learnedPatterns.find(p => p.name === name);
+        if (existing) {
+          // Weighted average for success rate based on sample size
+          const totalOccurrences = existing.occurrences + totalTrades;
+          existing.successRate = Math.round(
+            (existing.successRate * existing.occurrences + successRate * totalTrades) / totalOccurrences
+          );
+          existing.occurrences = totalOccurrences;
+          existing.totalPnL = (existing.totalPnL || 0) + stats.totalPnL;
+          existing.lastSeen = new Date().toISOString();
+        } else {
+          assetData.learnedPatterns.push({
+            name,
+            occurrences: totalTrades,
+            successRate: Math.round(successRate),
+            totalPnL: stats.totalPnL,
+            firstSeen: new Date().toISOString(),
+            lastSeen: new Date().toISOString()
+          });
+        }
+      }
+    });
+    
+    // Update best timeframes based on results
+    if (!assetData.bestTimeframes) assetData.bestTimeframes = [];
+    const tfEntry = assetData.bestTimeframes.find(t => t.timeframe === timeframe);
+    if (tfEntry) {
+      tfEntry.winRate = (tfEntry.winRate + summary.winRate) / 2;
+      tfEntry.samples++;
+    } else {
+      assetData.bestTimeframes.push({
+        timeframe,
+        winRate: summary.winRate,
+        samples: 1
+      });
+    }
+    assetData.bestTimeframes.sort((a, b) => b.winRate - a.winRate);
+    
+    assetData.lastUpdated = new Date().toISOString();
+    brain.globalStats.totalAnalyses++;
+    brain.globalStats.lastTrainingDate = new Date().toISOString();
+    
+    writeAIMemory('brain.json', brain);
+    
+    console.log(`Brain updated with backtest: ${asset} ${timeframe} - ${summary.totalTrades} trades, ${summary.winRate}% win rate`);
+    res.json({ success: true, patternsLearned: Object.keys(patternStats).length });
+  } catch (e) {
+    console.error('Error saving backtest to brain:', e);
+    res.status(500).json({ error: 'Failed to save backtest to brain' });
+  }
+});
+
+// AI Query endpoint - answer natural language questions about predictions
+app.post('/api/ai/query', async (req, res) => {
+  const { question, asset, timeframe } = req.body;
+  
+  // Validate required inputs
+  if (!question || !question.trim()) {
+    return res.status(400).json({ error: 'Question is required' });
+  }
+  
+  const validAsset = asset || 'silver';
+  const validTimeframe = timeframe || '1h';
+  
+  try {
+    // Get brain data for context
+    const brain = readAIMemory('brain.json') || { assets: {} };
+    const assetData = brain.assets[validAsset] || brain.assets[validAsset?.toLowerCase()] || {};
+    const events = readAIMemory('events.json') || { events: [] };
+    
+    // Get current market data
+    let currentPrice = null;
+    let recentCandles = [];
+    try {
+      const marketRes = await fetch(`http://localhost:${PORT}/api/market/${asset}/${timeframe || '1h'}`);
+      if (marketRes.ok) {
+        const marketData = await marketRes.json();
+        recentCandles = marketData.candles?.slice(-20) || [];
+        currentPrice = recentCandles[recentCandles.length - 1]?.close;
+      }
+    } catch (e) {
+      console.log('Could not fetch market data for query');
+    }
+    
+    // Find best performing patterns for context
+    const topPatterns = (assetData.learnedPatterns || [])
+      .filter(p => p.occurrences >= 3)
+      .sort((a, b) => b.successRate - a.successRate)
+      .slice(0, 5);
+    
+    // Get best timeframes from backtest history
+    const bestTfFromBacktest = (assetData.backtestHistory || [])
+      .filter(b => b.winRate > 50)
+      .slice(0, 3);
+    
+    const prompt = `You are an AI trading assistant with memory of past predictions and learned market patterns.
+
+BRAIN MEMORY DATA:
+- Asset: ${validAsset}
+- Current Price: ${currentPrice || 'unknown'}
+- Timeframe: ${validTimeframe}
+- Brain Accuracy: ${assetData.accuracy || 0}%
+- Total Predictions Recorded: ${assetData.totalPredictions || 0}
+- Confidence Level: ${assetData.confidenceLevel || 0}/100
+
+TOP PERFORMING PATTERNS (sorted by success rate):
+${topPatterns.map(p => `- ${p.name}: ${p.successRate}% success, ${p.occurrences} occurrences, P/L: $${(p.totalPnL || 0).toFixed(2)}`).join('\n') || '- No patterns learned yet'}
+
+BEST TIMEFRAMES FROM BACKTESTS:
+${(assetData.bestTimeframes || []).slice(0, 3).map(t => `- ${t.timeframe}: ${t.winRate}% win rate (${t.samples} samples)`).join('\n') || '- No backtest data yet'}
+
+RECENT BACKTEST RESULTS:
+${bestTfFromBacktest.map(b => `- ${b.timeframe}: ${b.winRate}% win rate, P/L: $${b.totalPnL?.toFixed(2) || 0}`).join('\n') || '- No profitable backtests yet'}
+
+RECENT MARKET EVENTS:
+${(events.events || []).slice(0, 3).map(e => `- ${e.title}: ${e.impact || 'unknown'} impact`).join('\n') || '- No events recorded'}
+
+RECENT CANDLES (last 5): ${JSON.stringify(recentCandles.slice(-5))}
+
+USER QUESTION: ${question}
+
+INSTRUCTIONS:
+1. Use the learned patterns above to inform your prediction - patterns with higher success rates should carry more weight
+2. If asking for a specific price/time, calculate based on current price, trend direction from patterns, and timeframe
+3. For Sydney time questions, convert appropriately (Sydney is currently UTC+11 in summer, UTC+10 in winter)
+4. Be specific with numbers - give exact price predictions when asked
+5. State your confidence based on: pattern success rates, sample sizes, and brain accuracy
+6. If no relevant patterns exist, acknowledge the uncertainty
+
+Respond concisely with the answer. Always include a specific number for price predictions and a confidence percentage.`;
+
+    const response = await callAI(prompt, 500);
+    
+    res.json({
+      answer: response,
+      context: {
+        asset: validAsset,
+        currentPrice,
+        brainAccuracy: assetData.accuracy,
+        patternsCount: assetData.learnedPatterns?.length || 0,
+        topPatterns: topPatterns.slice(0, 3)
+      }
+    });
+  } catch (e) {
+    console.error('Error processing AI query:', e);
+    res.status(500).json({ error: 'Failed to process query' });
+  }
+});
+
 // Get events archive
 app.get('/api/ai-memory/events', (req, res) => {
   try {

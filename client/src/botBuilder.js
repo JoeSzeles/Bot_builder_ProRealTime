@@ -7037,6 +7037,35 @@ function initBacktest() {
   if (downloadBtn) {
     downloadBtn.addEventListener('click', downloadBacktestJson);
   }
+  
+  // Continuous backtest buttons
+  const continuousBtn = document.getElementById('startContinuousBtn');
+  if (continuousBtn) {
+    continuousBtn.addEventListener('click', () => startContinuousBacktest('continuous'));
+  }
+  
+  const untilProfitBtn = document.getElementById('runUntilProfitBtn');
+  if (untilProfitBtn) {
+    untilProfitBtn.addEventListener('click', () => startContinuousBacktest('until_profit'));
+  }
+  
+  const stopContinuousBtn = document.getElementById('stopContinuousBtn');
+  if (stopContinuousBtn) {
+    stopContinuousBtn.addEventListener('click', stopContinuousBacktest);
+  }
+  
+  // AI Query input
+  const aiQueryBtn = document.getElementById('aiQueryBtn');
+  if (aiQueryBtn) {
+    aiQueryBtn.addEventListener('click', submitAiQuery);
+  }
+  
+  const aiQueryInput = document.getElementById('aiQueryInput');
+  if (aiQueryInput) {
+    aiQueryInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') submitAiQuery();
+    });
+  }
 }
 
 // Run backtest simulation on historical data
@@ -7208,7 +7237,162 @@ async function runBacktestSimulation() {
     renderBacktestTradeList();
   }, 200);
   
+  // Save results to AI brain for learning
+  await saveBacktestToBrain(symbol, timeframe, allTrades, BACKTEST_DATA.summary);
+  
   resetBacktestUI('Complete');
+  
+  // Check if continuous mode should continue
+  if (CONTINUOUS_BACKTEST.running) {
+    CONTINUOUS_BACKTEST.iterations++;
+    CONTINUOUS_BACKTEST.bestPnL = Math.max(CONTINUOUS_BACKTEST.bestPnL, totalPnL);
+    
+    const continuousIterations = document.getElementById('continuousIterations');
+    const continuousBestPnL = document.getElementById('continuousBestPnL');
+    if (continuousIterations) continuousIterations.textContent = CONTINUOUS_BACKTEST.iterations;
+    if (continuousBestPnL) continuousBestPnL.textContent = `$${CONTINUOUS_BACKTEST.bestPnL.toFixed(2)}`;
+    
+    // Check stop conditions
+    const reachedMaxIterations = CONTINUOUS_BACKTEST.iterations >= CONTINUOUS_BACKTEST.maxIterations;
+    const profitAchieved = CONTINUOUS_BACKTEST.mode === 'until_profit' && totalPnL > 0;
+    
+    if (reachedMaxIterations || profitAchieved) {
+      stopContinuousBacktest();
+      console.log(`Continuous backtest stopped - ${profitAchieved ? 'profit achieved!' : 'max iterations reached'}`);
+    } else {
+      // Continue after a short delay
+      setTimeout(() => {
+        if (CONTINUOUS_BACKTEST.running && !BACKTEST_RUNNING) {
+          runBacktestSimulation();
+        }
+      }, 500);
+    }
+  }
+}
+
+// Save backtest results to AI brain
+async function saveBacktestToBrain(asset, timeframe, trades, summary) {
+  try {
+    const response = await fetch('/api/ai-memory/brain/backtest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        asset,
+        timeframe,
+        trades: trades.map(t => ({
+          type: t.type,
+          entryTime: t.entryTime,
+          exitTime: t.exitTime,
+          pnl: t.pnl,
+          rsi: t.rsi,
+          win: t.win
+        })),
+        summary
+      })
+    });
+    
+    if (response.ok) {
+      const result = await response.json();
+      console.log('Backtest saved to brain:', result.patternsLearned, 'patterns learned');
+    }
+  } catch (e) {
+    console.error('Failed to save backtest to brain:', e);
+  }
+}
+
+// Continuous backtest state
+let CONTINUOUS_BACKTEST = {
+  running: false,
+  mode: null,
+  iterations: 0,
+  bestPnL: -Infinity
+};
+
+function startContinuousBacktest(mode) {
+  if (BACKTEST_RUNNING || CONTINUOUS_BACKTEST.running) {
+    console.log('Backtest already running');
+    return;
+  }
+  
+  CONTINUOUS_BACKTEST = {
+    running: true,
+    mode: mode,
+    iterations: 0,
+    bestPnL: -Infinity,
+    maxIterations: 100
+  };
+  
+  const continuousControls = document.getElementById('continuousControls');
+  const startContinuousBtn = document.getElementById('startContinuousBtn');
+  const runUntilProfitBtn = document.getElementById('runUntilProfitBtn');
+  const continuousIterations = document.getElementById('continuousIterations');
+  const continuousBestPnL = document.getElementById('continuousBestPnL');
+  
+  if (continuousControls) continuousControls.classList.remove('hidden');
+  if (startContinuousBtn) startContinuousBtn.classList.add('hidden');
+  if (runUntilProfitBtn) runUntilProfitBtn.classList.add('hidden');
+  if (continuousIterations) continuousIterations.textContent = '0';
+  if (continuousBestPnL) continuousBestPnL.textContent = '$0.00';
+  
+  runBacktestSimulation();
+}
+
+function stopContinuousBacktest() {
+  CONTINUOUS_BACKTEST.running = false;
+  
+  const continuousControls = document.getElementById('continuousControls');
+  const startContinuousBtn = document.getElementById('startContinuousBtn');
+  const runUntilProfitBtn = document.getElementById('runUntilProfitBtn');
+  
+  if (continuousControls) continuousControls.classList.add('hidden');
+  if (startContinuousBtn) startContinuousBtn.classList.remove('hidden');
+  if (runUntilProfitBtn) runUntilProfitBtn.classList.remove('hidden');
+}
+
+// AI Query functionality
+async function submitAiQuery() {
+  const input = document.getElementById('aiQueryInput');
+  const resultDiv = document.getElementById('aiQueryResult');
+  const loadingDiv = document.getElementById('aiQueryLoading');
+  
+  if (!input || !input.value.trim()) return;
+  
+  const question = input.value.trim();
+  const asset = document.getElementById('aiSymbol')?.value || 'silver';
+  const timeframe = document.getElementById('aiTimeframe')?.value || '1h';
+  
+  // Show loading
+  if (loadingDiv) loadingDiv.classList.remove('hidden');
+  if (resultDiv) resultDiv.innerHTML = '';
+  
+  try {
+    const response = await fetch('/api/ai/query', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question, asset, timeframe })
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      if (resultDiv) {
+        resultDiv.innerHTML = `
+          <div class="text-sm text-gray-800 dark:text-gray-200">${data.answer}</div>
+          <div class="text-xs text-gray-500 mt-2">
+            Asset: ${data.context?.asset || asset} | 
+            Current: $${data.context?.currentPrice?.toFixed(2) || 'N/A'} | 
+            Brain Accuracy: ${data.context?.brainAccuracy || 0}%
+          </div>
+        `;
+      }
+    } else {
+      if (resultDiv) resultDiv.innerHTML = '<div class="text-red-500 text-sm">Failed to get AI response</div>';
+    }
+  } catch (e) {
+    console.error('AI Query error:', e);
+    if (resultDiv) resultDiv.innerHTML = '<div class="text-red-500 text-sm">Error connecting to AI</div>';
+  } finally {
+    if (loadingDiv) loadingDiv.classList.add('hidden');
+  }
 }
 
 // Run a single backtest cycle on candle data - returns trade details
