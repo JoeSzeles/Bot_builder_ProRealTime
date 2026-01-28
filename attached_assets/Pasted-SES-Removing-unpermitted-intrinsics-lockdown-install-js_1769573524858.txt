@@ -1,0 +1,117 @@
+SES Removing unpermitted intrinsics lockdown-install.js:1:203117
+  Removing intrinsics.%MapPrototype%.getOrInsert lockdown-install.js:1:202962
+  Removing intrinsics.%MapPrototype%.getOrInsertComputed lockdown-install.js:1:202962
+  Removing intrinsics.%WeakMapPrototype%.getOrInsert lockdown-install.js:1:202962
+  Removing intrinsics.%WeakMapPrototype%.getOrInsertComputed lockdown-install.js:1:202962
+  Removing intrinsics.%DatePrototype%.toTemporalInstant lockdown-install.js:1:202962
+[vite] connecting... client:495:9
+[vite] connected. client:618:15
+Using localStorage cache for silver_1m botBuilder.js:75:15
+updateAiProjectionChart called with result: 
+Object { context: {…}, hypotheses: (3) […], learning: {…}, predictions: {…}, marketData: (30) […] }
+botBuilder.js:2922:11
+Container dimensions: 
+Object { width: 0, height: 0 }
+botBuilder.js:2933:13
+updateAiProjectionChart called with result: 
+Object { context: {…}, hypotheses: (3) […], learning: {…}, predictions: {…}, marketData: (30) […] }
+botBuilder.js:2922:11
+Container dimensions: 
+Object { width: 1020, height: 288 }
+botBuilder.js:2933:13
+Projection params: 
+Object { forecastCandles: 10000, tf: "1m", tfData: {…}, hasPredictions: true }
+botBuilder.js:2946:13
+Fetching 10000 candles for silver/1m (API: 1m) botBuilder.js:2962:11
+Market data response: 
+Object { status: 200, candleCount: 1321, timeframe: "1m" }
+botBuilder.js:2973:13
+Using 1321 candles (requested 10000, available 1321) botBuilder.js:2977:15
+Data status: 
+Object { historicalCandles: 1321, displayCandles: 1321 }
+botBuilder.js:2994:11
+Projection: 10000 forecast candles, 1321 historical candles available, displaying 1321 botBuilder.js:3003:11
+Creating chart with dimensions: 
+Object { chartWidth: 1020, chartHeight: 288 }
+botBuilder.js:3028:11
+Generating AI projection with learned patterns... botBuilder.js:2584:11
+updateAiProjectionChart called with result: 
+Object { context: {…}, hypotheses: (3) […], learning: {…}, predictions: {…}, marketData: (30) […] }
+botBuilder.js:2922:11
+Container dimensions: 
+Object { width: 1020, height: 288 }
+botBuilder.js:2933:13
+Projection params: 
+Object { forecastCandles: 10000, tf: "1m", tfData: {…}, hasPredictions: true }
+botBuilder.js:2946:13
+Fetching 10000 candles for silver/1m (API: 1m) botBuilder.js:2962:11
+Market data response: 
+Object { status: 200, candleCount: 1321, timeframe: "1m" }
+botBuilder.js:2973:13
+Using 1321 candles (requested 10000, available 1321) botBuilder.js:2977:15
+Data status: 
+Object { historicalCandles: 1321, displayCandles: 1321 }
+botBuilder.js:2994:11
+Projection: 10000 forecast candles, 1321 historical candles available, displaying 1321 botBuilder.js:3003:11
+Creating chart with dimensions: 
+Object { chartWidth: 1020, chartHeight: 288 }
+botBuilder.js:3028:11
+Generating AI projection with learned patterns... botBuilder.js:2584:11
+Using fallback projection botBuilder.js:2721:11
+Chart created successfully with 
+Object { bullishDataLength: 501, bearishDataLength: 501, expectedDataLength: 501 }
+botBuilder.js:3164:11
+Updating list view... botBuilder.js:3176:11
+updateProjectionListView called with: 
+Object { expectedLen: 501, bullishLen: 501, bearishLen: 501 }
+botBuilder.js:3566:11
+Using fallback projection botBuilder.js:2721:11
+Chart created successfully with 
+Object { bullishDataLength: 501, bearishDataLength: 501, expectedDataLength: 501 }
+botBuilder.js:3164:11
+Updating list view... botBuilder.js:3176:11
+updateProjectionListView called with: 
+Object { expectedLen: 501, bullishLen: 501, bearishLen: 501 }
+botBuilder.js:3566:11
+Backtest complete: 
+Object { candles: 455, trades: 91, totalPnL: -1401.3700000000006, winRate: "45.1" }
+botBuilder.js:7184:11
+Rendering backtest chart and trade list... botBuilder.js:7206:13
+renderBacktestSimChart called 
+Object { container: true, candles: 455, trades: 91, firstTrade: {…} }
+botBuilder.js:7314:11
+Chart container rect: 986 256 botBuilder.js:7345:11
+Setting chart markers: 182 first: 
+Object { time: 1766998800, position: "belowBar", color: "#10b981", shape: "arrowUp", text: "L" }
+botBuilder.js:7415:11
+Error rendering backtest chart: TypeError: priceSeries.setMarkers is not a function
+    renderBacktestSimChart botBuilder.js:7416
+    runBacktestSimulation botBuilder.js:7207
+botBuilder.js:7421:13
+renderBacktestTradeList called 
+Object { tbody: true, trades: 91, firstTrade: {…} }
+botBuilder.js:7429:11
+updateProjectionListView called with: 
+Object { expectedLen: 501, bullishLen: 501, bearishLen: 501 }
+botBuilder.js:3566:11
+Backtest complete: 
+Object { candles: 1321, trades: 271, totalPnL: -3876.169999999999, winRate: "16.2" }
+botBuilder.js:7184:11
+Rendering backtest chart and trade list... botBuilder.js:7206:13
+renderBacktestSimChart called 
+Object { container: true, candles: 1321, trades: 271, firstTrade: {…} }
+botBuilder.js:7314:11
+Chart container rect: 986 256 botBuilder.js:7345:11
+Setting chart markers: 542 first: 
+Object { time: 1769490600, position: "aboveBar", color: "#ef4444", shape: "arrowDown", text: "S" }
+botBuilder.js:7415:11
+Error rendering backtest chart: TypeError: priceSeries.setMarkers is not a function
+    renderBacktestSimChart botBuilder.js:7416
+    runBacktestSimulation botBuilder.js:7207
+botBuilder.js:7421:13
+renderBacktestTradeList called 
+Object { tbody: true, trades: 271, firstTrade: {…} }
+botBuilder.js:7429:11
+updateProjectionListView called with: 
+Object { expectedLen: 501, bullishLen: 501, bearishLen: 501 }
+botBuilder.js:3566:11
