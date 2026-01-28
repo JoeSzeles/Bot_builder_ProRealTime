@@ -3646,6 +3646,182 @@ app.post('/api/ai/generate-projection', async (req, res) => {
   }
 });
 
+// AI 7-Day Forecast endpoint
+app.post('/api/ai/forecast', async (req, res) => {
+  const { asset, brain, recentPrices, settings } = req.body;
+  
+  try {
+    const currentPrice = recentPrices && recentPrices.length > 0 
+      ? recentPrices[recentPrices.length - 1].close 
+      : 30;
+    
+    const patterns = brain?.patterns || [];
+    const avgWinRate = patterns.length > 0 
+      ? patterns.reduce((sum, p) => sum + (p.successRate || 50), 0) / patterns.length 
+      : 55;
+    
+    const prompt = `You are an expert market analyst. Based on the following data, generate a 7-day price forecast for ${asset.toUpperCase()}.
+
+CURRENT MARKET DATA:
+- Current Price: $${currentPrice.toFixed(2)}
+- Recent Price Trend: ${recentPrices ? (recentPrices[recentPrices.length - 1]?.close > recentPrices[0]?.close ? 'Upward' : 'Downward') : 'Unknown'}
+- Historical Pattern Win Rate: ${avgWinRate.toFixed(1)}%
+- Number of Known Patterns: ${patterns.length}
+
+TRADING SETTINGS:
+- Initial Capital: $${settings?.initialCapital || 2000}
+- Stop Loss: ${settings?.stopLoss || 2}%
+- Take Profit: ${settings?.takeProfit || 5}%
+
+Generate a JSON response with exactly 7 days of forecast data. Each day should include:
+- direction: "bullish" or "bearish"
+- confidence: number 40-90
+- expectedMove: percentage change from open (-5 to +5)
+- entryTime: best time to enter (e.g., "09:30")
+- exitTime: best time to exit (e.g., "15:30")
+- summary: 1-2 sentence natural language summary
+
+Respond ONLY with valid JSON in this format:
+{
+  "days": [
+    {
+      "direction": "bullish",
+      "confidence": 65,
+      "expectedMove": 1.5,
+      "entryTime": "09:30",
+      "exitTime": "15:30",
+      "summary": "Moderate bullish momentum expected with support at current levels."
+    }
+  ]
+}`;
+
+    let result = null;
+    
+    try {
+      const response = await anthropic.messages.create({
+        model: 'claude-sonnet-4-5',
+        max_tokens: 2000,
+        messages: [{ role: 'user', content: prompt }]
+      });
+      
+      const content = response.content[0]?.text || '{}';
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        result = JSON.parse(jsonMatch[0]);
+      }
+    } catch (claudeError) {
+      console.error('Claude forecast error, trying GPT:', claudeError.message);
+      
+      try {
+        const gptResponse = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          max_tokens: 2000,
+          messages: [{ role: 'user', content: prompt }]
+        });
+        
+        const content = gptResponse.choices[0]?.message?.content || '{}';
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          result = JSON.parse(jsonMatch[0]);
+        }
+      } catch (gptError) {
+        console.error('GPT forecast error:', gptError.message);
+      }
+    }
+    
+    if (result && result.days && result.days.length >= 7) {
+      const today = new Date();
+      result.days = result.days.slice(0, 7).map((day, i) => {
+        const date = new Date(today);
+        date.setDate(date.getDate() + i);
+        
+        const predictedOpen = i === 0 ? currentPrice : result.days[i - 1].predictedClose || currentPrice;
+        const move = (day.expectedMove || 0) / 100;
+        const predictedClose = predictedOpen * (1 + move);
+        const volatility = Math.abs(move) * 0.5;
+        
+        return {
+          date: date.toISOString(),
+          dayName: date.toLocaleDateString('en-US', { weekday: 'short' }),
+          direction: day.direction || 'bullish',
+          confidence: day.confidence || 50,
+          predictedOpen,
+          predictedHigh: Math.max(predictedOpen, predictedClose) * (1 + volatility),
+          predictedLow: Math.min(predictedOpen, predictedClose) * (1 - volatility),
+          predictedClose,
+          expectedMove: day.expectedMove || 0,
+          entryPrice: day.direction === 'bullish' 
+            ? predictedOpen * (1 - volatility * 0.5) 
+            : predictedOpen * (1 + volatility * 0.5),
+          exitPrice: day.direction === 'bullish' 
+            ? predictedClose * (1 + volatility * 0.3) 
+            : predictedClose * (1 - volatility * 0.3),
+          entryTime: day.entryTime || '09:00',
+          exitTime: day.exitTime || '16:00',
+          summary: day.summary || 'Forecast based on historical patterns.',
+          predictedPrices: generateHourlyPrices(predictedOpen, predictedClose, 24),
+          actualPrices: []
+        };
+      });
+      
+      res.json(result);
+    } else {
+      res.status(400).json({ error: 'Could not generate valid forecast' });
+    }
+  } catch (e) {
+    console.error('Error generating forecast:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+function generateHourlyPrices(open, close, hours) {
+  const prices = [];
+  const diff = close - open;
+  for (let i = 0; i < hours; i++) {
+    const progress = i / hours;
+    const noise = (Math.random() - 0.5) * Math.abs(diff) * 0.3;
+    prices.push(open + diff * progress + noise);
+  }
+  return prices;
+}
+
+// Brain learning endpoint for forecast accuracy
+app.post('/api/ai-memory/brain/learn', (req, res) => {
+  const { type, data } = req.body;
+  
+  try {
+    const brainPath = path.join(__dirname, '../data/ai-memory/brain.json');
+    let brain = { patterns: [], predictions: {}, accuracy: {}, forecasts: [] };
+    
+    if (fs.existsSync(brainPath)) {
+      brain = JSON.parse(fs.readFileSync(brainPath, 'utf8'));
+    }
+    
+    if (!brain.forecasts) brain.forecasts = [];
+    
+    if (type === 'forecast_accuracy') {
+      brain.forecasts.push({
+        ...data,
+        learnedAt: new Date().toISOString()
+      });
+      
+      if (brain.forecasts.length > 100) {
+        brain.forecasts = brain.forecasts.slice(-100);
+      }
+      
+      const recentForecasts = brain.forecasts.slice(-30);
+      const avgAccuracy = recentForecasts.reduce((sum, f) => sum + (f.accuracy || 0), 0) / recentForecasts.length;
+      brain.forecastAccuracy = avgAccuracy;
+    }
+    
+    fs.writeFileSync(brainPath, JSON.stringify(brain, null, 2));
+    res.json({ success: true });
+  } catch (e) {
+    console.error('Brain learn error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // AI Chat endpoint for real-time conversation
 app.post('/api/ai/chat', async (req, res) => {
   const { message, symbol, timeframe, brainData, chatHistory } = req.body;
