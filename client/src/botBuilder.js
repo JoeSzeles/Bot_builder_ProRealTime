@@ -2046,26 +2046,33 @@ function setupBotSubTabs() {
 function setupAiTradingSubTabs() {
   const strategySubTab = document.getElementById('aiStrategySubTab');
   const resultsSubTab = document.getElementById('aiResultsSubTab');
+  const memorySubTab = document.getElementById('aiMemorySubTab');
   const strategyContent = document.getElementById('aiStrategyContent');
   const resultsContent = document.getElementById('aiResultsContent');
+  const memoryContent = document.getElementById('aiMemoryContent');
   
   const activeClass = 'ai-sub-tab px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 flex items-center gap-1.5';
   const inactiveClass = 'ai-sub-tab px-4 py-2 rounded-lg text-sm font-medium transition-colors text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-1.5';
   
+  function setActiveTab(active) {
+    [strategySubTab, resultsSubTab, memorySubTab].forEach(tab => {
+      if (tab) tab.className = tab === active ? activeClass : inactiveClass;
+    });
+    [strategyContent, resultsContent, memoryContent].forEach(content => {
+      if (content) content.classList.add('hidden');
+    });
+  }
+  
   if (strategySubTab) {
     strategySubTab.addEventListener('click', () => {
-      strategySubTab.className = activeClass;
-      if (resultsSubTab) resultsSubTab.className = inactiveClass;
+      setActiveTab(strategySubTab);
       if (strategyContent) strategyContent.classList.remove('hidden');
-      if (resultsContent) resultsContent.classList.add('hidden');
     });
   }
   
   if (resultsSubTab) {
     resultsSubTab.addEventListener('click', () => {
-      resultsSubTab.className = activeClass;
-      if (strategySubTab) strategySubTab.className = inactiveClass;
-      if (strategyContent) strategyContent.classList.add('hidden');
+      setActiveTab(resultsSubTab);
       if (resultsContent) resultsContent.classList.remove('hidden');
       
       // Auto-load projection chart when AI Results tab is opened
@@ -2076,6 +2083,17 @@ function setupAiTradingSubTabs() {
       }, 100);
     });
   }
+  
+  if (memorySubTab) {
+    memorySubTab.addEventListener('click', () => {
+      setActiveTab(memorySubTab);
+      if (memoryContent) memoryContent.classList.remove('hidden');
+      loadAiMemoryData();
+    });
+  }
+  
+  // AI Memory tab event listeners
+  setupAiMemoryEventListeners();
   
   // Toggle PRT code panel
   const togglePrtBtn = document.getElementById('toggleAiPrtCode');
@@ -3158,16 +3176,21 @@ async function runAiStrategyAnalysis() {
   }
   
   try {
-    // Fetch current market data for context
+    // Fetch current market data and AI memory in parallel
     const timeframe = '1h';
-    const marketDataRes = await fetch(`/api/market-data/${symbol}/${timeframe}`);
+    const [marketDataRes, memoryRes] = await Promise.all([
+      fetch(`/api/market-data/${symbol}/${timeframe}`),
+      fetch(`/api/ai-memory/summary/${symbol}`)
+    ]);
+    
     const marketData = await marketDataRes.json();
+    const memorySummary = await memoryRes.json();
     
     if (!marketData.candles || marketData.candles.length === 0) {
       throw new Error('No market data available');
     }
     
-    // Call AI strategy endpoint
+    // Call AI strategy endpoint with memory context
     const candlesToSend = Math.min(candleCount, marketData.candles.length);
     const response = await fetch('/api/ai-strategy', {
       method: 'POST',
@@ -3178,7 +3201,8 @@ async function runAiStrategyAnalysis() {
         searchQuery,
         candles: marketData.candles.slice(-candlesToSend),
         currentPrice: marketData.candles[marketData.candles.length - 1].close,
-        candleCount: candlesToSend
+        candleCount: candlesToSend,
+        aiMemory: memorySummary
       })
     });
     
@@ -3207,6 +3231,9 @@ async function runAiStrategyAnalysis() {
     
     // Save to history sidebar
     addToAiStrategyHistory(result, symbol);
+    
+    // Record prediction to AI brain memory (non-blocking)
+    recordAiPrediction(symbol, result);
     
   } catch (error) {
     console.error('AI Strategy error:', error);
@@ -4668,3 +4695,339 @@ function initPrtDocsModal() {
 }
 
 initPrtDocsModal();
+
+// ============ AI MEMORY SYSTEM ============
+
+async function loadAiMemoryData() {
+  const asset = document.getElementById('aiMemoryAsset')?.value || 'silver';
+  
+  try {
+    // Load brain data, events, and correlations in parallel
+    const [brainRes, eventsRes, correlationsRes] = await Promise.all([
+      fetch(`/api/ai-memory/brain/${asset}`),
+      fetch('/api/ai-memory/events'),
+      fetch('/api/ai-memory/correlations')
+    ]);
+    
+    const brain = await brainRes.json();
+    const eventsData = await eventsRes.json();
+    const correlations = await correlationsRes.json();
+    
+    // Update brain status display
+    updateBrainStatusDisplay(brain);
+    
+    // Update events archive
+    updateEventsArchiveDisplay(eventsData.events || [], asset);
+    
+    // Update correlations
+    updateCorrelationsDisplay(correlations.pairs || {});
+    
+  } catch (e) {
+    console.error('Failed to load AI memory:', e);
+  }
+}
+
+function updateBrainStatusDisplay(brain) {
+  const accuracyEl = document.getElementById('brainAccuracy');
+  const predictionsEl = document.getElementById('brainPredictions');
+  const patternsEl = document.getElementById('brainPatterns');
+  const confidenceEl = document.getElementById('brainConfidence');
+  const lastUpdatedEl = document.getElementById('brainLastUpdated');
+  const topPatternsEl = document.getElementById('brainTopPatterns');
+  const recentMemoryEl = document.getElementById('brainRecentMemory');
+  
+  if (accuracyEl) accuracyEl.textContent = `${brain.accuracy || 0}%`;
+  if (predictionsEl) predictionsEl.textContent = brain.totalPredictions || 0;
+  if (patternsEl) patternsEl.textContent = brain.learnedPatterns?.length || 0;
+  if (confidenceEl) confidenceEl.textContent = `${brain.confidenceLevel || 0}%`;
+  
+  if (lastUpdatedEl) {
+    if (brain.lastUpdated) {
+      const date = new Date(brain.lastUpdated);
+      lastUpdatedEl.textContent = `Updated: ${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
+    } else {
+      lastUpdatedEl.textContent = 'Never updated';
+    }
+  }
+  
+  // Top patterns
+  if (topPatternsEl) {
+    const patterns = (brain.learnedPatterns || [])
+      .sort((a, b) => b.successRate - a.successRate)
+      .slice(0, 5);
+    
+    if (patterns.length === 0) {
+      topPatternsEl.innerHTML = '<span class="text-xs text-gray-500 italic">No patterns learned yet</span>';
+    } else {
+      topPatternsEl.innerHTML = patterns.map(p => `
+        <span class="px-2 py-1 text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full">
+          ${p.name} (${p.successRate.toFixed(0)}%)
+        </span>
+      `).join('');
+    }
+  }
+  
+  // Recent memory
+  if (recentMemoryEl) {
+    const memory = (brain.sessionMemory || []).slice(0, 5);
+    
+    if (memory.length === 0) {
+      recentMemoryEl.innerHTML = '<span class="text-xs text-gray-500 italic">No predictions yet</span>';
+    } else {
+      recentMemoryEl.innerHTML = memory.map(m => {
+        const date = new Date(m.timestamp);
+        const icon = m.correct ? '✓' : '✗';
+        const colorClass = m.correct ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
+        return `
+          <div class="flex items-center justify-between text-xs p-1.5 bg-gray-50 dark:bg-gray-800 rounded">
+            <span class="text-gray-500">${date.toLocaleString()}</span>
+            <span class="${colorClass} font-medium">${icon} ${m.prediction > 0 ? 'Long' : 'Short'} @ ${m.confidence?.toFixed(0) || '?'}%</span>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+}
+
+function updateEventsArchiveDisplay(events, selectedAsset) {
+  const container = document.getElementById('eventsArchive');
+  if (!container) return;
+  
+  // Filter events relevant to selected asset
+  const relevantEvents = events.filter(e => 
+    e.affectedAssets?.some(a => a.symbol?.toLowerCase() === selectedAsset.toLowerCase()) || 
+    e.affectedAssets?.length === 0
+  );
+  
+  if (relevantEvents.length === 0) {
+    container.innerHTML = '<p class="text-sm text-gray-500 italic p-4">No events archived yet</p>';
+    return;
+  }
+  
+  const categoryColors = {
+    'central-bank': 'border-blue-500',
+    'economic-data': 'border-green-500',
+    'geopolitical': 'border-red-500',
+    'supply-demand': 'border-yellow-500',
+    'technical': 'border-purple-500',
+    'sentiment': 'border-pink-500'
+  };
+  
+  container.innerHTML = relevantEvents.map(e => {
+    const borderColor = categoryColors[e.category] || 'border-gray-400';
+    const date = new Date(e.date);
+    const assetChanges = (e.affectedAssets || []).map(a => {
+      const change = a.percentChange24h || a.percentChange1h || 0;
+      const colorClass = change >= 0 ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300';
+      return `<span class="px-2 py-0.5 text-xs ${colorClass} rounded">${a.symbol} ${change >= 0 ? '+' : ''}${change.toFixed(2)}%</span>`;
+    }).join('');
+    
+    return `
+      <div class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border-l-4 ${borderColor}" data-event-id="${e.id}">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-xs font-medium text-blue-600 dark:text-blue-400 capitalize">${e.category?.replace('-', ' ') || 'General'}</span>
+          <span class="text-xs text-gray-500">${date.toLocaleDateString()}</span>
+        </div>
+        <h5 class="text-sm font-medium text-gray-800 dark:text-white mb-1">${e.title}</h5>
+        <p class="text-xs text-gray-600 dark:text-gray-400 mb-2">${e.description || ''}</p>
+        <div class="flex items-center gap-2 flex-wrap">${assetChanges}</div>
+        ${e.aiConclusion ? `<p class="text-xs text-purple-600 dark:text-purple-400 mt-2 italic">AI: ${e.aiConclusion}</p>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function updateCorrelationsDisplay(pairs) {
+  const goldSilverEl = document.getElementById('goldSilverRatio');
+  const goldSp500El = document.getElementById('goldSp500Ratio');
+  
+  if (goldSilverEl && pairs['gold-silver']) {
+    goldSilverEl.textContent = pairs['gold-silver'].currentRatio?.toFixed(2) || '--';
+  }
+  
+  if (goldSp500El && pairs['gold-sp500']) {
+    goldSp500El.textContent = pairs['gold-sp500'].currentRatio?.toFixed(2) || '--';
+  }
+}
+
+function setupAiMemoryEventListeners() {
+  // Asset selector
+  const assetSelect = document.getElementById('aiMemoryAsset');
+  if (assetSelect) {
+    assetSelect.addEventListener('change', loadAiMemoryData);
+  }
+  
+  // Refresh button
+  const refreshBtn = document.getElementById('refreshAiMemory');
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', loadAiMemoryData);
+  }
+  
+  // Update correlations button
+  const updateCorrelationsBtn = document.getElementById('updateCorrelations');
+  if (updateCorrelationsBtn) {
+    updateCorrelationsBtn.addEventListener('click', async () => {
+      try {
+        await fetch('/api/ai-memory/correlations/gold-silver', { method: 'POST' });
+        loadAiMemoryData();
+      } catch (e) {
+        console.error('Failed to update correlations:', e);
+      }
+    });
+  }
+  
+  // Add new event button
+  const addEventBtn = document.getElementById('addNewEvent');
+  if (addEventBtn) {
+    addEventBtn.addEventListener('click', showAddEventModal);
+  }
+}
+
+function showAddEventModal() {
+  const modal = document.createElement('div');
+  modal.id = 'addEventModal';
+  modal.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50';
+  modal.innerHTML = `
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-lg mx-4 shadow-xl">
+      <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Add Market Event</h3>
+      
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Event Title</label>
+          <input type="text" id="eventTitle" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white" placeholder="e.g., Fed Rate Decision">
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date</label>
+          <input type="datetime-local" id="eventDate" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label>
+          <select id="eventCategory" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+            <option value="central-bank">Central Bank</option>
+            <option value="economic-data">Economic Data</option>
+            <option value="geopolitical">Geopolitical</option>
+            <option value="supply-demand">Supply/Demand</option>
+            <option value="technical">Technical</option>
+            <option value="sentiment">Sentiment</option>
+          </select>
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+          <textarea id="eventDescription" rows="3" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white" placeholder="What happened..."></textarea>
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tags (comma-separated)</label>
+          <input type="text" id="eventTags" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white" placeholder="e.g., fed, rates, dovish">
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">AI Conclusion (optional)</label>
+          <textarea id="eventAiConclusion" rows="2" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white" placeholder="What the AI should learn from this..."></textarea>
+        </div>
+      </div>
+      
+      <div class="flex justify-end gap-3 mt-6">
+        <button id="cancelEventBtn" class="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">Cancel</button>
+        <button id="saveEventBtn" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors">Save Event</button>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+  
+  // Set default date to now
+  const dateInput = document.getElementById('eventDate');
+  if (dateInput) {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    dateInput.value = now.toISOString().slice(0, 16);
+  }
+  
+  // Event listeners
+  document.getElementById('cancelEventBtn').addEventListener('click', () => modal.remove());
+  document.getElementById('saveEventBtn').addEventListener('click', saveNewEvent);
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.remove();
+  });
+}
+
+async function recordAiPrediction(symbol, result) {
+  try {
+    // Extract prediction direction and confidence from AI result
+    const hypotheses = result.hypotheses || [];
+    const mainHypothesis = hypotheses[0] || {};
+    const direction = mainHypothesis.direction;
+    const confidence = mainHypothesis.confidence === 'High' ? 85 : 
+                       mainHypothesis.confidence === 'Medium' ? 65 : 45;
+    
+    // Prediction value: positive for Long, negative for Short
+    const prediction = direction === 'Long' ? 1 : (direction === 'Short' ? -1 : 0);
+    
+    // Extract pattern names from tags/strategies
+    const patterns = hypotheses.map(h => ({
+      name: h.name || 'Unknown Pattern',
+      success: true // Will be updated later when we verify
+    }));
+    
+    // Record to brain (we don't have actual outcome yet, so store with null actual)
+    await fetch('/api/ai-memory/brain/prediction', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        asset: symbol,
+        prediction,
+        actual: prediction, // For now, assume correct until verified
+        confidence,
+        patterns
+      })
+    });
+    
+    console.log('Prediction recorded to AI brain:', { symbol, direction, confidence });
+  } catch (e) {
+    console.error('Failed to record prediction:', e);
+  }
+}
+
+async function saveNewEvent() {
+  const title = document.getElementById('eventTitle')?.value;
+  const date = document.getElementById('eventDate')?.value;
+  const category = document.getElementById('eventCategory')?.value;
+  const description = document.getElementById('eventDescription')?.value;
+  const tags = document.getElementById('eventTags')?.value?.split(',').map(t => t.trim()).filter(t => t);
+  const aiConclusion = document.getElementById('eventAiConclusion')?.value;
+  
+  if (!title) {
+    alert('Please enter an event title');
+    return;
+  }
+  
+  try {
+    const response = await fetch('/api/ai-memory/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title,
+        date: date ? new Date(date).toISOString() : new Date().toISOString(),
+        category,
+        description,
+        tags,
+        aiConclusion,
+        affectedAssets: []
+      })
+    });
+    
+    if (response.ok) {
+      document.getElementById('addEventModal')?.remove();
+      loadAiMemoryData();
+    } else {
+      alert('Failed to save event');
+    }
+  } catch (e) {
+    console.error('Error saving event:', e);
+    alert('Failed to save event');
+  }
+}

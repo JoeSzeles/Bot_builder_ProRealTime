@@ -42,11 +42,22 @@ The application features a modern full-stack architecture:
 -   **MetalPriceAPI**: Fallback for real-time Silver & Gold spot prices (requires `METALS_API_KEY` secret).
 
 ## Recent Changes (Jan 28, 2026)
+- **AI Memory System** (New Feature):
+  - New "AI Memory" sub-tab in AI Trading section
+  - **Brain Status Panel**: Shows accuracy %, total predictions, patterns learned, confidence level per asset
+  - **Cross-Asset Correlations**: Gold/Silver ratio, Gold vs S&P 500 with live ratio tracking
+  - **News & Events Archive**: Wiki-style storage for market events with asset price reactions
+  - Memory data stored in `data/ai-memory/` (brain.json, events.json, correlations.json)
+  - AI analysis now references past performance and historical events in strategy generation
+  - Backend API endpoints: `/api/ai-memory/brain`, `/api/ai-memory/events`, `/api/ai-memory/correlations`
+
 - **AI Price Projection Chart Fix**:
   - Fixed value explosion bug where projections reached astronomical numbers (90 trillion)
   - Implemented bounded random walk algorithm (prices stay within 50%-200% of start)
   - Added container dimension checks to defer chart rendering until visible
   - Chart now properly renders in AI Results tab with 10k forecast candles
+  - **Timeframe-specific data fetching**: Each timeframe now fetches fresh data instead of reusing cache
+  - **Full historical display**: Charts show all available historical candles (not limited to 100)
 
 - **Backtest Simulation Feature**:
   - New "Backtest" dropdown in AI Projection panel with time offsets:

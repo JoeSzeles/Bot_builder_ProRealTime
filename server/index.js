@@ -1151,7 +1151,7 @@ Based on this description, what clarifying questions would help you build a bett
 
 // AI Strategy Analysis endpoint
 app.post('/api/ai-strategy', async (req, res) => {
-  const { symbol, session, searchQuery, candles, currentPrice } = req.body;
+  const { symbol, session, searchQuery, candles, currentPrice, aiMemory } = req.body;
   
   if (!candles || candles.length === 0) {
     return res.status(400).json({ error: 'Market data (candles) is required' });
@@ -1212,9 +1212,48 @@ Generate strategies that work across all sessions or specify which session each 
 `;
     }
     
+    // Build AI memory context string
+    let memoryContext = '';
+    if (aiMemory) {
+      const brain = aiMemory.brain || {};
+      const events = aiMemory.events || [];
+      const correlations = aiMemory.correlations || [];
+      
+      if (brain.accuracy > 0 || brain.topPatterns?.length > 0) {
+        memoryContext += `\nAI LEARNING HISTORY FOR ${symbol.toUpperCase()}:\n`;
+        memoryContext += `- Past Accuracy: ${brain.accuracy}% (${brain.totalPredictions} predictions)\n`;
+        memoryContext += `- Confidence Level: ${brain.confidenceLevel}%\n`;
+        
+        if (brain.topPatterns?.length > 0) {
+          memoryContext += `- Top Performing Patterns: ${brain.topPatterns.map(p => `${p.name} (${p.successRate?.toFixed(0) || 0}%)`).join(', ')}\n`;
+        }
+        
+        if (brain.recentMemory?.length > 0) {
+          const recentCorrect = brain.recentMemory.filter(m => m.correct).length;
+          memoryContext += `- Recent Performance: ${recentCorrect}/${brain.recentMemory.length} correct\n`;
+        }
+      }
+      
+      if (events.length > 0) {
+        memoryContext += `\nRELEVANT HISTORICAL EVENTS:\n`;
+        events.slice(0, 3).forEach(e => {
+          memoryContext += `- ${e.title} (${e.date?.split('T')[0]}): ${e.conclusion}\n`;
+        });
+      }
+      
+      if (correlations.length > 0) {
+        memoryContext += `\nCORRELATED ASSETS:\n`;
+        correlations.forEach(c => {
+          if (c.ratio) {
+            memoryContext += `- ${c.pair}: Current ratio ${c.ratio} (correlation: ${c.correlation})\n`;
+          }
+        });
+      }
+    }
+    
     // Build AI prompt for strategy analysis
     const analysisPrompt = `You are an expert trading strategy analyst. Analyze the following market data and generate trading strategy hypotheses.
-${sessionContext}
+${sessionContext}${memoryContext}
 MARKET DATA:
 - Symbol: ${symbol.toUpperCase()}
 - Current Price: ${currentPrice}
