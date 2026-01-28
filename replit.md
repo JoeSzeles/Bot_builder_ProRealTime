@@ -42,6 +42,22 @@ The application features a modern full-stack architecture:
 -   **MetalPriceAPI**: Fallback for real-time Silver & Gold spot prices (requires `METALS_API_KEY` secret).
 
 ## Recent Changes (Jan 28, 2026)
+- **Parameter Optimization System** (New Feature):
+  - Optimizable parameter ranges with min/max/default: TP% (0.3-5%), SL% (0.3-3%), trailing% (0.3-2%), ATR multiplier (0.5-4x), RSI thresholds (20-40/60-80), position size (1-20%)
+  - **Random Params checkbox**: Generates random parameters within ranges for each backtest run
+  - **Use Learned checkbox**: Applies brain's best-known parameters from previous optimizations
+  - **Auto-Optimize button**: Runs 50 iterations with random params, saves best combination to brain
+  - **Current Parameters panel**: Shows active TP/SL/Trail/ATR/RSI/Size with source (Default/Random/Learned)
+  - Backend endpoint `/api/ai-memory/brain/params` stores best params with P/L per asset
+  - Validation ensures SL < TP and trailing <= TP for valid combinations
+  - Brain sanitizes stored params to exclude metadata when retrieving
+
+- **Portfolio Protection**:
+  - Position sizing capped by capital percentage allocation
+  - Max risk per trade: 2% of capital (configurable)
+  - Risk-adjusted sizing: max position = (capital × 2%) / stopLossPct
+  - Effective size bounded between minSize and 10x minSize
+
 - **Backtest Simulation Panel** (New Feature):
   - New panel in AI Results for running historical backtest simulations
   - **Cycles selector**: Run 1, 5, 10, 25, 50, or 100 simulation rounds
