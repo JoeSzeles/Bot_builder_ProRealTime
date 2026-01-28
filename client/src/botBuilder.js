@@ -2383,27 +2383,31 @@ async function updateAiProjectionChart(result) {
   const tfSeconds = { '1s': 1, '2s': 2, '3s': 3, '5s': 5, '10s': 10, '30s': 30, '1m': 60, '5m': 300, '15m': 900, '1h': 3600, '4h': 14400, '1d': 86400 };
   const interval = tfSeconds[tf] || 300;
   
-  // Reuse cached market data if available
-  let historicalCandles = result.marketData || [];
-  console.log('Initial historicalCandles length:', historicalCandles.length);
+  // Always fetch fresh data for the selected timeframe
+  const symbol = document.getElementById('aiSymbol')?.value || 'silver';
   
-  // Only fetch if no data cached
-  if (historicalCandles.length === 0) {
-    const symbol = document.getElementById('aiSymbol')?.value || 'silver';
-    console.log('Fetching market data for symbol:', symbol);
-    
-    try {
-      container.innerHTML = '<div class="h-full flex items-center justify-center text-gray-500">Loading market data...</div>';
-      const response = await fetch(`/api/market-data/${symbol}/1h`);
-      const data = await response.json();
-      console.log('Market data response:', { status: response.status, candleCount: data.candles?.length });
-      if (data.candles && data.candles.length > 0) {
-        historicalCandles = data.candles;
-        result.marketData = historicalCandles;
-      }
-    } catch (e) {
-      console.error('Failed to fetch market data:', e);
+  // Map timeframe to API endpoint
+  const tfApiMap = {
+    '1s': '1m', '2s': '1m', '3s': '1m', '5s': '1m', '10s': '1m', '30s': '1m',
+    '1m': '1m', '5m': '5m', '15m': '15m', '1h': '1h', '4h': '4h', '1d': '1d'
+  };
+  const apiTimeframe = tfApiMap[tf] || '1h';
+  
+  console.log(`Fetching ${forecastCandles} candles for ${symbol}/${tf} (API: ${apiTimeframe})`);
+  
+  let historicalCandles = [];
+  try {
+    container.innerHTML = '<div class="h-full flex items-center justify-center text-gray-500">Loading market data...</div>';
+    const response = await fetch(`/api/market-data/${symbol}/${apiTimeframe}`);
+    const data = await response.json();
+    console.log('Market data response:', { status: response.status, candleCount: data.candles?.length, timeframe: apiTimeframe });
+    if (data.candles && data.candles.length > 0) {
+      // Use all available candles, up to requested amount
+      historicalCandles = data.candles.slice(-forecastCandles);
+      console.log(`Using ${historicalCandles.length} candles (requested ${forecastCandles}, available ${data.candles.length})`);
     }
+  } catch (e) {
+    console.error('Failed to fetch market data:', e);
   }
   
   // Historical candles to display (proportional to forecast, max 100)
