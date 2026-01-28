@@ -2912,7 +2912,7 @@ async function updateAiProjectionChart(result) {
     console.log('Projection params:', { forecastCandles, tf, tfData, hasPredictions: !!result.predictions });
   
   // Timeframe intervals in seconds
-  const tfSeconds = { '1s': 1, '2s': 2, '3s': 3, '5s': 5, '10s': 10, '30s': 30, '1m': 60, '5m': 300, '15m': 900, '1h': 3600, '4h': 14400, '1d': 86400 };
+  const tfSeconds = { '1s': 1, '2s': 2, '3s': 3, '5s': 5, '10s': 10, '30s': 30, '1m': 60, '5m': 300, '15m': 900, '1h': 3600, '4h': 14400, '1d': 86400, '1w': 604800, '1M': 2592000 };
   const interval = tfSeconds[tf] || 300;
   
   // Always fetch fresh data for the selected timeframe
@@ -3017,7 +3017,7 @@ async function updateAiProjectionChart(result) {
     lastPrice,
     lastTime,
     interval,
-    Math.min(forecastCandles, 100), // Limit projection points for AI
+    Math.min(forecastCandles, 500), // Limit projection points for AI efficiency
     direction,
     result
   );
@@ -3304,7 +3304,9 @@ async function runBacktestSimulation() {
       '15m': { api: '15m', interval: 900 },
       '1h': { api: '1h', interval: 3600 },
       '4h': { api: '1h', interval: 14400 },
-      '1d': { api: '1d', interval: 86400 }
+      '1d': { api: '1d', interval: 86400 },
+      '1w': { api: '1w', interval: 604800 },
+      '1M': { api: '1M', interval: 2592000 }
     };
     const tfConfig = tfMap[currentTf] || { api: '1h', interval: 3600 };
     
@@ -6982,6 +6984,275 @@ function updateTradeList() {
     `;
   }).join('');
 }
+
+// ==================== BACKTEST SIMULATION ====================
+
+let BACKTEST_RUNNING = false;
+
+// Initialize backtest event listener
+function initBacktest() {
+  const startBtn = document.getElementById('startBacktest');
+  if (startBtn) {
+    startBtn.addEventListener('click', runBacktestSimulation);
+  }
+}
+
+// Run backtest simulation on historical data
+async function runBacktestSimulation() {
+  if (BACKTEST_RUNNING) return;
+  BACKTEST_RUNNING = true;
+  
+  const cycles = parseInt(document.getElementById('backtestCycles')?.value || '10');
+  const timeframe = document.getElementById('backtestTimeframe')?.value || '1h';
+  const holdCandles = parseInt(document.getElementById('backtestHold')?.value || '3');
+  const symbol = document.getElementById('aiSymbol')?.value || 'silver';
+  
+  // Get trading settings
+  const settings = getTradeSettings();
+  
+  // Update UI
+  const startBtn = document.getElementById('startBacktest');
+  const progressContainer = document.getElementById('backtestProgressContainer');
+  const resultsPanel = document.getElementById('backtestResults');
+  const statusBadge = document.getElementById('backtestStatus');
+  
+  startBtn.disabled = true;
+  startBtn.innerHTML = '<svg class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="4" class="opacity-25"></circle><path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" fill="currentColor" class="opacity-75"></path></svg> Running...';
+  progressContainer.classList.remove('hidden');
+  resultsPanel.classList.add('hidden');
+  statusBadge.textContent = 'Running';
+  statusBadge.className = 'px-2 py-0.5 text-xs font-medium bg-violet-100 dark:bg-violet-900 text-violet-700 dark:text-violet-300 rounded-full';
+  
+  // Fetch historical data
+  const tfMap = {
+    '5m': { api: '5m', interval: 300 },
+    '15m': { api: '15m', interval: 900 },
+    '1h': { api: '1h', interval: 3600 },
+    '4h': { api: '1h', interval: 14400 },
+    '1d': { api: '1d', interval: 86400 },
+    '1w': { api: '1w', interval: 604800 },
+    '1M': { api: '1M', interval: 2592000 }
+  };
+  const tfConfig = tfMap[timeframe] || { api: '1h', interval: 3600 };
+  
+  // Contract specs per asset (point value)
+  const contractSpecs = {
+    silver: 100, xagusd: 100,  // $100 per point
+    gold: 100, xauusd: 100,
+    oil: 10, wti: 10, brent: 10,
+    sp500: 50, nasdaq: 20, dow: 10,
+    eurusd: 100000, gbpusd: 100000, usdjpy: 1000,
+    btcusd: 1, ethusd: 1
+  };
+  const pointValue = contractSpecs[symbol.toLowerCase()] || 100;
+  
+  let candles = [];
+  try {
+    const response = await fetch(`/api/market-data/${symbol}/${tfConfig.api}`);
+    const data = await response.json();
+    candles = data.candles || [];
+  } catch (e) {
+    console.error('Failed to fetch backtest data:', e);
+    resetBacktestUI('Error');
+    return;
+  }
+  
+  if (candles.length < 100) {
+    console.error('Not enough data for backtest');
+    resetBacktestUI('No Data');
+    return;
+  }
+  
+  // Aggregate to 4h if needed
+  if (timeframe === '4h') {
+    candles = aggregateCandlesTo4H(candles);
+  }
+  
+  // Run simulation cycles - cap cycles if not enough data
+  const minCandlesPerCycle = 50;
+  const maxCycles = Math.floor(candles.length / minCandlesPerCycle);
+  const actualCycles = Math.min(cycles, maxCycles);
+  
+  if (actualCycles < 1) {
+    console.error('Not enough data for requested cycles');
+    resetBacktestUI('No Data');
+    return;
+  }
+  
+  const cycleResults = [];
+  const candlesPerCycle = Math.floor(candles.length / actualCycles);
+  let totalTrades = 0;
+  let totalWins = 0;
+  let totalPnL = 0;
+  
+  for (let cycle = 0; cycle < actualCycles; cycle++) {
+    // Update progress
+    const pct = Math.round(((cycle + 1) / actualCycles) * 100);
+    document.getElementById('backtestProgressLabel').textContent = `Cycle ${cycle + 1} / ${actualCycles}`;
+    document.getElementById('backtestProgressPct').textContent = `${pct}%`;
+    document.getElementById('backtestProgressBar').style.width = `${pct}%`;
+    
+    // Get candles for this cycle
+    const startIdx = cycle * candlesPerCycle;
+    const endIdx = Math.min(startIdx + candlesPerCycle, candles.length - holdCandles - 1);
+    const cycleCandles = candles.slice(startIdx, endIdx + holdCandles + 1);
+    
+    if (cycleCandles.length < 50) continue;
+    
+    // Run backtest on cycle data with correct contract specs
+    const cycleResult = await runCycleBacktest(cycleCandles, holdCandles, settings, pointValue);
+    cycleResults.push(cycleResult);
+    
+    totalTrades += cycleResult.trades;
+    totalWins += cycleResult.wins;
+    totalPnL += cycleResult.pnl;
+    
+    // Small delay to allow UI update
+    await new Promise(r => setTimeout(r, 50));
+  }
+  
+  // Calculate final results
+  const winRate = totalTrades > 0 ? ((totalWins / totalTrades) * 100).toFixed(1) : 0;
+  const avgTrade = totalTrades > 0 ? (totalPnL / totalTrades).toFixed(2) : 0;
+  const bestCycle = cycleResults.length > 0 ? Math.max(...cycleResults.map(c => c.pnl)) : 0;
+  
+  // Update results display
+  document.getElementById('btTotalTrades').textContent = totalTrades;
+  document.getElementById('btWinRate').textContent = `${winRate}%`;
+  document.getElementById('btWinRate').className = `font-bold ${winRate >= 50 ? 'text-emerald-600' : 'text-red-600'}`;
+  document.getElementById('btTotalPnL').textContent = `$${totalPnL.toFixed(2)}`;
+  document.getElementById('btTotalPnL').className = `font-bold ${totalPnL >= 0 ? 'text-emerald-600' : 'text-red-600'}`;
+  document.getElementById('btAvgTrade').textContent = `$${avgTrade}`;
+  document.getElementById('btAvgTrade').className = `font-bold ${avgTrade >= 0 ? 'text-emerald-600' : 'text-red-600'}`;
+  document.getElementById('btBestCycle').textContent = `$${bestCycle.toFixed(2)}`;
+  
+  // Show results
+  resultsPanel.classList.remove('hidden');
+  resetBacktestUI('Complete');
+}
+
+// Run a single backtest cycle on candle data
+async function runCycleBacktest(candles, holdCandles, settings, pointValue) {
+  let trades = 0;
+  let wins = 0;
+  let pnl = 0;
+  
+  // Simple momentum-based trading logic (similar to live AI trading)
+  const lookback = 10;
+  
+  for (let i = lookback; i < candles.length - holdCandles; i++) {
+    // Calculate simple indicators
+    const recentCandles = candles.slice(i - lookback, i);
+    const sma = recentCandles.reduce((sum, c) => sum + c.close, 0) / lookback;
+    const currentPrice = candles[i].close;
+    
+    // Calculate momentum
+    const priceChange = (currentPrice - candles[i - lookback].close) / candles[i - lookback].close;
+    
+    // Simple RSI approximation
+    let gains = 0, losses = 0;
+    for (let j = 1; j < recentCandles.length; j++) {
+      const diff = recentCandles[j].close - recentCandles[j-1].close;
+      if (diff > 0) gains += diff;
+      else losses -= diff;
+    }
+    const rs = losses > 0 ? gains / losses : 100;
+    const rsi = 100 - (100 / (1 + rs));
+    
+    // Determine signal
+    let signal = null;
+    if (rsi < 30 && priceChange < -0.005) {
+      signal = 'long'; // Oversold, expect bounce
+    } else if (rsi > 70 && priceChange > 0.005) {
+      signal = 'short'; // Overbought, expect pullback
+    } else if (currentPrice > sma * 1.002 && priceChange > 0.003) {
+      signal = 'long'; // Trend following
+    } else if (currentPrice < sma * 0.998 && priceChange < -0.003) {
+      signal = 'short'; // Trend following
+    }
+    
+    if (!signal) continue;
+    
+    // Skip if trade type doesn't match
+    if (settings.tradeType === 'long' && signal === 'short') continue;
+    if (settings.tradeType === 'short' && signal === 'long') continue;
+    
+    // Execute trade
+    const entryPrice = candles[i].close;
+    const exitPrice = candles[i + holdCandles].close;
+    
+    // Calculate P/L with spread using asset-specific point value
+    const spreadCost = settings.spreadPips * 0.01;
+    let tradePnL = 0;
+    
+    if (signal === 'long') {
+      tradePnL = (exitPrice - entryPrice) * pointValue * settings.minSize - spreadCost;
+    } else {
+      tradePnL = (entryPrice - exitPrice) * pointValue * settings.minSize - spreadCost;
+    }
+    
+    // Apply commission
+    tradePnL -= settings.commission * 2; // Entry + exit
+    
+    trades++;
+    pnl += tradePnL;
+    if (tradePnL > 0) wins++;
+    
+    // Skip ahead past the hold period
+    i += holdCandles;
+  }
+  
+  return { trades, wins, pnl };
+}
+
+// Aggregate 1h candles to 4h
+function aggregateCandlesTo4H(candles) {
+  const aggregated = [];
+  for (let i = 0; i < candles.length; i += 4) {
+    const chunk = candles.slice(i, i + 4);
+    if (chunk.length < 4) break;
+    aggregated.push({
+      time: chunk[0].time,
+      open: chunk[0].open,
+      high: Math.max(...chunk.map(c => c.high)),
+      low: Math.min(...chunk.map(c => c.low)),
+      close: chunk[chunk.length - 1].close,
+      volume: chunk.reduce((sum, c) => sum + (c.volume || 0), 0)
+    });
+  }
+  return aggregated;
+}
+
+// Reset backtest UI
+function resetBacktestUI(status) {
+  BACKTEST_RUNNING = false;
+  const startBtn = document.getElementById('startBacktest');
+  startBtn.disabled = false;
+  startBtn.innerHTML = '<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg> Run Backtest';
+  
+  // Hide progress bar unless showing results
+  const progressContainer = document.getElementById('backtestProgressContainer');
+  if (status !== 'Complete') {
+    progressContainer?.classList.add('hidden');
+  }
+  
+  const statusBadge = document.getElementById('backtestStatus');
+  if (status === 'Complete') {
+    statusBadge.textContent = 'Complete';
+    statusBadge.className = 'px-2 py-0.5 text-xs font-medium bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 rounded-full';
+  } else if (status === 'Error' || status === 'No Data') {
+    statusBadge.textContent = status;
+    statusBadge.className = 'px-2 py-0.5 text-xs font-medium bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full';
+  } else {
+    statusBadge.textContent = 'Ready';
+    statusBadge.className = 'px-2 py-0.5 text-xs font-medium bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 rounded-full';
+  }
+}
+
+// Initialize backtest on load
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(initBacktest, 600);
+});
 
 // Save trading state to localStorage
 function saveAiTradingState() {
