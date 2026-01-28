@@ -2067,6 +2067,13 @@ function setupAiTradingSubTabs() {
       if (strategySubTab) strategySubTab.className = inactiveClass;
       if (strategyContent) strategyContent.classList.add('hidden');
       if (resultsContent) resultsContent.classList.remove('hidden');
+      
+      // Auto-load projection chart when AI Results tab is opened
+      setTimeout(() => {
+        if (window.lastAiResult) {
+          updateAiProjectionChart(window.lastAiResult);
+        }
+      }, 100);
     });
   }
   
@@ -2305,13 +2312,16 @@ async function updateAiProjectionChart(result) {
   const container = document.getElementById('aiProjectionChart');
   if (!container) return;
   
-  // Cap forecast candles for performance (max 500 for smooth rendering)
-  const rawForecast = parseInt(document.getElementById('aiProjectionCandles')?.value || '100');
-  const forecastCandles = Math.min(rawForecast, 500);
+  // Get forecast candles from selector (default 10k)
+  const forecastCandles = parseInt(document.getElementById('aiProjectionCandles')?.value || '10000');
   const tf = aiResultsTimeframe;
   const tfData = result.predictions?.[tf] || result.predictions?.['5m'] || {};
   
-  // Reuse cached market data if available for speed
+  // Timeframe intervals in seconds
+  const tfSeconds = { '1s': 1, '2s': 2, '3s': 3, '5s': 5, '10s': 10, '30s': 30, '1m': 60, '5m': 300, '15m': 900, '1h': 3600, '4h': 14400, '1d': 86400 };
+  const interval = tfSeconds[tf] || 300;
+  
+  // Reuse cached market data if available
   let historicalCandles = result.marketData || [];
   
   // Only fetch if no data cached
@@ -2331,8 +2341,8 @@ async function updateAiProjectionChart(result) {
     }
   }
   
-  // Determine how many historical candles to show (max 50 for clean display)
-  const historyToShow = Math.min(50, historicalCandles.length);
+  // Historical candles to display (proportional to forecast, max 100)
+  const historyToShow = Math.min(100, Math.max(20, Math.floor(forecastCandles / 100)));
   
   // Use only the last portion for display, but keep all for volatility calc
   const displayCandles = historicalCandles.slice(-historyToShow);
@@ -2352,6 +2362,17 @@ async function updateAiProjectionChart(result) {
     realPriceSeries = null; // Reset real price series reference
   }
   
+  // Calculate bar spacing based on timeframe and forecast count
+  // Larger timeframes and more candles = smaller bar spacing
+  let barSpacing = 6;
+  if (forecastCandles >= 10000) barSpacing = 0.5;
+  else if (forecastCandles >= 1000) barSpacing = 2;
+  else if (forecastCandles >= 100) barSpacing = 4;
+  
+  // Adjust for timeframe (seconds need tighter spacing)
+  if (interval <= 30) barSpacing = Math.max(0.3, barSpacing * 0.5);
+  else if (interval >= 3600) barSpacing = Math.min(10, barSpacing * 1.5);
+  
   // Create chart with scroll/zoom enabled
   aiProjectionChart = createChart(container, {
     width: container.clientWidth,
@@ -2368,8 +2389,8 @@ async function updateAiProjectionChart(result) {
       borderColor: '#374151',
       timeVisible: true,
       rightOffset: 5,
-      barSpacing: 6,
-      minBarSpacing: 2,
+      barSpacing: barSpacing,
+      minBarSpacing: 0.1,
     },
     rightPriceScale: {
       borderColor: '#374151',
@@ -2412,10 +2433,6 @@ async function updateAiProjectionChart(result) {
   }
   const avgChange = priceChanges.reduce((a, b) => a + b, 0) / priceChanges.length;
   const volatility = Math.sqrt(priceChanges.reduce((sum, c) => sum + Math.pow(c - avgChange, 2), 0) / priceChanges.length) || 0.002;
-  
-  // Calculate time interval based on timeframe
-  const tfIntervals = { '1s': 1, '2s': 2, '3s': 3, '5s': 5, '10s': 10, '30s': 30, '1m': 60, '5m': 300, '15m': 900, '1h': 3600, '4h': 14400, '1d': 86400 };
-  const interval = tfIntervals[tf] || 300;
   
   // Generate bullish, bearish, and expected projections with realistic movement
   const bullishData = [];
@@ -2479,18 +2496,21 @@ async function updateAiProjectionChart(result) {
   });
   expectedSeries.setData(expectedData);
   
-  // Scroll to start of projection (left side) showing historical + beginning of forecast
-  // Show first 20% of data by default for better initial view
-  const allData = [...displayCandles.map(c => ({ time: c.time })), ...expectedData];
-  if (allData.length > 10) {
-    const visibleBars = Math.min(100, Math.floor(allData.length * 0.2));
-    aiProjectionChart.timeScale().setVisibleLogicalRange({
-      from: 0,
-      to: visibleBars
-    });
-  } else {
-    aiProjectionChart.timeScale().fitContent();
-  }
+  // Set initial view to show historical data + start of projection
+  // Calculate visible bars based on container width and bar spacing
+  const containerWidth = container.clientWidth || 600;
+  const visibleBars = Math.floor(containerWidth / barSpacing);
+  const historicalStart = 0;
+  const projectionStart = displayCandles.length;
+  
+  // Show from start of historical to some projection (centered around where projection begins)
+  const viewStart = Math.max(0, projectionStart - Math.floor(visibleBars * 0.3));
+  const viewEnd = viewStart + visibleBars;
+  
+  aiProjectionChart.timeScale().setVisibleLogicalRange({
+    from: viewStart,
+    to: Math.min(viewEnd, displayCandles.length + forecastCandles)
+  });
   
   // Store projection data for list view and real price comparison
   window.projectionData = {
