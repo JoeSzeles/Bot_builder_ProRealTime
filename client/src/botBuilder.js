@@ -8764,7 +8764,7 @@ async function generateForecast() {
     
     const brainData = await brainRes.json();
     const priceResponse = await priceRes.json();
-    const priceData = Array.isArray(priceResponse) ? priceResponse : (priceResponse.data || []);
+    const priceData = Array.isArray(priceResponse) ? priceResponse : (priceResponse.candles || priceResponse.data || []);
     
     const response = await fetch('/api/ai/forecast', {
       method: 'POST',
@@ -8803,7 +8803,7 @@ async function generateForecast() {
     try {
       const priceRes = await fetch(`/api/market-data/${asset}/1h`);
       const priceResponse = await priceRes.json();
-      const priceData = Array.isArray(priceResponse) ? priceResponse : (priceResponse.data || []);
+      const priceData = Array.isArray(priceResponse) ? priceResponse : (priceResponse.candles || priceResponse.data || []);
       const brainRes = await fetch('/api/ai-memory/brain');
       const brainData = await brainRes.json();
       
@@ -8884,7 +8884,7 @@ function getNextTradingSession(date) {
 }
 
 function generateMockForecast(asset, priceData, brainData) {
-  const prices = Array.isArray(priceData) ? priceData : (priceData?.data || []);
+  const prices = Array.isArray(priceData) ? priceData : (priceData?.candles || priceData?.data || []);
   if (prices.length === 0) return [];
   
   // Get real current price and recent data
