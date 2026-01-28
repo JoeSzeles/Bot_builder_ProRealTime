@@ -5232,6 +5232,9 @@ async function loadAiMemoryData() {
     // Update brain status display
     updateBrainStatusDisplay(brain);
     
+    // Update pattern map visualization
+    updatePatternMapDisplay(brain.learnedPatterns || []);
+    
     // Update events archive
     updateEventsArchiveDisplay(eventsData.events || [], asset);
     
@@ -5303,6 +5306,172 @@ function updateBrainStatusDisplay(brain) {
       }).join('');
     }
   }
+}
+
+function updatePatternMapDisplay(patterns) {
+  const gridEl = document.getElementById('patternMapGrid');
+  const topPatternsEl = document.getElementById('topProfitablePatterns');
+  const totalPnLEl = document.getElementById('patternTotalPnL');
+  const avgWinRateEl = document.getElementById('patternAvgWinRate');
+  const totalTradesEl = document.getElementById('patternTotalTrades');
+  const bestSessionEl = document.getElementById('patternBestSession');
+  
+  if (!gridEl || !patterns || patterns.length === 0) {
+    if (gridEl) gridEl.innerHTML = '<p class="text-xs text-gray-500 italic col-span-full text-center py-4">Run backtests or auto-optimize to build pattern data</p>';
+    // Reset stats to avoid stale data when switching assets
+    if (topPatternsEl) topPatternsEl.innerHTML = '<p class="text-xs text-gray-500 italic">No profitable patterns yet</p>';
+    if (totalPnLEl) { totalPnLEl.textContent = '$0'; totalPnLEl.className = 'text-sm font-bold text-green-600'; }
+    if (avgWinRateEl) avgWinRateEl.textContent = '0%';
+    if (totalTradesEl) totalTradesEl.textContent = '0';
+    if (bestSessionEl) bestSessionEl.textContent = '--';
+    return;
+  }
+  
+  // Parse patterns into structured data
+  const sessions = ['asian', 'london', 'ny', 'other'];
+  const directions = ['long', 'short'];
+  const exitTypes = ['dynamic_tp', 'rsi_overbought', 'rsi_oversold', 'trailing', 'other'];
+  
+  // Group patterns by session, direction, exit type
+  const patternMap = {};
+  const sessionPnL = { asian: 0, london: 0, ny: 0, other: 0 };
+  let totalPnL = 0;
+  let totalOccurrences = 0;
+  let weightedWinRate = 0;
+  
+  patterns.forEach(p => {
+    const name = (p.name || '').toLowerCase();
+    const pnl = p.totalPnL || 0;
+    const occurrences = p.occurrences || 0;
+    const winRate = p.successRate || 0;
+    
+    totalPnL += pnl;
+    totalOccurrences += occurrences;
+    weightedWinRate += winRate * occurrences;
+    
+    // Extract session
+    let session = 'other';
+    for (const s of sessions) {
+      if (name.includes(s)) { session = s; break; }
+    }
+    sessionPnL[session] += pnl;
+    
+    // Extract direction
+    let direction = 'long';
+    if (name.includes('short')) direction = 'short';
+    
+    // Extract exit type
+    let exitType = 'other';
+    if (name.includes('dynamic_tp')) exitType = 'dynamic_tp';
+    else if (name.includes('rsi_overbought')) exitType = 'rsi_overbought';
+    else if (name.includes('rsi_oversold')) exitType = 'rsi_oversold';
+    else if (name.includes('trailing')) exitType = 'trailing';
+    
+    const key = `${session}_${direction}_${exitType}`;
+    if (!patternMap[key]) {
+      patternMap[key] = { session, direction, exitType, pnl: 0, occurrences: 0, totalWins: 0, count: 0 };
+    }
+    patternMap[key].pnl += pnl;
+    patternMap[key].occurrences += occurrences;
+    // Weight wins by occurrences for accurate aggregation
+    patternMap[key].totalWins += (winRate / 100) * occurrences;
+    patternMap[key].count++;
+  });
+  
+  // Calculate weighted win rates per cell
+  Object.values(patternMap).forEach(p => {
+    p.winRate = p.occurrences > 0 ? (p.totalWins / p.occurrences) * 100 : 0;
+  });
+  
+  // Build heatmap grid
+  const exitLabels = { dynamic_tp: 'Dynamic TP', rsi_overbought: 'RSI OB', rsi_oversold: 'RSI OS', trailing: 'Trail', other: 'Other' };
+  const sessionLabels = { asian: 'Asian', london: 'London', ny: 'NY', other: 'Other' };
+  
+  let gridHtml = `
+    <div class="grid grid-cols-6 gap-1 text-xs">
+      <div class="font-medium text-gray-500 p-1"></div>
+      ${exitTypes.map(e => `<div class="font-medium text-gray-500 text-center p-1">${exitLabels[e]}</div>`).join('')}
+  `;
+  
+  sessions.forEach(session => {
+    directions.forEach(direction => {
+      const rowLabel = `${sessionLabels[session]} ${direction === 'long' ? '↑' : '↓'}`;
+      gridHtml += `<div class="font-medium text-gray-600 dark:text-gray-400 p-1 flex items-center">${rowLabel}</div>`;
+      
+      exitTypes.forEach(exitType => {
+        const key = `${session}_${direction}_${exitType}`;
+        const data = patternMap[key];
+        
+        if (!data || data.occurrences === 0) {
+          gridHtml += `<div class="bg-gray-100 dark:bg-gray-800 rounded p-2 text-center text-gray-400 cursor-default" title="No data">-</div>`;
+        } else {
+          // Color based on P/L
+          let bgColor = 'bg-gray-200 dark:bg-gray-700';
+          if (data.pnl > 0) {
+            if (data.pnl > 10000) bgColor = 'bg-green-600 text-white';
+            else if (data.pnl > 5000) bgColor = 'bg-green-500 text-white';
+            else if (data.pnl > 1000) bgColor = 'bg-green-400';
+            else bgColor = 'bg-green-200';
+          } else if (data.pnl < 0) {
+            if (data.pnl < -10000) bgColor = 'bg-red-600 text-white';
+            else if (data.pnl < -5000) bgColor = 'bg-red-500 text-white';
+            else if (data.pnl < -1000) bgColor = 'bg-red-400';
+            else bgColor = 'bg-red-200';
+          }
+          
+          const tooltip = `${sessionLabels[session]} ${direction.toUpperCase()} - ${exitLabels[exitType]}\\nP/L: $${data.pnl.toFixed(2)}\\nTrades: ${data.occurrences}\\nWin Rate: ${data.winRate.toFixed(0)}%`;
+          gridHtml += `<div class="${bgColor} rounded p-2 text-center cursor-pointer hover:opacity-80 transition-opacity" title="${tooltip}">
+            <div class="font-bold">${data.pnl >= 0 ? '+' : ''}${(data.pnl / 1000).toFixed(1)}k</div>
+            <div class="text-xs opacity-75">${data.occurrences}</div>
+          </div>`;
+        }
+      });
+    });
+  });
+  
+  gridHtml += '</div>';
+  gridEl.innerHTML = gridHtml;
+  
+  // Top 5 profitable patterns
+  const sortedPatterns = [...patterns]
+    .filter(p => (p.totalPnL || 0) > 0)
+    .sort((a, b) => (b.totalPnL || 0) - (a.totalPnL || 0))
+    .slice(0, 5);
+  
+  if (topPatternsEl) {
+    if (sortedPatterns.length === 0) {
+      topPatternsEl.innerHTML = '<p class="text-xs text-gray-500 italic">No profitable patterns yet</p>';
+    } else {
+      topPatternsEl.innerHTML = sortedPatterns.map((p, i) => {
+        const pnl = p.totalPnL || 0;
+        const winRate = p.successRate || 0;
+        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '📊';
+        return `
+          <div class="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded">
+            <div class="flex items-center gap-2">
+              <span>${medal}</span>
+              <span class="text-xs font-medium text-gray-700 dark:text-gray-300">${p.name}</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="text-xs text-gray-500">${p.occurrences || 0} trades</span>
+              <span class="text-xs ${winRate >= 60 ? 'text-green-600' : 'text-gray-600'}">${winRate.toFixed(0)}% win</span>
+              <span class="text-sm font-bold text-green-600">+$${pnl.toFixed(2)}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+  
+  // Summary stats
+  const avgWinRate = totalOccurrences > 0 ? weightedWinRate / totalOccurrences : 0;
+  const bestSession = Object.entries(sessionPnL).sort((a, b) => b[1] - a[1])[0];
+  
+  if (totalPnLEl) totalPnLEl.textContent = `$${totalPnL.toFixed(0)}`;
+  if (totalPnLEl) totalPnLEl.className = `text-sm font-bold ${totalPnL >= 0 ? 'text-green-600' : 'text-red-600'}`;
+  if (avgWinRateEl) avgWinRateEl.textContent = `${avgWinRate.toFixed(0)}%`;
+  if (totalTradesEl) totalTradesEl.textContent = totalOccurrences.toString();
+  if (bestSessionEl) bestSessionEl.textContent = sessionLabels[bestSession[0]] || '--';
 }
 
 function updateEventsArchiveDisplay(events, selectedAsset) {

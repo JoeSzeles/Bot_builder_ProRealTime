@@ -2125,6 +2125,68 @@ SET STOP pLOSS ATR(14) * 1.2</pre>
                   </div>
                 </div>
 
+                <!-- Pattern Map Visualization -->
+                <div class="bg-white dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600 mb-4">
+                  <div class="flex items-center justify-between mb-3">
+                    <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                      <svg class="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                      </svg>
+                      Pattern Performance Map
+                    </h4>
+                    <div class="flex items-center gap-2">
+                      <span class="text-xs text-gray-500">Profitable</span>
+                      <div class="flex gap-0.5">
+                        <div class="w-3 h-3 bg-green-200 rounded-sm"></div>
+                        <div class="w-3 h-3 bg-green-400 rounded-sm"></div>
+                        <div class="w-3 h-3 bg-green-600 rounded-sm"></div>
+                      </div>
+                      <span class="text-xs text-gray-500 ml-2">Losing</span>
+                      <div class="flex gap-0.5">
+                        <div class="w-3 h-3 bg-red-200 rounded-sm"></div>
+                        <div class="w-3 h-3 bg-red-400 rounded-sm"></div>
+                        <div class="w-3 h-3 bg-red-600 rounded-sm"></div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- Pattern Heatmap Grid -->
+                  <div id="patternMapGrid" class="grid gap-1 mb-4">
+                    <p class="text-xs text-gray-500 italic col-span-full text-center py-4">Run backtests or auto-optimize to build pattern data</p>
+                  </div>
+                  
+                  <!-- Top 5 Best Patterns -->
+                  <div class="border-t border-gray-200 dark:border-gray-600 pt-3 mt-3">
+                    <h5 class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2 flex items-center gap-2">
+                      <span>Top 5 Most Profitable Patterns</span>
+                      <span class="text-green-600">$</span>
+                    </h5>
+                    <div id="topProfitablePatterns" class="space-y-2">
+                      <p class="text-xs text-gray-500 italic">No profitable patterns yet</p>
+                    </div>
+                  </div>
+                  
+                  <!-- Pattern Stats Summary -->
+                  <div class="grid grid-cols-4 gap-2 mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+                    <div class="text-center p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                      <div id="patternTotalPnL" class="text-sm font-bold text-green-600">$0</div>
+                      <div class="text-xs text-gray-500">Total P/L</div>
+                    </div>
+                    <div class="text-center p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                      <div id="patternAvgWinRate" class="text-sm font-bold text-blue-600">0%</div>
+                      <div class="text-xs text-gray-500">Avg Win Rate</div>
+                    </div>
+                    <div class="text-center p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                      <div id="patternTotalTrades" class="text-sm font-bold text-purple-600">0</div>
+                      <div class="text-xs text-gray-500">Total Trades</div>
+                    </div>
+                    <div class="text-center p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                      <div id="patternBestSession" class="text-sm font-bold text-orange-600">--</div>
+                      <div class="text-xs text-gray-500">Best Session</div>
+                    </div>
+                  </div>
+                </div>
+
                 <!-- Cross-Asset Correlations -->
                 <div class="bg-white dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600 mb-4">
                   <div class="flex items-center justify-between mb-3">
