@@ -2075,10 +2075,16 @@ function setupAiTradingSubTabs() {
       setActiveTab(resultsSubTab);
       if (resultsContent) resultsContent.classList.remove('hidden');
       
-      // Auto-load projection chart when AI Results tab is opened
+      // Resize chart if it exists (don't reload, just resize to fit container)
       setTimeout(() => {
-        if (window.lastAiResult) {
-          updateAiProjectionChart(window.lastAiResult);
+        if (aiProjectionChart) {
+          const container = document.getElementById('aiProjectionChart');
+          if (container) {
+            const rect = container.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0) {
+              aiProjectionChart.resize(rect.width, rect.height);
+            }
+          }
         }
       }, 100);
     });
@@ -2118,15 +2124,8 @@ function setupAiTradingSubTabs() {
   // AI Results timeframe buttons
   setupAiResultsTimeframes();
   
-  // AI Projection candles selector
-  const projCandles = document.getElementById('aiProjectionCandles');
-  if (projCandles) {
-    projCandles.addEventListener('change', () => {
-      if (window.lastAiResult) {
-        updateAiProjectionChart(window.lastAiResult);
-      }
-    });
-  }
+  // AI Projection candles selector - just stores value, refresh button triggers update
+  // (No auto-update on change - user clicks Refresh to apply)
   
   // Toggle projection list panel
   const toggleListBtn = document.getElementById('toggleProjectionList');
@@ -2139,15 +2138,8 @@ function setupAiTradingSubTabs() {
     });
   }
   
-  // Backtest offset selector
-  const backtestOffset = document.getElementById('aiBacktestOffset');
-  if (backtestOffset) {
-    backtestOffset.addEventListener('change', () => {
-      if (window.lastAiResult) {
-        runBacktestOffsetAnalysis();
-      }
-    });
-  }
+  // Backtest offset selector - just stores value, refresh button triggers update
+  // (No auto-update on change - user clicks Refresh to apply)
   
   // Refresh chart button
   const refreshBtn = document.getElementById('refreshProjectionChart');
