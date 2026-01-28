@@ -7031,6 +7031,12 @@ function initBacktest() {
   if (startBtn) {
     startBtn.addEventListener('click', runBacktestSimulation);
   }
+  
+  // Download JSON button
+  const downloadBtn = document.getElementById('downloadBacktestJson');
+  if (downloadBtn) {
+    downloadBtn.addEventListener('click', downloadBacktestJson);
+  }
 }
 
 // Run backtest simulation on historical data
@@ -7120,6 +7126,10 @@ async function runBacktestSimulation() {
   let totalTrades = 0;
   let totalWins = 0;
   let totalPnL = 0;
+  let allTrades = [];
+  
+  // Store candles for chart
+  BACKTEST_DATA.candles = candles;
   
   for (let cycle = 0; cycle < actualCycles; cycle++) {
     // Update progress
@@ -7139,6 +7149,11 @@ async function runBacktestSimulation() {
     const cycleResult = await runCycleBacktest(cycleCandles, holdCandles, settings, pointValue);
     cycleResults.push(cycleResult);
     
+    // Collect all trades
+    if (cycleResult.tradeList) {
+      allTrades = allTrades.concat(cycleResult.tradeList);
+    }
+    
     totalTrades += cycleResult.trades;
     totalWins += cycleResult.wins;
     totalPnL += cycleResult.pnl;
@@ -7152,6 +7167,18 @@ async function runBacktestSimulation() {
   const avgTrade = totalTrades > 0 ? (totalPnL / totalTrades).toFixed(2) : 0;
   const bestCycle = cycleResults.length > 0 ? Math.max(...cycleResults.map(c => c.pnl)) : 0;
   
+  // Store results for chart and download
+  BACKTEST_DATA.trades = allTrades;
+  BACKTEST_DATA.summary = {
+    totalTrades,
+    totalWins,
+    winRate: parseFloat(winRate),
+    totalPnL,
+    avgTrade: parseFloat(avgTrade),
+    bestCycle,
+    cycles: actualCycles
+  };
+  
   // Update results display
   document.getElementById('btTotalTrades').textContent = totalTrades;
   document.getElementById('btWinRate').textContent = `${winRate}%`;
@@ -7164,14 +7191,22 @@ async function runBacktestSimulation() {
   
   // Show results
   resultsPanel.classList.remove('hidden');
+  
+  // Render chart and trade list
+  setTimeout(() => {
+    renderBacktestChart();
+    renderBacktestTradeList();
+  }, 100);
+  
   resetBacktestUI('Complete');
 }
 
-// Run a single backtest cycle on candle data
+// Run a single backtest cycle on candle data - returns trade details
 async function runCycleBacktest(candles, holdCandles, settings, pointValue) {
   let trades = 0;
   let wins = 0;
   let pnl = 0;
+  const tradeList = [];
   
   // Simple momentum-based trading logic (similar to live AI trading)
   const lookback = 10;
@@ -7214,8 +7249,10 @@ async function runCycleBacktest(candles, holdCandles, settings, pointValue) {
     if (settings.tradeType === 'short' && signal === 'long') continue;
     
     // Execute trade
-    const entryPrice = candles[i].close;
-    const exitPrice = candles[i + holdCandles].close;
+    const entryCandle = candles[i];
+    const exitCandle = candles[i + holdCandles];
+    const entryPrice = entryCandle.close;
+    const exitPrice = exitCandle.close;
     
     // Calculate P/L with spread using asset-specific point value
     const spreadCost = settings.spreadPips * 0.01;
@@ -7230,6 +7267,18 @@ async function runCycleBacktest(candles, holdCandles, settings, pointValue) {
     // Apply commission
     tradePnL -= settings.commission * 2; // Entry + exit
     
+    // Store trade details
+    tradeList.push({
+      type: signal,
+      entryTime: entryCandle.time,
+      exitTime: exitCandle.time,
+      entryPrice: entryPrice,
+      exitPrice: exitPrice,
+      pnl: tradePnL,
+      rsi: rsi.toFixed(1),
+      win: tradePnL > 0
+    });
+    
     trades++;
     pnl += tradePnL;
     if (tradePnL > 0) wins++;
@@ -7238,7 +7287,137 @@ async function runCycleBacktest(candles, holdCandles, settings, pointValue) {
     i += holdCandles;
   }
   
-  return { trades, wins, pnl };
+  return { trades, wins, pnl, tradeList };
+}
+
+// Global storage for backtest results
+let BACKTEST_DATA = {
+  candles: [],
+  trades: [],
+  summary: {}
+};
+let backtestChart = null;
+
+// Render backtest chart with trade markers
+function renderBacktestChart() {
+  const container = document.getElementById('backtestChart');
+  if (!container || BACKTEST_DATA.candles.length === 0) return;
+  
+  // Clear previous chart
+  if (backtestChart) {
+    backtestChart.remove();
+    backtestChart = null;
+  }
+  
+  const rect = container.getBoundingClientRect();
+  
+  backtestChart = createChart(container, {
+    width: rect.width || 400,
+    height: rect.height || 192,
+    layout: {
+      background: { type: ColorType.Solid, color: '#111827' },
+      textColor: '#9ca3af',
+    },
+    grid: {
+      vertLines: { color: '#374151' },
+      horzLines: { color: '#374151' },
+    },
+    timeScale: {
+      borderColor: '#374151',
+      timeVisible: true,
+    },
+    rightPriceScale: {
+      borderColor: '#374151',
+    },
+  });
+  
+  // Add price line
+  const priceSeries = backtestChart.addSeries(LineSeries, {
+    color: '#9ca3af',
+    lineWidth: 1,
+    priceLineVisible: false,
+  });
+  priceSeries.setData(BACKTEST_DATA.candles.map(c => ({ time: c.time, value: c.close })));
+  
+  // Add trade markers
+  const markers = [];
+  BACKTEST_DATA.trades.forEach(trade => {
+    // Entry marker
+    markers.push({
+      time: trade.entryTime,
+      position: trade.type === 'long' ? 'belowBar' : 'aboveBar',
+      color: trade.type === 'long' ? '#10b981' : '#ef4444',
+      shape: trade.type === 'long' ? 'arrowUp' : 'arrowDown',
+      text: trade.type === 'long' ? 'L' : 'S',
+    });
+    // Exit marker
+    markers.push({
+      time: trade.exitTime,
+      position: 'inBar',
+      color: trade.win ? '#10b981' : '#ef4444',
+      shape: 'circle',
+      text: trade.win ? '+' : '-',
+    });
+  });
+  
+  // Sort markers by time
+  markers.sort((a, b) => a.time - b.time);
+  priceSeries.setMarkers(markers);
+  
+  backtestChart.timeScale().fitContent();
+}
+
+// Render trade list table
+function renderBacktestTradeList() {
+  const tbody = document.getElementById('backtestTradeListBody');
+  if (!tbody) return;
+  
+  tbody.innerHTML = '';
+  
+  BACKTEST_DATA.trades.forEach((trade, idx) => {
+    const row = document.createElement('tr');
+    row.className = `${trade.win ? 'bg-emerald-50/30 dark:bg-emerald-900/10' : 'bg-red-50/30 dark:bg-red-900/10'}`;
+    
+    const entryDate = new Date(trade.entryTime * 1000);
+    const timeStr = entryDate.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    
+    row.innerHTML = `
+      <td class="px-2 py-1 text-gray-600 dark:text-gray-400">${idx + 1}</td>
+      <td class="px-2 py-1 font-medium ${trade.type === 'long' ? 'text-emerald-600' : 'text-red-600'}">${trade.type.toUpperCase()}</td>
+      <td class="px-2 py-1 text-right text-gray-700 dark:text-gray-300">${trade.entryPrice.toFixed(4)}</td>
+      <td class="px-2 py-1 text-right text-gray-700 dark:text-gray-300">${trade.exitPrice.toFixed(4)}</td>
+      <td class="px-2 py-1 text-right font-medium ${trade.pnl >= 0 ? 'text-emerald-600' : 'text-red-600'}">$${trade.pnl.toFixed(2)}</td>
+      <td class="px-2 py-1 text-gray-500 dark:text-gray-400">${timeStr}</td>
+    `;
+    tbody.appendChild(row);
+  });
+}
+
+// Download backtest results as JSON
+function downloadBacktestJson() {
+  const data = {
+    timestamp: new Date().toISOString(),
+    symbol: document.getElementById('aiSymbol')?.value || 'unknown',
+    timeframe: document.getElementById('backtestTimeframe')?.value || '1h',
+    cycles: document.getElementById('backtestCycles')?.value || '10',
+    holdCandles: document.getElementById('backtestHold')?.value || '3',
+    summary: BACKTEST_DATA.summary,
+    trades: BACKTEST_DATA.trades.map(t => ({
+      ...t,
+      entryTimeISO: new Date(t.entryTime * 1000).toISOString(),
+      exitTimeISO: new Date(t.exitTime * 1000).toISOString()
+    }))
+  };
+  
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `backtest_${data.symbol}_${data.timeframe}_${Date.now()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 // Aggregate 1h candles to 4h
