@@ -58,6 +58,14 @@ The application features a modern full-stack architecture:
   - Risk-adjusted sizing: max position = (capital × 2%) / stopLossPct
   - Effective size bounded between minSize and 10x minSize
 
+- **Backtest Trading Settings Panel**:
+  - Trade Type selector: Long & Short, Long Only, Short Only
+  - Capital input with customizable initial capital
+  - Position Size and Max Size inputs
+  - Order Fee per trade
+  - Spread cost per contract
+  - Cumulate Orders checkbox: Increases position size after consecutive wins (resets on loss)
+
 - **Backtest Simulation Panel** (New Feature):
   - New panel in AI Results for running historical backtest simulations
   - **Cycles selector**: Run 1, 5, 10, 25, 50, or 100 simulation rounds

@@ -6280,6 +6280,26 @@ function getTradeSettings() {
   };
 }
 
+// Get backtest-specific trading settings from AI Trading panel
+function getBacktestSettings() {
+  return {
+    capital: parseFloat(document.getElementById('backtestCapital')?.value) || 10000,
+    initialCapital: parseFloat(document.getElementById('backtestCapital')?.value) || 10000,
+    positionSize: parseFloat(document.getElementById('backtestPositionSize')?.value) || 1,
+    minSize: parseFloat(document.getElementById('backtestPositionSize')?.value) || 1,
+    maxSize: parseFloat(document.getElementById('backtestMaxSize')?.value) || 10,
+    maxPositionSize: parseFloat(document.getElementById('backtestMaxSize')?.value) || 10,
+    orderFee: parseFloat(document.getElementById('backtestOrderFee')?.value) || 2,
+    commission: parseFloat(document.getElementById('backtestOrderFee')?.value) || 2,
+    spread: parseFloat(document.getElementById('backtestSpread')?.value) || 0.02,
+    spreadPips: parseFloat(document.getElementById('backtestSpread')?.value) || 0.02,
+    cumulate: document.getElementById('backtestCumulate')?.checked ?? false,
+    tradeType: document.getElementById('backtestTradeType')?.value || 'both',
+    useOrderFee: true,
+    useSpread: true
+  };
+}
+
 // Start AI Trading
 async function startAiTrading() {
   if (AI_TRADING.active) return;
@@ -7082,10 +7102,11 @@ async function runBacktestSimulation() {
   const cycles = parseInt(document.getElementById('backtestCycles')?.value || '10');
   const timeframe = document.getElementById('backtestTimeframe')?.value || '1h';
   const exitStrategy = document.getElementById('backtestExitStrategy')?.value || 'dynamic';
+  const tradeType = document.getElementById('backtestTradeType')?.value || 'both';
   const symbol = document.getElementById('aiSymbol')?.value || 'silver';
   
-  // Get trading settings
-  const settings = getTradeSettings();
+  // Get trading settings from backtest panel
+  const settings = getBacktestSettings();
   
   // Get optimization parameters (random, learned, or default)
   const params = await getCurrentParams(symbol, settings);
@@ -7656,6 +7677,11 @@ async function runCycleBacktest(candles, exitStrategy, settings, pointValue, par
   const lookback = 14;
   const maxHoldCandles = 50; // Maximum hold period to prevent infinite holds
   
+  // Cumulation tracking - increase position size after consecutive wins
+  let consecutiveWins = 0;
+  let currentPositionSize = settings.minSize || 1;
+  const maxPositionSize = settings.maxSize || settings.maxPositionSize || 10;
+  
   // Use provided params or defaults
   const exitParams = params || getDefaultParams();
   
@@ -7873,17 +7899,35 @@ async function runCycleBacktest(candles, exitStrategy, settings, pointValue, par
     const holdDuration = exitIdx - i;
     
     // Calculate P/L with spread using asset-specific point value
-    const spreadCost = settings.spreadPips * 0.01;
+    // Spread is in price units, so multiply by pointValue and position size
+    const spreadCost = settings.spread * pointValue * currentPositionSize;
     let tradePnL = 0;
     
     if (signal === 'long') {
-      tradePnL = (exitPrice - entryPrice) * pointValue * settings.minSize - spreadCost;
+      tradePnL = (exitPrice - entryPrice) * pointValue * currentPositionSize - spreadCost;
     } else {
-      tradePnL = (entryPrice - exitPrice) * pointValue * settings.minSize - spreadCost;
+      tradePnL = (entryPrice - exitPrice) * pointValue * currentPositionSize - spreadCost;
     }
     
-    // Apply commission
-    tradePnL -= settings.commission * 2; // Entry + exit
+    // Apply commission per trade (entry + exit) - flat fee per trade
+    tradePnL -= settings.orderFee * 2;
+    
+    // Track win/loss for cumulation (applied to NEXT trade)
+    const isWin = tradePnL > 0;
+    
+    // Update cumulation for next trade
+    if (settings.cumulate) {
+      if (isWin) {
+        consecutiveWins++;
+        // Increase position by 0.5 for every 2 consecutive wins, capped at max
+        if (consecutiveWins % 2 === 0) {
+          currentPositionSize = Math.min(currentPositionSize + 0.5, maxPositionSize);
+        }
+      } else {
+        consecutiveWins = 0;
+        currentPositionSize = settings.minSize || 1; // Reset to base on loss
+      }
+    }
     
     // Determine session based on entry time
     const entryHour = new Date(entryCandle.time * 1000).getUTCHours();
@@ -7901,13 +7945,14 @@ async function runCycleBacktest(candles, exitStrategy, settings, pointValue, par
       exitPrice: exitPrice,
       pnl: tradePnL,
       rsi: rsi.toFixed(1),
-      win: tradePnL > 0,
+      win: isWin,
       exitStrategy: exitStrategy,
       exitReason: exitReason,
       holdDuration: holdDuration,
       session: session,
       atr: atr.toFixed(4),
-      signalStrength: signalStrength
+      signalStrength: signalStrength,
+      positionSize: currentPositionSize
     });
     
     trades++;
