@@ -72,16 +72,15 @@ The application features a modern full-stack architecture:
   - Accuracy builds over time as more predictions are recorded
   - View stats in AI Memory tab: accuracy %, predictions count, patterns learned
 
-- **AI Price Projection Chart** (Major Algorithm Upgrade):
-  - **Multi-timeframe wave analysis**: Projections now use indicator-based trend detection
-  - Analyzes SMA20/50/100/200, EMA9/21/50, RSI, MACD for trend scoring
-  - Detects swing highs/lows to identify wave structure
-  - **Nested wave generation**: Primary wave (long cycle), secondary wave, tertiary wave (ripples)
-  - Wave parameters derived from actual historical price patterns
-  - Trend drift incorporates long-term momentum and AI direction bias
+- **AI Price Projection Chart** (Complete Rewrite - True AI Predictions):
+  - **No more formulas**: Projection now uses actual AI (Claude/GPT) to predict prices
+  - AI receives: recent price data, brain memory patterns, historical accuracy, market events
+  - AI analyzes patterns and makes intelligent predictions based on learned data
+  - Returns 3 scenarios: Expected (most likely), Bullish, Bearish
+  - **AI reasoning displayed**: Shows why AI made its prediction
+  - Falls back to trend extrapolation only if AI fails
   - **Timeframe label & data info**: Shows current timeframe badge and candle date range
-  - **Time axis formatting**: Adapts display format based on timeframe (seconds/minutes/hours/days)
-  - Bounded projections stay within reasonable range (max 50% from start)
+  - Limited to 100 projection points for AI efficiency
 
 - **AI Trading Panel** (New Feature):
   - New "AI Trading" panel in AI Results tab above Prediction Accuracy

@@ -2587,6 +2587,153 @@ function analyzeWaveStructure(swings, currentPrice) {
 }
 
 // Generate wave-based projections
+// Generate AI-powered price projection using learned patterns and brain memory
+async function generateAiProjection(symbol, tf, historicalCandles, lastPrice, lastTime, interval, projectionPoints, direction, aiResult) {
+  console.log('Generating AI projection with learned patterns...');
+  
+  // Prepare recent price data for AI analysis (last 50 candles for context)
+  const recentCandles = historicalCandles.slice(-50);
+  const priceData = recentCandles.map(c => ({
+    time: c.time,
+    open: c.open.toFixed(4),
+    high: c.high.toFixed(4),
+    low: c.low.toFixed(4),
+    close: c.close.toFixed(4)
+  }));
+  
+  // Get brain memory data for context
+  let brainData = null;
+  let eventsData = null;
+  try {
+    const [brainRes, eventsRes] = await Promise.all([
+      fetch('/api/ai-memory/brain'),
+      fetch('/api/ai-memory/events')
+    ]);
+    if (brainRes.ok) brainData = await brainRes.json();
+    if (eventsRes.ok) eventsData = await eventsRes.json();
+  } catch (e) {
+    console.log('Could not fetch brain memory:', e.message);
+  }
+  
+  // Extract relevant learned patterns for this asset
+  const assetPatterns = brainData?.patterns?.[symbol] || {};
+  const accuracy = brainData?.accuracy?.[symbol] || 0;
+  const predictions = brainData?.predictions?.[symbol] || 0;
+  const recentEvents = (eventsData || []).slice(-10);
+  
+  // Build AI prompt
+  const prompt = `You are analyzing ${symbol} on the ${tf} timeframe to predict future price movement.
+
+CURRENT PRICE: ${lastPrice.toFixed(4)}
+CURRENT DIRECTION BIAS: ${direction}
+AI CONFIDENCE: ${aiResult?.confidence || 'Unknown'}
+
+RECENT PRICE DATA (last 50 candles):
+${JSON.stringify(priceData.slice(-20), null, 1)}
+
+LEARNED PATTERNS FOR ${symbol.toUpperCase()}:
+- Historical Accuracy: ${(accuracy * 100).toFixed(1)}% from ${predictions} predictions
+- Detected Patterns: ${JSON.stringify(assetPatterns)}
+
+RECENT MARKET EVENTS:
+${recentEvents.map(e => `- ${e.date}: ${e.title} (Impact: ${e.impact})`).join('\n') || 'None recorded'}
+
+AI ANALYSIS RESULTS:
+${JSON.stringify(aiResult?.predictions?.[tf] || {}, null, 1)}
+
+Based on your analysis of the patterns, trends, and learned data, predict the next ${projectionPoints} price points.
+
+RESPOND WITH ONLY A JSON OBJECT in this exact format:
+{
+  "expected": [array of ${projectionPoints} predicted prices for most likely scenario],
+  "bullish": [array of ${projectionPoints} prices for bullish scenario],
+  "bearish": [array of ${projectionPoints} prices for bearish scenario],
+  "reasoning": "Brief explanation of your prediction logic"
+}
+
+Make realistic predictions that reflect actual market behavior - not random waves. Consider:
+1. Current trend direction and momentum
+2. Support/resistance levels visible in the data
+3. Typical price movement patterns for this asset
+4. Your learned accuracy and past pattern performance`;
+
+  try {
+    const response = await fetch('/api/ai/generate-projection', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt,
+        symbol,
+        timeframe: tf,
+        currentPrice: lastPrice,
+        projectionPoints
+      })
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log('AI projection response:', data);
+      
+      if (data.expected && data.bullish && data.bearish) {
+        // Convert AI predictions to chart data format
+        const bullishData = [{ time: lastTime, value: lastPrice }];
+        const bearishData = [{ time: lastTime, value: lastPrice }];
+        const expectedData = [{ time: lastTime, value: lastPrice }];
+        
+        for (let i = 0; i < data.expected.length; i++) {
+          const time = lastTime + ((i + 1) * interval);
+          expectedData.push({ time, value: parseFloat(data.expected[i]) || lastPrice });
+          bullishData.push({ time, value: parseFloat(data.bullish[i]) || lastPrice });
+          bearishData.push({ time, value: parseFloat(data.bearish[i]) || lastPrice });
+        }
+        
+        // Store reasoning for display
+        window.aiProjectionReasoning = data.reasoning || '';
+        
+        return { bullishData, bearishData, expectedData };
+      }
+    }
+  } catch (e) {
+    console.error('AI projection failed:', e);
+  }
+  
+  // Fallback: use simple trend-based projection if AI fails
+  console.log('Using fallback projection');
+  return generateFallbackProjection(historicalCandles, lastPrice, lastTime, interval, projectionPoints, direction);
+}
+
+// Simple fallback projection based on recent trend (not a formula, just extrapolation)
+function generateFallbackProjection(historicalCandles, lastPrice, lastTime, interval, projectionPoints, direction) {
+  const bullishData = [{ time: lastTime, value: lastPrice }];
+  const bearishData = [{ time: lastTime, value: lastPrice }];
+  const expectedData = [{ time: lastTime, value: lastPrice }];
+  
+  // Calculate recent trend from last 20 candles
+  const recent = historicalCandles.slice(-20);
+  const avgChange = (recent[recent.length - 1].close - recent[0].close) / recent.length;
+  const volatility = Math.abs(avgChange) * 0.5;
+  
+  let expPrice = lastPrice;
+  let bullPrice = lastPrice;
+  let bearPrice = lastPrice;
+  
+  for (let i = 1; i <= projectionPoints; i++) {
+    const time = lastTime + (i * interval);
+    
+    // Continue recent trend with dampening
+    const trendFactor = Math.max(0.1, 1 - (i / projectionPoints) * 0.5);
+    expPrice += avgChange * trendFactor;
+    bullPrice += (avgChange + volatility) * trendFactor;
+    bearPrice += (avgChange - volatility) * trendFactor;
+    
+    expectedData.push({ time, value: expPrice });
+    bullishData.push({ time, value: bullPrice });
+    bearishData.push({ time, value: bearPrice });
+  }
+  
+  return { bullishData, bearishData, expectedData };
+}
+
 function generateWaveProjections(historicalCandles, lastPrice, lastTime, interval, forecastCandles, direction, analysis) {
   const bullishData = [];
   const bearishData = [];
@@ -2916,30 +3063,23 @@ async function updateAiProjectionChart(result) {
   const lastTime = lastCandle.time;
   const direction = tfData.direction || 'Neutral';
   
-  // Analyze historical data for patterns and indicators
-  const analysis = analyzeHistoricalData(historicalCandles);
+  // Use AI to generate intelligent price projection based on learned patterns
+  container.innerHTML = '<div class="h-full flex items-center justify-center text-purple-400"><div class="text-center"><div class="animate-spin h-8 w-8 border-4 border-purple-500 border-t-transparent rounded-full mx-auto mb-2"></div>AI analyzing patterns and generating projection...</div></div>';
   
-  // Fetch higher timeframe data for multi-timeframe analysis
-  const higherTFAnalysis = await fetchHigherTimeframeContext(symbol, tf, interval);
-  
-  // Merge higher TF trend into analysis
-  if (higherTFAnalysis) {
-    analysis.higherTFTrend = higherTFAnalysis.trend;
-    analysis.higherTFLongTermTrend = higherTFAnalysis.longTermTrend;
-    analysis.higherTFVolatility = higherTFAnalysis.volatility;
-    console.log('Higher TF analysis:', { trend: higherTFAnalysis.trend, longTermTrend: higherTFAnalysis.longTermTrend?.toFixed(4) });
-  }
-  
-  // Generate projections using multi-timeframe wave analysis
-  const { bullishData, bearishData, expectedData } = generateWaveProjections(
-    historicalCandles, 
-    lastPrice, 
-    lastTime, 
-    interval, 
-    forecastCandles, 
+  const { bullishData, bearishData, expectedData } = await generateAiProjection(
+    symbol,
+    tf,
+    historicalCandles,
+    lastPrice,
+    lastTime,
+    interval,
+    Math.min(forecastCandles, 100), // Limit projection points for AI
     direction,
-    analysis
+    result
   );
+  
+  // Clear loading state
+  container.innerHTML = '';
   
   // Bullish line (green, dashed)
   const bullishSeries = aiProjectionChart.addSeries(LineSeries, {

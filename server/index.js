@@ -3225,8 +3225,80 @@ Respond in JSON format ONLY:
     
     res.json(result);
   } catch (e) {
-    console.error('Error checking breaking news:', e);
-    res.json({ sentiment: 'neutral', confidence: 'low', reason: 'Analysis failed', breakingNews: false });
+    console.error('Breaking news error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// AI-powered price projection endpoint
+app.post('/api/ai/generate-projection', async (req, res) => {
+  const { prompt, symbol, timeframe, currentPrice, projectionPoints } = req.body;
+  
+  try {
+    let result = null;
+    
+    // Try Claude first
+    try {
+      const response = await anthropic.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2000,
+        messages: [{ role: 'user', content: prompt }]
+      });
+      
+      const content = response.content[0]?.text || '{}';
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        result = JSON.parse(jsonMatch[0]);
+      }
+    } catch (claudeError) {
+      console.error('Claude projection error, trying GPT:', claudeError.message);
+      
+      try {
+        const gptResponse = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          max_tokens: 2000,
+          messages: [{ role: 'user', content: prompt }]
+        });
+        
+        const content = gptResponse.choices[0]?.message?.content || '{}';
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          result = JSON.parse(jsonMatch[0]);
+        }
+      } catch (gptError) {
+        console.error('GPT projection error:', gptError.message);
+      }
+    }
+    
+    if (result && result.expected && result.bullish && result.bearish) {
+      // Validate and clean the arrays
+      const validatePrices = (arr) => {
+        if (!Array.isArray(arr)) return [];
+        return arr.map(p => {
+          const price = parseFloat(p);
+          return isNaN(price) ? currentPrice : price;
+        });
+      };
+      
+      result.expected = validatePrices(result.expected);
+      result.bullish = validatePrices(result.bullish);
+      result.bearish = validatePrices(result.bearish);
+      
+      // Ensure we have enough points
+      while (result.expected.length < projectionPoints) {
+        result.expected.push(result.expected[result.expected.length - 1] || currentPrice);
+        result.bullish.push(result.bullish[result.bullish.length - 1] || currentPrice);
+        result.bearish.push(result.bearish[result.bearish.length - 1] || currentPrice);
+      }
+      
+      res.json(result);
+    } else {
+      // Return a simple trend-based fallback
+      res.status(400).json({ error: 'Could not generate projection', result });
+    }
+  } catch (e) {
+    console.error('Error generating projection:', e);
+    res.status(500).json({ error: e.message });
   }
 });
 
