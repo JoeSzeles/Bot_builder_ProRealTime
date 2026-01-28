@@ -2413,6 +2413,10 @@ async function updateAiProjectionChart(result) {
   
   console.log(`Fetching ${forecastCandles} candles for ${symbol}/${tf} (API: ${apiTimeframe})`);
   
+  // Update timeframe label in UI
+  const tfLabel = document.getElementById('projectionTimeframeLabel');
+  if (tfLabel) tfLabel.textContent = tf;
+  
   let historicalCandles = [];
   try {
     container.innerHTML = '<div class="h-full flex items-center justify-center text-gray-500">Loading market data...</div>';
@@ -2423,6 +2427,14 @@ async function updateAiProjectionChart(result) {
       // Use all available candles, up to requested amount
       historicalCandles = data.candles.slice(-forecastCandles);
       console.log(`Using ${historicalCandles.length} candles (requested ${forecastCandles}, available ${data.candles.length})`);
+      
+      // Update data info label
+      const dataInfo = document.getElementById('projectionDataInfo');
+      if (dataInfo) {
+        const firstDate = new Date(historicalCandles[0].time * 1000).toLocaleDateString();
+        const lastDate = new Date(historicalCandles[historicalCandles.length - 1].time * 1000).toLocaleDateString();
+        dataInfo.textContent = `${historicalCandles.length} candles (${firstDate} - ${lastDate})`;
+      }
     }
   } catch (e) {
     console.error('Failed to fetch market data:', e);
@@ -2470,6 +2482,10 @@ async function updateAiProjectionChart(result) {
   // Clear container before creating chart
   container.innerHTML = '';
   
+  // Determine time format based on timeframe
+  const useSecondsFormat = interval <= 60;
+  const useDayFormat = interval >= 86400;
+  
   // Create chart with scroll/zoom enabled
   aiProjectionChart = createChart(container, {
     width: chartWidth,
@@ -2484,10 +2500,23 @@ async function updateAiProjectionChart(result) {
     },
     timeScale: {
       borderColor: '#374151',
-      timeVisible: true,
+      timeVisible: !useDayFormat,
+      secondsVisible: useSecondsFormat,
       rightOffset: 5,
       barSpacing: barSpacing,
       minBarSpacing: 0.1,
+      tickMarkFormatter: (time) => {
+        const date = new Date(time * 1000);
+        if (useDayFormat) {
+          return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        } else if (interval >= 3600) {
+          return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        } else if (interval >= 60) {
+          return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        } else {
+          return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+      },
     },
     rightPriceScale: {
       borderColor: '#374151',
