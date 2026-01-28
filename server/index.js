@@ -2580,6 +2580,176 @@ app.delete('/api/prt-docs/:id', (req, res) => {
   }
 });
 
+// Historical price data directory
+const HISTORICAL_PRICES_DIR = path.join(__dirname, '..', 'data', 'historical-prices');
+
+// Parse CSV to JSON
+function parseHistoricalCSV(filePath) {
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const lines = content.trim().split('\n');
+    const headers = lines[0].split(',');
+    
+    const data = [];
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(',');
+      const row = {};
+      headers.forEach((h, idx) => {
+        row[h.trim()] = values[idx]?.trim() || null;
+      });
+      data.push(row);
+    }
+    return data;
+  } catch (e) {
+    console.error('Error parsing CSV:', e);
+    return [];
+  }
+}
+
+// Get historical gold/silver data
+app.get('/api/historical-prices/:metal', (req, res) => {
+  const { metal } = req.params;
+  const { start, end, limit } = req.query;
+  
+  try {
+    const ratioFile = path.join(HISTORICAL_PRICES_DIR, 'gold_silver_ratio.csv');
+    
+    if (!fs.existsSync(ratioFile)) {
+      return res.status(404).json({ error: 'Historical data not available. Please download first.' });
+    }
+    
+    const data = parseHistoricalCSV(ratioFile);
+    
+    // Transform data based on requested metal
+    let result = data.map(row => {
+      const goldPrice = parseFloat(row.price) || 0;
+      const ratio = parseFloat(row.silver_oz_per_gold_oz) || 60;
+      const silverPrice = ratio > 0 ? goldPrice / ratio : goldPrice / 60;
+      
+      return {
+        date: row.date,
+        gold: goldPrice,
+        silver: silverPrice,
+        ratio: ratio,
+        currency: row.currency || 'USD'
+      };
+    }).filter(r => r.gold > 0);
+    
+    // Filter by date range if specified
+    if (start) {
+      result = result.filter(r => r.date >= start);
+    }
+    if (end) {
+      result = result.filter(r => r.date <= end);
+    }
+    
+    // Limit results
+    const maxResults = parseInt(limit) || 10000;
+    if (result.length > maxResults) {
+      result = result.slice(-maxResults);
+    }
+    
+    // Convert to candle format for chart compatibility
+    const candles = result.map(r => {
+      const price = metal === 'silver' ? r.silver : r.gold;
+      const timestamp = new Date(r.date).getTime() / 1000;
+      return {
+        time: timestamp,
+        open: price,
+        high: price * 1.001,
+        low: price * 0.999,
+        close: price
+      };
+    }).filter(c => !isNaN(c.time) && c.close > 0);
+    
+    res.json({
+      metal,
+      count: candles.length,
+      range: {
+        start: result[0]?.date,
+        end: result[result.length - 1]?.date
+      },
+      candles
+    });
+  } catch (e) {
+    console.error('Error fetching historical prices:', e);
+    res.status(500).json({ error: 'Failed to fetch historical prices' });
+  }
+});
+
+// Refresh historical data from FreeGoldAPI
+app.post('/api/historical-prices/refresh', async (req, res) => {
+  try {
+    const goldUrl = 'https://freegoldapi.com/data/latest.csv';
+    const ratioUrl = 'https://freegoldapi.com/data/gold_silver_ratio_enriched.csv';
+    
+    // Ensure directory exists
+    if (!fs.existsSync(HISTORICAL_PRICES_DIR)) {
+      fs.mkdirSync(HISTORICAL_PRICES_DIR, { recursive: true });
+    }
+    
+    // Download gold data
+    const goldRes = await fetch(goldUrl);
+    if (goldRes.ok) {
+      const goldData = await goldRes.text();
+      fs.writeFileSync(path.join(HISTORICAL_PRICES_DIR, 'gold.csv'), goldData);
+    }
+    
+    // Download ratio data (includes silver)
+    const ratioRes = await fetch(ratioUrl);
+    if (ratioRes.ok) {
+      const ratioData = await ratioRes.text();
+      fs.writeFileSync(path.join(HISTORICAL_PRICES_DIR, 'gold_silver_ratio.csv'), ratioData);
+    }
+    
+    // Count rows
+    const ratioFile = path.join(HISTORICAL_PRICES_DIR, 'gold_silver_ratio.csv');
+    const lines = fs.readFileSync(ratioFile, 'utf-8').split('\n').length - 1;
+    
+    res.json({ 
+      success: true, 
+      message: `Downloaded ${lines} historical price records`,
+      dataPoints: lines
+    });
+  } catch (e) {
+    console.error('Error refreshing historical data:', e);
+    res.status(500).json({ error: 'Failed to refresh historical data' });
+  }
+});
+
+// Get historical data info
+app.get('/api/historical-prices/info', (req, res) => {
+  try {
+    const ratioFile = path.join(HISTORICAL_PRICES_DIR, 'gold_silver_ratio.csv');
+    
+    if (!fs.existsSync(ratioFile)) {
+      return res.json({ available: false, message: 'No historical data downloaded yet' });
+    }
+    
+    const stats = fs.statSync(ratioFile);
+    const content = fs.readFileSync(ratioFile, 'utf-8');
+    const lines = content.split('\n');
+    const dataPoints = lines.length - 1;
+    
+    // Get date range
+    const firstLine = lines[1]?.split(',');
+    const lastLine = lines[lines.length - 2]?.split(',');
+    
+    res.json({
+      available: true,
+      dataPoints,
+      fileSize: stats.size,
+      lastUpdated: stats.mtime,
+      dateRange: {
+        start: firstLine?.[0],
+        end: lastLine?.[0]
+      }
+    });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to get historical data info' });
+  }
+});
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);

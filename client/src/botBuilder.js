@@ -2317,20 +2317,39 @@ async function updateAiProjectionChart(result) {
   const historyToShow = Math.min(Math.max(50, Math.floor(forecastCandles / 10)), 500);
   
   if (historicalCandles.length === 0) {
-    // Fetch fresh market data - use daily for larger forecasts to get more history
     const symbol = document.getElementById('aiSymbol')?.value || 'silver';
-    // Use longer timeframe for larger forecasts to get more data points
-    const fetchTf = forecastCandles >= 10000 ? '1d' : (forecastCandles >= 1000 ? '4h' : '1h');
-    try {
-      container.innerHTML = '<div class="h-full flex items-center justify-center text-gray-500">Loading market data for projection...</div>';
-      const response = await fetch(`/api/market-data/${symbol}/${fetchTf}`);
-      const data = await response.json();
-      if (data.candles && data.candles.length > 0) {
-        historicalCandles = data.candles;
-        result.marketData = historicalCandles; // Store for future use
+    
+    // For large projections (1k+), try to use historical database first
+    if (forecastCandles >= 1000) {
+      try {
+        container.innerHTML = '<div class="h-full flex items-center justify-center text-gray-500">Loading historical database...</div>';
+        const metal = symbol.toLowerCase().includes('gold') ? 'gold' : 'silver';
+        const histResponse = await fetch(`/api/historical-prices/${metal}?limit=${Math.min(forecastCandles, 100000)}`);
+        const histData = await histResponse.json();
+        if (histData.candles && histData.candles.length > 100) {
+          historicalCandles = histData.candles;
+          result.marketData = historicalCandles;
+          console.log(`Loaded ${historicalCandles.length} candles from historical database`);
+        }
+      } catch (e) {
+        console.warn('Historical database not available, falling back to live data:', e);
       }
-    } catch (e) {
-      console.warn('Failed to fetch market data for projection:', e);
+    }
+    
+    // Fallback to live Yahoo Finance data
+    if (historicalCandles.length === 0) {
+      const fetchTf = forecastCandles >= 10000 ? '1d' : (forecastCandles >= 1000 ? '4h' : '1h');
+      try {
+        container.innerHTML = '<div class="h-full flex items-center justify-center text-gray-500">Loading market data...</div>';
+        const response = await fetch(`/api/market-data/${symbol}/${fetchTf}`);
+        const data = await response.json();
+        if (data.candles && data.candles.length > 0) {
+          historicalCandles = data.candles;
+          result.marketData = historicalCandles;
+        }
+      } catch (e) {
+        console.warn('Failed to fetch market data for projection:', e);
+      }
     }
   }
   
