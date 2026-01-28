@@ -6061,6 +6061,166 @@ function initAiTrading() {
   // Load saved state
   loadAiTradingState();
   updateAiTradingUI();
+  
+  // Initialize AI Chat
+  initAiChat();
+}
+
+// AI Chat state
+const AI_CHAT = {
+  messages: [],
+  isLoading: false
+};
+
+// Initialize AI Chat handlers
+function initAiChat() {
+  const sendBtn = document.getElementById('sendAiChat');
+  const clearBtn = document.getElementById('clearAiChat');
+  const inputEl = document.getElementById('aiChatInput');
+  
+  if (sendBtn) {
+    sendBtn.addEventListener('click', sendAiChatMessage);
+  }
+  
+  if (clearBtn) {
+    clearBtn.addEventListener('click', clearAiChat);
+  }
+  
+  if (inputEl) {
+    inputEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendAiChatMessage();
+      }
+    });
+  }
+  
+  // Load saved chat
+  const saved = localStorage.getItem('aiChatMessages');
+  if (saved) {
+    try {
+      AI_CHAT.messages = JSON.parse(saved);
+      renderAiChatMessages();
+    } catch (e) {}
+  }
+}
+
+// Send message to AI
+async function sendAiChatMessage() {
+  const inputEl = document.getElementById('aiChatInput');
+  const message = inputEl?.value?.trim();
+  
+  if (!message || AI_CHAT.isLoading) return;
+  
+  AI_CHAT.isLoading = true;
+  inputEl.value = '';
+  
+  // Add user message
+  AI_CHAT.messages.push({ role: 'user', content: message, time: Date.now() });
+  renderAiChatMessages();
+  
+  // Show loading
+  const loadingId = Date.now();
+  AI_CHAT.messages.push({ role: 'assistant', content: '...', time: loadingId, loading: true });
+  renderAiChatMessages();
+  
+  try {
+    // Get current context
+    const symbol = document.getElementById('aiSymbol')?.value || 'silver';
+    const tf = aiResultsTimeframe || '5m';
+    
+    // Fetch brain data for context
+    let brainData = null;
+    try {
+      const res = await fetch('/api/ai-memory/brain');
+      if (res.ok) brainData = await res.json();
+    } catch (e) {}
+    
+    const response = await fetch('/api/ai/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message,
+        symbol,
+        timeframe: tf,
+        brainData,
+        chatHistory: AI_CHAT.messages.slice(-10).filter(m => !m.loading)
+      })
+    });
+    
+    // Remove loading message
+    AI_CHAT.messages = AI_CHAT.messages.filter(m => m.time !== loadingId);
+    
+    if (response.ok) {
+      const data = await response.json();
+      AI_CHAT.messages.push({ role: 'assistant', content: data.response, time: Date.now() });
+    } else {
+      AI_CHAT.messages.push({ role: 'assistant', content: 'Sorry, I had trouble processing that. Please try again.', time: Date.now() });
+    }
+  } catch (e) {
+    AI_CHAT.messages = AI_CHAT.messages.filter(m => m.time !== loadingId);
+    AI_CHAT.messages.push({ role: 'assistant', content: 'Connection error. Please try again.', time: Date.now() });
+  }
+  
+  AI_CHAT.isLoading = false;
+  saveAiChat();
+  renderAiChatMessages();
+}
+
+// Render chat messages
+function renderAiChatMessages() {
+  const container = document.getElementById('aiChatMessages');
+  if (!container) return;
+  
+  if (AI_CHAT.messages.length === 0) {
+    container.innerHTML = '<div class="text-center text-xs text-gray-500 dark:text-gray-400 italic py-4">Ask me about trading strategies, market analysis, or discuss your ideas...</div>';
+    return;
+  }
+  
+  container.innerHTML = AI_CHAT.messages.map(msg => {
+    if (msg.role === 'user') {
+      return `<div class="flex justify-end"><div class="max-w-[80%] bg-purple-100 dark:bg-purple-900/50 text-gray-800 dark:text-gray-200 rounded-lg px-3 py-2 text-sm">${escapeHtml(msg.content)}</div></div>`;
+    } else {
+      const content = msg.loading 
+        ? '<div class="flex gap-1"><span class="w-2 h-2 bg-purple-400 rounded-full animate-bounce"></span><span class="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style="animation-delay:0.1s"></span><span class="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style="animation-delay:0.2s"></span></div>'
+        : formatAiResponse(msg.content);
+      return `<div class="flex justify-start"><div class="max-w-[85%] bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg px-3 py-2 text-sm">${content}</div></div>`;
+    }
+  }).join('');
+  
+  container.scrollTop = container.scrollHeight;
+}
+
+// Format AI response with markdown-like parsing
+function formatAiResponse(text) {
+  if (!text) return '';
+  let html = escapeHtml(text);
+  // Bold
+  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  // Code
+  html = html.replace(/`([^`]+)`/g, '<code class="bg-gray-200 dark:bg-gray-600 px-1 rounded text-xs">$1</code>');
+  // Line breaks
+  html = html.replace(/\n/g, '<br>');
+  return html;
+}
+
+// Escape HTML
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// Clear chat
+function clearAiChat() {
+  AI_CHAT.messages = [];
+  localStorage.removeItem('aiChatMessages');
+  renderAiChatMessages();
+}
+
+// Save chat to localStorage
+function saveAiChat() {
+  localStorage.setItem('aiChatMessages', JSON.stringify(AI_CHAT.messages.slice(-50)));
 }
 
 // Read settings from Capital & Fees section

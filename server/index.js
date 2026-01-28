@@ -3302,6 +3302,84 @@ app.post('/api/ai/generate-projection', async (req, res) => {
   }
 });
 
+// AI Chat endpoint for real-time conversation
+app.post('/api/ai/chat', async (req, res) => {
+  const { message, symbol, timeframe, brainData, chatHistory } = req.body;
+  
+  try {
+    // Build context from brain data
+    const assetAccuracy = brainData?.accuracy?.[symbol] || 0;
+    const assetPredictions = brainData?.predictions?.[symbol] || 0;
+    const assetPatterns = brainData?.patterns?.[symbol] || {};
+    
+    // Format chat history for context
+    const historyText = (chatHistory || [])
+      .filter(m => m.role && m.content)
+      .map(m => `${m.role === 'user' ? 'Human' : 'Assistant'}: ${m.content}`)
+      .join('\n');
+    
+    const systemPrompt = `You are an expert trading assistant specializing in ${symbol.toUpperCase()} analysis on the ${timeframe} timeframe.
+
+YOUR LEARNED DATA FOR ${symbol.toUpperCase()}:
+- Historical Prediction Accuracy: ${(assetAccuracy * 100).toFixed(1)}%
+- Total Predictions Made: ${assetPredictions}
+- Detected Patterns: ${JSON.stringify(assetPatterns)}
+
+You help traders by:
+1. Analyzing market conditions and patterns
+2. Discussing trading strategies and ideas
+3. Explaining technical indicators and their signals
+4. Providing insights based on your learned patterns
+5. Answering questions about ProRealTime bot development
+
+Be concise but helpful. Use your learned data to inform your responses. If asked about predictions, reference your historical accuracy.`;
+
+    const fullPrompt = historyText 
+      ? `${systemPrompt}\n\nPrevious conversation:\n${historyText}\n\nHuman: ${message}\n\nAssistant:`
+      : `${systemPrompt}\n\nHuman: ${message}\n\nAssistant:`;
+    
+    let responseText = '';
+    
+    // Try Claude first
+    try {
+      const response = await anthropic.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: fullPrompt }]
+      });
+      
+      responseText = response.content[0]?.text || 'I could not generate a response.';
+    } catch (claudeError) {
+      console.error('Claude chat error, trying GPT:', claudeError.message);
+      
+      try {
+        const gptResponse = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          max_tokens: 1000,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            ...((chatHistory || []).map(m => ({ 
+              role: m.role === 'user' ? 'user' : 'assistant', 
+              content: m.content 
+            }))),
+            { role: 'user', content: message }
+          ]
+        });
+        
+        responseText = gptResponse.choices[0]?.message?.content || 'I could not generate a response.';
+      } catch (gptError) {
+        console.error('GPT chat error:', gptError.message);
+        responseText = 'Sorry, I am currently unavailable. Please try again later.';
+      }
+    }
+    
+    res.json({ response: responseText });
+  } catch (e) {
+    console.error('Chat error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);

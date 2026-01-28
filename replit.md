@@ -72,6 +72,14 @@ The application features a modern full-stack architecture:
   - Accuracy builds over time as more predictions are recorded
   - View stats in AI Memory tab: accuracy %, predictions count, patterns learned
 
+- **AI Chat Panel** (New Feature):
+  - Real-time chat interface with Claude in AI Results section
+  - Discuss trading strategies, market analysis, and ideas
+  - AI has context: current asset, timeframe, brain memory, learned patterns
+  - Chat history preserved in localStorage
+  - Supports Enter to send, Clear button to reset
+  - Backend endpoint: `/api/ai/chat`
+
 - **AI Price Projection Chart** (Complete Rewrite - True AI Predictions):
   - **No more formulas**: Projection now uses actual AI (Claude/GPT) to predict prices
   - AI receives: recent price data, brain memory patterns, historical accuracy, market events
