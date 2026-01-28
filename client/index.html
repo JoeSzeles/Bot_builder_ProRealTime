@@ -1551,6 +1551,90 @@
                     <span class="flex items-center gap-2"><span class="w-4 h-1 rounded" style="background: #ff3333; box-shadow: 0 0 6px #ff3333;"></span> <span class="font-medium text-red-500">Real Price</span></span>
                   </div>
                   
+                  <!-- AI Trading Panel -->
+                  <div id="aiTradesPanel" class="mt-3 p-4 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-xl border border-emerald-300 dark:border-emerald-700">
+                    <div class="flex items-center justify-between mb-3">
+                      <div class="flex items-center gap-3">
+                        <h4 class="text-sm font-bold text-gray-800 dark:text-gray-200">AI Trading</h4>
+                        <span id="aiTradeStatus" class="px-2 py-0.5 text-xs font-medium bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 rounded-full">Stopped</span>
+                        <span id="aiTradeSignal" class="hidden px-3 py-1 text-xs font-bold rounded-full animate-pulse"></span>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <button id="startAiTrading" class="px-3 py-1.5 text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors flex items-center gap-1">
+                          <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                          Start
+                        </button>
+                        <button id="stopAiTrading" class="hidden px-3 py-1.5 text-xs font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center gap-1">
+                          <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg>
+                          Stop
+                        </button>
+                        <button id="resetAiTrading" class="px-3 py-1.5 text-xs font-medium bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-colors">Reset</button>
+                      </div>
+                    </div>
+                    
+                    <!-- Trading Stats Grid -->
+                    <div class="grid grid-cols-5 gap-3 mb-3">
+                      <div class="bg-white/50 dark:bg-gray-800/50 rounded-lg p-2 text-center">
+                        <div class="text-xs text-gray-500 dark:text-gray-400">Capital</div>
+                        <div id="aiTradeCapital" class="text-sm font-bold text-gray-800 dark:text-gray-200">$2,000</div>
+                      </div>
+                      <div class="bg-white/50 dark:bg-gray-800/50 rounded-lg p-2 text-center">
+                        <div class="text-xs text-gray-500 dark:text-gray-400">P/L</div>
+                        <div id="aiTradePnL" class="text-sm font-bold text-gray-600">$0.00</div>
+                      </div>
+                      <div class="bg-white/50 dark:bg-gray-800/50 rounded-lg p-2 text-center">
+                        <div class="text-xs text-gray-500 dark:text-gray-400">Win Rate</div>
+                        <div id="aiTradeWinRate" class="text-sm font-bold text-gray-600">--%</div>
+                      </div>
+                      <div class="bg-white/50 dark:bg-gray-800/50 rounded-lg p-2 text-center">
+                        <div class="text-xs text-gray-500 dark:text-gray-400">Trades</div>
+                        <div id="aiTradeCount" class="text-sm font-bold text-gray-600">0</div>
+                      </div>
+                      <div class="bg-white/50 dark:bg-gray-800/50 rounded-lg p-2 text-center">
+                        <div class="text-xs text-gray-500 dark:text-gray-400">Position</div>
+                        <div id="aiTradePosition" class="text-sm font-bold text-gray-500">None</div>
+                      </div>
+                    </div>
+                    
+                    <!-- Learning & Confidence Stats -->
+                    <div class="grid grid-cols-3 gap-3 mb-3">
+                      <div class="bg-white/50 dark:bg-gray-800/50 rounded-lg p-2">
+                        <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">Learning Score</div>
+                        <div class="flex items-center gap-2">
+                          <div class="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                            <div id="aiLearningBar" class="h-full bg-gradient-to-r from-purple-500 to-blue-500 transition-all" style="width: 0%"></div>
+                          </div>
+                          <span id="aiLearningScore" class="text-xs font-bold text-purple-600 dark:text-purple-400">0</span>
+                        </div>
+                      </div>
+                      <div class="bg-white/50 dark:bg-gray-800/50 rounded-lg p-2">
+                        <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">News Sentiment</div>
+                        <div id="aiNewsSentiment" class="text-xs font-medium text-gray-600 dark:text-gray-300">Checking...</div>
+                      </div>
+                      <div class="bg-white/50 dark:bg-gray-800/50 rounded-lg p-2">
+                        <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">Market Speed</div>
+                        <div id="aiMarketSpeed" class="text-xs font-medium text-gray-600 dark:text-gray-300">Normal</div>
+                      </div>
+                    </div>
+                    
+                    <!-- Trade History List -->
+                    <div class="bg-white/30 dark:bg-gray-800/30 rounded-lg overflow-hidden">
+                      <div class="flex items-center justify-between px-3 py-2 bg-gray-100 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-600">
+                        <span class="text-xs font-medium text-gray-600 dark:text-gray-400">Recent Trades</span>
+                        <span id="aiTradeListCount" class="text-xs text-gray-500 dark:text-gray-400">0 trades</span>
+                      </div>
+                      <div id="aiTradeList" class="max-h-32 overflow-y-auto text-xs">
+                        <div class="p-3 text-center text-gray-500 dark:text-gray-400 italic">No trades yet - click Start to begin AI trading</div>
+                      </div>
+                    </div>
+                    
+                    <!-- Contract Info -->
+                    <div class="mt-2 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+                      <span>Silver Contract: Min 0.05, 100/point, 1pt = $1 AUD</span>
+                      <span id="aiTradeLastCheck" class="italic">Last analysis: --</span>
+                    </div>
+                  </div>
+                  
                   <!-- Accuracy Display -->
                   <div id="aiPredictionAccuracy" class="mt-3 p-3 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-lg border border-purple-200 dark:border-purple-700">
                     <div class="flex items-center justify-between">

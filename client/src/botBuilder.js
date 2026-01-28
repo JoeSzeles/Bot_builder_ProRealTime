@@ -5832,3 +5832,859 @@ async function checkDailyNewsOnLoad() {
   // Check for news
   await checkOnlineMarketNews();
 }
+
+// ===== AI TRADING ENGINE =====
+const AI_TRADING = {
+  active: false,
+  interval: null,
+  
+  // Silver contract specifications
+  contract: {
+    minSize: 0.05,
+    contractSizePerPoint: 100,
+    onePointMeans: 0.01, // Cents/Troy Ounce
+    valuePerPoint: 1, // AUD
+    minStopDistance: 4,
+    minGuaranteedStop: 40
+  },
+  
+  // Trading state
+  state: {
+    capital: 2000,
+    startingCapital: 2000,
+    position: null, // { type: 'long'/'short', size: number, entryPrice: number, entryTime: Date }
+    trades: [],
+    pnl: 0,
+    wins: 0,
+    losses: 0
+  },
+  
+  // Learning weights (adjusted based on success)
+  learning: {
+    score: 0,
+    weights: {
+      trend: 1.0,
+      momentum: 1.0,
+      rsi: 1.0,
+      macd: 1.0,
+      wavePosition: 1.0,
+      news: 1.2,
+      higherTF: 1.3
+    },
+    recentPatterns: []
+  },
+  
+  // Market analysis cache
+  analysis: {
+    allTimeframes: {},
+    newsSentiment: 'neutral',
+    marketSpeed: 'normal',
+    lastCheck: null
+  }
+};
+
+// Initialize AI Trading UI
+function initAiTrading() {
+  const startBtn = document.getElementById('startAiTrading');
+  const stopBtn = document.getElementById('stopAiTrading');
+  const resetBtn = document.getElementById('resetAiTrading');
+  
+  if (startBtn) {
+    startBtn.addEventListener('click', startAiTrading);
+  }
+  if (stopBtn) {
+    stopBtn.addEventListener('click', stopAiTrading);
+  }
+  if (resetBtn) {
+    resetBtn.addEventListener('click', resetAiTrading);
+  }
+  
+  // Load saved state
+  loadAiTradingState();
+  updateAiTradingUI();
+}
+
+// Read settings from Capital & Fees section
+function getTradeSettings() {
+  return {
+    initialCapital: parseFloat(document.getElementById('initialCapital')?.value) || 2000,
+    maxPositionSize: parseFloat(document.getElementById('maxPositionSize')?.value) || 1,
+    positionSize: parseFloat(document.getElementById('positionSize')?.value) || 0.5,
+    useOrderFee: document.getElementById('useOrderFee')?.checked ?? true,
+    orderFee: parseFloat(document.getElementById('orderFee')?.value) || 7,
+    useSpread: document.getElementById('useSpread')?.checked ?? true,
+    spreadPips: parseFloat(document.getElementById('spreadPips')?.value) || 2,
+    stopLoss: parseFloat(document.getElementById('stopLoss')?.value) || 7000,
+    takeProfit: parseFloat(document.getElementById('takeProfit')?.value) || 0,
+    tradeType: document.getElementById('tradeType')?.value || 'both'
+  };
+}
+
+// Start AI Trading
+async function startAiTrading() {
+  if (AI_TRADING.active) return;
+  
+  AI_TRADING.active = true;
+  
+  // Update UI
+  document.getElementById('startAiTrading')?.classList.add('hidden');
+  document.getElementById('stopAiTrading')?.classList.remove('hidden');
+  document.getElementById('aiTradeStatus').textContent = 'Running';
+  document.getElementById('aiTradeStatus').className = 'px-2 py-0.5 text-xs font-medium bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 rounded-full';
+  
+  // Initialize capital from settings if starting fresh
+  if (AI_TRADING.state.trades.length === 0) {
+    const settings = getTradeSettings();
+    AI_TRADING.state.capital = settings.initialCapital;
+    AI_TRADING.state.startingCapital = settings.initialCapital;
+  }
+  
+  // Run immediately, then on interval
+  await runAiTradingCycle();
+  
+  // Determine interval based on timeframe
+  const tf = document.querySelector('#aiResultsTimeframeBtns .ai-tf-btn.bg-purple-100')?.dataset?.tf || '5m';
+  AI_TRADING.currentTF = tf;
+  AI_TRADING.baseIntervalMs = getTradeIntervalForTimeframe(tf);
+  
+  // Start with base interval, will be adjusted dynamically based on market speed
+  scheduleNextTradeCycle();
+  
+  console.log('AI Trading started, base interval:', AI_TRADING.baseIntervalMs, 'ms');
+}
+
+// Schedule next trade cycle with dynamic interval based on market speed
+function scheduleNextTradeCycle() {
+  if (!AI_TRADING.active) return;
+  
+  // Adjust interval based on market speed
+  const speedMultipliers = {
+    'very-fast': 0.5,  // Trade twice as fast
+    'fast': 0.75,
+    'normal': 1.0,
+    'slow': 1.5  // Trade slower in quiet markets
+  };
+  
+  const multiplier = speedMultipliers[AI_TRADING.analysis.marketSpeed] || 1.0;
+  const adjustedInterval = Math.floor(AI_TRADING.baseIntervalMs * multiplier);
+  
+  AI_TRADING.interval = setTimeout(async () => {
+    await runAiTradingCycle();
+    scheduleNextTradeCycle();  // Schedule next cycle with potentially new interval
+  }, adjustedInterval);
+  
+  console.log(`Next trade cycle in ${adjustedInterval}ms (speed: ${AI_TRADING.analysis.marketSpeed})`);
+}
+
+// Get trade interval based on timeframe (market speed awareness)
+function getTradeIntervalForTimeframe(tf) {
+  const intervals = {
+    '1s': 3000,    // 3 sec
+    '2s': 5000,    // 5 sec
+    '3s': 6000,    // 6 sec
+    '5s': 10000,   // 10 sec
+    '10s': 15000,  // 15 sec
+    '30s': 30000,  // 30 sec
+    '1m': 60000,   // 1 min
+    '5m': 120000,  // 2 min
+    '15m': 300000, // 5 min
+    '1h': 600000,  // 10 min
+    '4h': 900000,  // 15 min
+    '1d': 1800000  // 30 min
+  };
+  return intervals[tf] || 60000;
+}
+
+// Stop AI Trading
+function stopAiTrading() {
+  AI_TRADING.active = false;
+  
+  if (AI_TRADING.interval) {
+    clearTimeout(AI_TRADING.interval);
+    AI_TRADING.interval = null;
+  }
+  
+  // Close any open position
+  if (AI_TRADING.state.position) {
+    closePosition('Trading stopped');
+  }
+  
+  document.getElementById('startAiTrading')?.classList.remove('hidden');
+  document.getElementById('stopAiTrading')?.classList.add('hidden');
+  document.getElementById('aiTradeStatus').textContent = 'Stopped';
+  document.getElementById('aiTradeStatus').className = 'px-2 py-0.5 text-xs font-medium bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 rounded-full';
+  
+  // Hide signal
+  document.getElementById('aiTradeSignal')?.classList.add('hidden');
+  
+  saveAiTradingState();
+  console.log('AI Trading stopped');
+}
+
+// Reset AI Trading
+function resetAiTrading() {
+  stopAiTrading();
+  
+  const settings = getTradeSettings();
+  
+  AI_TRADING.state = {
+    capital: settings.initialCapital,
+    startingCapital: settings.initialCapital,
+    position: null,
+    trades: [],
+    pnl: 0,
+    wins: 0,
+    losses: 0
+  };
+  
+  AI_TRADING.learning = {
+    score: 0,
+    weights: {
+      trend: 1.0,
+      momentum: 1.0,
+      rsi: 1.0,
+      macd: 1.0,
+      wavePosition: 1.0,
+      news: 1.2,
+      higherTF: 1.3
+    },
+    recentPatterns: []
+  };
+  
+  saveAiTradingState();
+  updateAiTradingUI();
+  
+  // Clear trade list
+  const tradeList = document.getElementById('aiTradeList');
+  if (tradeList) {
+    tradeList.innerHTML = '<div class="p-3 text-center text-gray-500 dark:text-gray-400 italic">No trades yet - click Start to begin AI trading</div>';
+  }
+  
+  console.log('AI Trading reset');
+}
+
+// Main trading cycle
+async function runAiTradingCycle() {
+  if (!AI_TRADING.active) return;
+  
+  try {
+    const asset = document.getElementById('aiMemoryAsset')?.value || 'silver';
+    const symbol = asset === 'silver' ? 'XAGUSD' : 'XAUUSD';
+    const currentTF = document.querySelector('#aiResultsTimeframeBtns .ai-tf-btn.bg-purple-100')?.dataset?.tf || '5m';
+    
+    // 1. Fetch ALL timeframes for comprehensive analysis
+    await fetchAllTimeframeData(symbol);
+    
+    // 2. Check news/breaking events (every 5 cycles to save resources)
+    const cycleCount = AI_TRADING.state.trades.length;
+    if (cycleCount % 5 === 0) {
+      await checkMarketNews();
+    }
+    
+    // 3. Calculate market speed based on volatility
+    updateMarketSpeed();
+    
+    // 4. Run comprehensive analysis
+    const decision = analyzeAndDecide(currentTF);
+    
+    // 5. Execute trade decision
+    await executeTradeDecision(decision, symbol);
+    
+    // 6. Update UI
+    updateAiTradingUI();
+    
+    // Update last check time
+    document.getElementById('aiTradeLastCheck').textContent = `Last analysis: ${new Date().toLocaleTimeString()}`;
+    
+  } catch (e) {
+    console.error('AI Trading cycle error:', e);
+  }
+}
+
+// Fetch data from ALL timeframes
+async function fetchAllTimeframeData(symbol) {
+  const timeframes = ['1m', '5m', '15m', '1h', '4h', '1d'];
+  
+  const fetchPromises = timeframes.map(async (tf) => {
+    try {
+      const response = await fetch(`/api/market-data/${symbol}/${tf}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.candles && data.candles.length > 0) {
+          AI_TRADING.analysis.allTimeframes[tf] = {
+            candles: data.candles,
+            analysis: analyzeHistoricalData(data.candles),
+            timestamp: Date.now()
+          };
+        }
+      }
+    } catch (e) {
+      console.error(`Failed to fetch ${tf} data:`, e);
+    }
+  });
+  
+  await Promise.all(fetchPromises);
+  console.log('All timeframes fetched:', Object.keys(AI_TRADING.analysis.allTimeframes));
+}
+
+// Check market news using AI
+async function checkMarketNews() {
+  try {
+    const response = await fetch('/api/ai/check-breaking-news', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ asset: 'silver' })
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      AI_TRADING.analysis.newsSentiment = data.sentiment || 'neutral';
+      
+      const sentimentEl = document.getElementById('aiNewsSentiment');
+      if (sentimentEl) {
+        const colors = {
+          bullish: 'text-green-600 dark:text-green-400',
+          bearish: 'text-red-600 dark:text-red-400',
+          neutral: 'text-gray-600 dark:text-gray-400'
+        };
+        sentimentEl.textContent = data.sentiment?.charAt(0).toUpperCase() + data.sentiment?.slice(1) || 'Neutral';
+        sentimentEl.className = `text-xs font-medium ${colors[data.sentiment] || colors.neutral}`;
+      }
+    }
+  } catch (e) {
+    // Fallback to neutral if news check fails
+    AI_TRADING.analysis.newsSentiment = 'neutral';
+  }
+}
+
+// Calculate market speed based on current volatility
+function updateMarketSpeed() {
+  const tf1m = AI_TRADING.analysis.allTimeframes['1m'];
+  if (!tf1m || !tf1m.analysis) {
+    AI_TRADING.analysis.marketSpeed = 'normal';
+    return;
+  }
+  
+  const volatility = tf1m.analysis.volatility || 0.01;
+  
+  let speed;
+  if (volatility > 0.02) speed = 'very-fast';
+  else if (volatility > 0.01) speed = 'fast';
+  else if (volatility > 0.005) speed = 'normal';
+  else speed = 'slow';
+  
+  AI_TRADING.analysis.marketSpeed = speed;
+  
+  const speedEl = document.getElementById('aiMarketSpeed');
+  if (speedEl) {
+    const colors = {
+      'very-fast': 'text-red-600 dark:text-red-400 font-bold',
+      'fast': 'text-orange-600 dark:text-orange-400',
+      'normal': 'text-gray-600 dark:text-gray-400',
+      'slow': 'text-blue-600 dark:text-blue-400'
+    };
+    speedEl.textContent = speed.replace('-', ' ').toUpperCase();
+    speedEl.className = `text-xs font-medium ${colors[speed]}`;
+  }
+}
+
+// Comprehensive analysis across all timeframes
+function analyzeAndDecide(currentTF) {
+  const weights = AI_TRADING.learning.weights;
+  let bullScore = 0;
+  let bearScore = 0;
+  let confidence = 0;
+  const reasons = [];
+  
+  // 1. Calculate separate local TF and higher TF trends, then blend 30/70
+  const htfOrder = ['1d', '4h', '1h', '15m', '5m', '1m'];
+  const currentIdx = htfOrder.indexOf(currentTF);
+  
+  let localTrend = 0;
+  let higherTFTrend = 0;
+  let higherTFCount = 0;
+  
+  for (let i = 0; i < htfOrder.length; i++) {
+    const tf = htfOrder[i];
+    const tfData = AI_TRADING.analysis.allTimeframes[tf];
+    if (!tfData?.analysis) continue;
+    
+    const trend = tfData.analysis.trend || 0;
+    const isHigher = i < currentIdx;
+    
+    if (tf === currentTF) {
+      localTrend = trend;
+    } else if (isHigher) {
+      // Weight higher timeframes more heavily (longer = more weight)
+      const htfWeight = 1 + (currentIdx - i) * 0.2;
+      higherTFTrend += trend * htfWeight;
+      higherTFCount += htfWeight;
+      if (Math.abs(trend) > 0.2) {
+        reasons.push(`${tf} ${trend > 0 ? 'uptrend' : 'downtrend'}`);
+      }
+    }
+  }
+  
+  // Normalize higher TF trend
+  if (higherTFCount > 0) {
+    higherTFTrend = higherTFTrend / higherTFCount;
+  }
+  
+  // Blend: 30% local + 70% higher TF (as per design spec)
+  const blendedTrend = (localTrend * 0.3) + (higherTFTrend * 0.7);
+  
+  // Apply blended trend to scores
+  if (blendedTrend > 0.1) {
+    bullScore += blendedTrend * weights.trend;
+    reasons.push(`Blended trend bullish (${(blendedTrend * 100).toFixed(0)}%)`);
+  } else if (blendedTrend < -0.1) {
+    bearScore += Math.abs(blendedTrend) * weights.trend;
+    reasons.push(`Blended trend bearish (${(blendedTrend * 100).toFixed(0)}%)`);
+  }
+  
+  // 2. Current timeframe indicators
+  const currentData = AI_TRADING.analysis.allTimeframes[currentTF];
+  if (currentData?.analysis) {
+    const { indicators, waveInfo } = currentData.analysis;
+    
+    // RSI
+    if (indicators?.rsi < 30) {
+      bullScore += 0.5 * weights.rsi;
+      reasons.push('RSI oversold');
+    } else if (indicators?.rsi > 70) {
+      bearScore += 0.5 * weights.rsi;
+      reasons.push('RSI overbought');
+    }
+    
+    // MACD
+    if (indicators?.macd > 0) {
+      bullScore += 0.3 * weights.macd;
+    } else {
+      bearScore += 0.3 * weights.macd;
+    }
+    
+    // Wave position (mean reversion)
+    if (waveInfo?.positionInCycle < 0.2) {
+      bullScore += 0.4 * weights.wavePosition;
+      reasons.push('Near support');
+    } else if (waveInfo?.positionInCycle > 0.8) {
+      bearScore += 0.4 * weights.wavePosition;
+      reasons.push('Near resistance');
+    }
+  }
+  
+  // 3. News sentiment
+  if (AI_TRADING.analysis.newsSentiment === 'bullish') {
+    bullScore += 0.5 * weights.news;
+    reasons.push('Bullish news');
+  } else if (AI_TRADING.analysis.newsSentiment === 'bearish') {
+    bearScore += 0.5 * weights.news;
+    reasons.push('Bearish news');
+  }
+  
+  // 4. Market speed adjustment (avoid trading in very fast markets unless confident)
+  const speed = AI_TRADING.analysis.marketSpeed;
+  const speedMultiplier = speed === 'very-fast' ? 0.7 : (speed === 'fast' ? 0.85 : 1);
+  
+  // Calculate final decision
+  const totalScore = bullScore + bearScore;
+  confidence = totalScore > 0 ? Math.abs(bullScore - bearScore) / totalScore * speedMultiplier : 0;
+  
+  let action = 'hold';
+  const settings = getTradeSettings();
+  
+  // Decision thresholds (require minimum confidence)
+  const minConfidence = 0.3;
+  
+  if (confidence > minConfidence) {
+    if (bullScore > bearScore * 1.2 && (settings.tradeType === 'both' || settings.tradeType === 'long')) {
+      action = 'buy';
+    } else if (bearScore > bullScore * 1.2 && (settings.tradeType === 'both' || settings.tradeType === 'short')) {
+      action = 'sell';
+    }
+  }
+  
+  // Check if we should close existing position
+  if (AI_TRADING.state.position) {
+    const pos = AI_TRADING.state.position;
+    if (pos.type === 'long' && action === 'sell') action = 'close_and_sell';
+    else if (pos.type === 'short' && action === 'buy') action = 'close_and_buy';
+    else if (confidence < 0.15) action = 'close'; // Close on low confidence
+  }
+  
+  return { action, confidence, bullScore, bearScore, reasons };
+}
+
+// Execute trade decision
+async function executeTradeDecision(decision, symbol) {
+  const { action, confidence, reasons } = decision;
+  const settings = getTradeSettings();
+  const signalEl = document.getElementById('aiTradeSignal');
+  
+  // Get current price
+  const tf1m = AI_TRADING.analysis.allTimeframes['1m'];
+  if (!tf1m?.candles?.length) return;
+  
+  const currentPrice = tf1m.candles[tf1m.candles.length - 1].close;
+  
+  // Show signal indicator
+  if (action === 'buy' || action === 'close_and_buy') {
+    showTradeSignal('BUY', 'bg-green-500');
+  } else if (action === 'sell' || action === 'close_and_sell') {
+    showTradeSignal('SELL', 'bg-red-500');
+  } else if (action === 'close') {
+    showTradeSignal('CLOSE', 'bg-yellow-500');
+  } else {
+    signalEl?.classList.add('hidden');
+  }
+  
+  // Handle close actions first
+  if (action.includes('close') && AI_TRADING.state.position) {
+    await closePosition(reasons.join(', '));
+  }
+  
+  // Open new position
+  if ((action === 'buy' || action === 'close_and_buy') && !AI_TRADING.state.position) {
+    openPosition('long', currentPrice, settings, confidence, reasons);
+  } else if ((action === 'sell' || action === 'close_and_sell') && !AI_TRADING.state.position) {
+    openPosition('short', currentPrice, settings, confidence, reasons);
+  }
+  
+  // Check stop loss / take profit for existing position
+  if (AI_TRADING.state.position) {
+    checkStopLossTakeProfit(currentPrice, settings);
+  }
+}
+
+// Show blinking trade signal and add marker to chart
+function showTradeSignal(text, colorClass) {
+  const signalEl = document.getElementById('aiTradeSignal');
+  if (!signalEl) return;
+  
+  signalEl.textContent = text;
+  signalEl.className = `px-3 py-1 text-xs font-bold text-white rounded-full animate-pulse ${colorClass}`;
+  signalEl.classList.remove('hidden');
+  
+  // Add blinking animation with CSS
+  signalEl.style.animation = 'none';
+  signalEl.offsetHeight; // Trigger reflow
+  signalEl.style.animation = 'pulse 0.5s ease-in-out 6';
+  
+  // Hide after 3 seconds
+  setTimeout(() => {
+    signalEl.classList.add('hidden');
+  }, 3000);
+  
+  // Add marker to projection chart if available
+  addTradeMarkerToChart(text);
+}
+
+// Add trade marker to the projection chart
+function addTradeMarkerToChart(tradeType) {
+  if (!aiProjectionChart) return;
+  
+  // Get current time for marker
+  const tf1m = AI_TRADING.analysis.allTimeframes['1m'];
+  if (!tf1m?.candles?.length) return;
+  
+  const lastCandle = tf1m.candles[tf1m.candles.length - 1];
+  const markerTime = lastCandle.time;
+  const price = lastCandle.close;
+  
+  // Store markers in AI_TRADING for persistence
+  if (!AI_TRADING.chartMarkers) {
+    AI_TRADING.chartMarkers = [];
+  }
+  
+  const marker = {
+    time: markerTime,
+    position: tradeType === 'BUY' || tradeType === 'CLOSE' ? 'belowBar' : 'aboveBar',
+    color: tradeType === 'BUY' ? '#22c55e' : (tradeType === 'SELL' ? '#ef4444' : '#eab308'),
+    shape: tradeType === 'BUY' ? 'arrowUp' : (tradeType === 'SELL' ? 'arrowDown' : 'circle'),
+    text: tradeType,
+    size: 2
+  };
+  
+  AI_TRADING.chartMarkers.push(marker);
+  
+  // Keep only last 50 markers
+  if (AI_TRADING.chartMarkers.length > 50) {
+    AI_TRADING.chartMarkers = AI_TRADING.chartMarkers.slice(-50);
+  }
+  
+  // Try to add markers to the chart series
+  try {
+    // Find the historical series (first series) and add markers
+    if (aiProjectionSeries && aiProjectionSeries.length > 0) {
+      const historicalSeries = aiProjectionSeries[0];
+      if (historicalSeries && typeof historicalSeries.setMarkers === 'function') {
+        historicalSeries.setMarkers(AI_TRADING.chartMarkers);
+      }
+    }
+  } catch (e) {
+    console.log('Could not add marker to chart:', e.message);
+  }
+  
+  console.log(`Chart marker added: ${tradeType} at ${price.toFixed(4)}`);
+}
+
+// Open a new position
+function openPosition(type, price, settings, confidence, reasons) {
+  const fee = settings.useOrderFee ? settings.orderFee : 0;
+  const spread = settings.useSpread ? settings.spreadPips * AI_TRADING.contract.onePointMeans : 0;
+  
+  // Apply spread to entry
+  const entryPrice = type === 'long' ? price + spread : price - spread;
+  
+  // Calculate position size (respect contract minimums)
+  let size = Math.min(settings.positionSize, settings.maxPositionSize);
+  size = Math.max(size, AI_TRADING.contract.minSize);
+  
+  AI_TRADING.state.position = {
+    type,
+    size,
+    entryPrice,
+    entryTime: new Date(),
+    confidence,
+    reasons
+  };
+  
+  // Deduct fee
+  AI_TRADING.state.capital -= fee;
+  
+  console.log(`Opened ${type} position at ${entryPrice}, size: ${size}, confidence: ${(confidence * 100).toFixed(1)}%`);
+  
+  // Record pattern for learning
+  AI_TRADING.learning.recentPatterns.push({
+    type,
+    entryPrice,
+    reasons: [...reasons],
+    timestamp: Date.now()
+  });
+  
+  updatePositionDisplay();
+}
+
+// Close position
+async function closePosition(reason) {
+  if (!AI_TRADING.state.position) return;
+  
+  const pos = AI_TRADING.state.position;
+  const settings = getTradeSettings();
+  
+  // Get current price
+  const tf1m = AI_TRADING.analysis.allTimeframes['1m'];
+  const currentPrice = tf1m?.candles?.[tf1m.candles.length - 1]?.close || pos.entryPrice;
+  
+  const fee = settings.useOrderFee ? settings.orderFee : 0;
+  const spread = settings.useSpread ? settings.spreadPips * AI_TRADING.contract.onePointMeans : 0;
+  
+  // Apply spread to exit
+  const exitPrice = pos.type === 'long' ? currentPrice - spread : currentPrice + spread;
+  
+  // Calculate P&L
+  const pointsGained = pos.type === 'long' 
+    ? (exitPrice - pos.entryPrice) / AI_TRADING.contract.onePointMeans
+    : (pos.entryPrice - exitPrice) / AI_TRADING.contract.onePointMeans;
+  
+  const pnl = pointsGained * AI_TRADING.contract.valuePerPoint * pos.size * AI_TRADING.contract.contractSizePerPoint - fee;
+  
+  // Update state
+  AI_TRADING.state.capital += pnl;
+  AI_TRADING.state.pnl += pnl;
+  
+  const isWin = pnl > 0;
+  if (isWin) AI_TRADING.state.wins++;
+  else AI_TRADING.state.losses++;
+  
+  // Record trade
+  const trade = {
+    type: pos.type,
+    entryPrice: pos.entryPrice,
+    exitPrice,
+    size: pos.size,
+    pnl,
+    isWin,
+    entryTime: pos.entryTime,
+    exitTime: new Date(),
+    reasons: pos.reasons,
+    closeReason: reason
+  };
+  
+  AI_TRADING.state.trades.unshift(trade);
+  if (AI_TRADING.state.trades.length > 100) {
+    AI_TRADING.state.trades = AI_TRADING.state.trades.slice(0, 100);
+  }
+  
+  // Learning: adjust weights based on outcome
+  adjustLearningWeights(trade);
+  
+  AI_TRADING.state.position = null;
+  
+  console.log(`Closed ${pos.type} at ${exitPrice}, P&L: $${pnl.toFixed(2)}, Reason: ${reason}`);
+  
+  saveAiTradingState();
+  updateTradeList();
+  updatePositionDisplay();
+}
+
+// Check stop loss and take profit
+function checkStopLossTakeProfit(currentPrice, settings) {
+  const pos = AI_TRADING.state.position;
+  if (!pos) return;
+  
+  const pointsFromEntry = pos.type === 'long'
+    ? (currentPrice - pos.entryPrice) / AI_TRADING.contract.onePointMeans
+    : (pos.entryPrice - currentPrice) / AI_TRADING.contract.onePointMeans;
+  
+  // Check stop loss
+  if (settings.stopLoss > 0 && pointsFromEntry < -settings.stopLoss) {
+    closePosition('Stop loss hit');
+    return;
+  }
+  
+  // Check take profit
+  if (settings.takeProfit > 0 && pointsFromEntry > settings.takeProfit) {
+    closePosition('Take profit hit');
+    return;
+  }
+}
+
+// Adjust learning weights based on trade outcome
+function adjustLearningWeights(trade) {
+  const adjustAmount = 0.05;
+  const weights = AI_TRADING.learning.weights;
+  
+  // Find which reasons contributed to this trade
+  if (trade.reasons) {
+    trade.reasons.forEach(reason => {
+      const r = reason.toLowerCase();
+      
+      if (r.includes('trend') || r.includes('uptrend') || r.includes('downtrend')) {
+        weights.trend = Math.max(0.5, Math.min(2, weights.trend + (trade.isWin ? adjustAmount : -adjustAmount)));
+      }
+      if (r.includes('rsi')) {
+        weights.rsi = Math.max(0.5, Math.min(2, weights.rsi + (trade.isWin ? adjustAmount : -adjustAmount)));
+      }
+      if (r.includes('support') || r.includes('resistance')) {
+        weights.wavePosition = Math.max(0.5, Math.min(2, weights.wavePosition + (trade.isWin ? adjustAmount : -adjustAmount)));
+      }
+      if (r.includes('news')) {
+        weights.news = Math.max(0.5, Math.min(2, weights.news + (trade.isWin ? adjustAmount : -adjustAmount)));
+      }
+    });
+  }
+  
+  // Update learning score
+  AI_TRADING.learning.score = Math.max(0, AI_TRADING.learning.score + (trade.isWin ? 5 : -3));
+  
+  console.log('Learning weights updated:', weights);
+}
+
+// Update all UI elements
+function updateAiTradingUI() {
+  const state = AI_TRADING.state;
+  
+  // Capital
+  document.getElementById('aiTradeCapital').textContent = `$${state.capital.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  
+  // P&L with color
+  const pnlEl = document.getElementById('aiTradePnL');
+  if (pnlEl) {
+    const pnlStr = `${state.pnl >= 0 ? '+' : ''}$${state.pnl.toFixed(2)}`;
+    pnlEl.textContent = pnlStr;
+    pnlEl.className = `text-sm font-bold ${state.pnl > 0 ? 'text-green-600' : state.pnl < 0 ? 'text-red-600' : 'text-gray-600'}`;
+  }
+  
+  // Win rate
+  const totalTrades = state.wins + state.losses;
+  const winRate = totalTrades > 0 ? (state.wins / totalTrades * 100).toFixed(1) : '--';
+  document.getElementById('aiTradeWinRate').textContent = `${winRate}%`;
+  
+  // Trade count
+  document.getElementById('aiTradeCount').textContent = totalTrades.toString();
+  document.getElementById('aiTradeListCount').textContent = `${state.trades.length} trades`;
+  
+  // Learning score
+  const scoreEl = document.getElementById('aiLearningScore');
+  const barEl = document.getElementById('aiLearningBar');
+  if (scoreEl) scoreEl.textContent = AI_TRADING.learning.score.toString();
+  if (barEl) barEl.style.width = `${Math.min(100, AI_TRADING.learning.score)}%`;
+  
+  updatePositionDisplay();
+}
+
+// Update position display
+function updatePositionDisplay() {
+  const posEl = document.getElementById('aiTradePosition');
+  if (!posEl) return;
+  
+  const pos = AI_TRADING.state.position;
+  if (pos) {
+    posEl.textContent = `${pos.type.toUpperCase()} ${pos.size}`;
+    posEl.className = `text-sm font-bold ${pos.type === 'long' ? 'text-green-600' : 'text-red-600'}`;
+  } else {
+    posEl.textContent = 'None';
+    posEl.className = 'text-sm font-bold text-gray-500';
+  }
+}
+
+// Update trade list display
+function updateTradeList() {
+  const listEl = document.getElementById('aiTradeList');
+  if (!listEl) return;
+  
+  const trades = AI_TRADING.state.trades.slice(0, 20); // Show last 20
+  
+  if (trades.length === 0) {
+    listEl.innerHTML = '<div class="p-3 text-center text-gray-500 dark:text-gray-400 italic">No trades yet - click Start to begin AI trading</div>';
+    return;
+  }
+  
+  listEl.innerHTML = trades.map(t => {
+    const pnlColor = t.isWin ? 'text-green-600' : 'text-red-600';
+    const typeColor = t.type === 'long' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700';
+    const time = new Date(t.exitTime).toLocaleTimeString();
+    
+    return `
+      <div class="flex items-center justify-between px-3 py-2 border-b border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700">
+        <div class="flex items-center gap-2">
+          <span class="px-1.5 py-0.5 rounded text-xs font-medium ${typeColor}">${t.type.toUpperCase()}</span>
+          <span class="text-gray-600 dark:text-gray-400">${t.entryPrice.toFixed(4)} → ${t.exitPrice.toFixed(4)}</span>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="font-bold ${pnlColor}">${t.pnl >= 0 ? '+' : ''}$${t.pnl.toFixed(2)}</span>
+          <span class="text-gray-400 text-xs">${time}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// Save trading state to localStorage
+function saveAiTradingState() {
+  localStorage.setItem('aiTradingState', JSON.stringify({
+    state: AI_TRADING.state,
+    learning: AI_TRADING.learning
+  }));
+}
+
+// Load trading state from localStorage
+function loadAiTradingState() {
+  try {
+    const saved = localStorage.getItem('aiTradingState');
+    if (saved) {
+      const data = JSON.parse(saved);
+      if (data.state) AI_TRADING.state = data.state;
+      if (data.learning) AI_TRADING.learning = data.learning;
+      updateTradeList();
+    }
+  } catch (e) {
+    console.error('Failed to load AI trading state:', e);
+  }
+}
+
+// Initialize on load
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(initAiTrading, 500);
+});

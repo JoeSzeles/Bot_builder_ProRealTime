@@ -3164,6 +3164,72 @@ Return ONLY the JSON array, no other text. If there are no significant events to
   }
 });
 
+// AI Trading - Check breaking news sentiment
+app.post('/api/ai/check-breaking-news', async (req, res) => {
+  const { asset } = req.body;
+  
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const assetName = asset === 'silver' ? 'silver (XAGUSD)' : 'gold (XAUUSD)';
+    
+    const prompt = `You are a trading assistant analyzing market sentiment for ${assetName}.
+    
+Today is ${today}. Based on your knowledge of current market conditions, geopolitical events, central bank policies, and economic data:
+
+1. What is the overall sentiment for ${assetName}? (bullish, bearish, or neutral)
+2. Are there any breaking news or significant events that could move the price?
+3. What is your confidence level (low, medium, high)?
+
+Respond in JSON format ONLY:
+{
+  "sentiment": "bullish|bearish|neutral",
+  "confidence": "low|medium|high",
+  "reason": "brief explanation (max 50 words)",
+  "breakingNews": true|false
+}`;
+
+    let result = { sentiment: 'neutral', confidence: 'low', reason: 'Unable to analyze', breakingNews: false };
+    
+    // Try Claude first
+    try {
+      const response = await anthropic.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 300,
+        messages: [{ role: 'user', content: prompt }]
+      });
+      
+      const content = response.content[0]?.text || '{}';
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        result = JSON.parse(jsonMatch[0]);
+      }
+    } catch (claudeError) {
+      console.error('Claude breaking news error, trying GPT:', claudeError.message);
+      
+      try {
+        const gptResponse = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          max_tokens: 300,
+          messages: [{ role: 'user', content: prompt }]
+        });
+        
+        const content = gptResponse.choices[0]?.message?.content || '{}';
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          result = JSON.parse(jsonMatch[0]);
+        }
+      } catch (gptError) {
+        console.error('GPT breaking news error:', gptError.message);
+      }
+    }
+    
+    res.json(result);
+  } catch (e) {
+    console.error('Error checking breaking news:', e);
+    res.json({ sentiment: 'neutral', confidence: 'low', reason: 'Analysis failed', breakingNews: false });
+  }
+});
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);

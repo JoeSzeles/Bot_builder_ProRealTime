@@ -83,6 +83,19 @@ The application features a modern full-stack architecture:
   - **Time axis formatting**: Adapts display format based on timeframe (seconds/minutes/hours/days)
   - Bounded projections stay within reasonable range (max 50% from start)
 
+- **AI Trading Panel** (New Feature):
+  - New "AI Trading" panel in AI Results tab above Prediction Accuracy
+  - **Mock Trading Engine**: Runs paper trades using Capital & Fees settings
+  - **Silver Contract Specs**: Min size 0.05, 100/point, 1 point = $1 AUD
+  - **Multi-Timeframe Analysis**: Fetches ALL timeframes (1m, 5m, 15m, 1h, 4h, 1d) before each decision
+  - **News Sentiment Check**: Uses AI to analyze market news/breaking events before trades
+  - **Learning System**: Adjusts strategy weights (trend, RSI, MACD, wave, news) based on win/loss outcomes
+  - **Market Speed Awareness**: Adjusts trade interval based on volatility (fast markets = faster decisions)
+  - **Blinking Buy/Sell Signals**: Green/red animated indicators for trade execution
+  - **Trade List**: Shows recent trades with entry/exit prices, P&L, timestamps
+  - **Stats Display**: Capital, P&L, Win Rate, Trade Count, Current Position, Learning Score
+  - State persisted to localStorage
+
 - **Backtest Simulation Feature**:
   - New "Backtest" dropdown in AI Projection panel with time offsets:
     - Live (now), -1 min, -10 min, -30 min, -1 hour, -4 hours, -12 hours, -1 day, -1 week
