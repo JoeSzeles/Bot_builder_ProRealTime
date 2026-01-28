@@ -2144,7 +2144,7 @@ function setupAiTradingSubTabs() {
   if (backtestOffset) {
     backtestOffset.addEventListener('change', () => {
       if (window.lastAiResult) {
-        runBacktestSimulation();
+        runBacktestOffsetAnalysis();
       }
     });
   }
@@ -2174,7 +2174,7 @@ function forceRefreshProjectionChart() {
   
   if (backtestOffset > 0) {
     // Backtest mode
-    runBacktestSimulation();
+    runBacktestOffsetAnalysis();
   } else if (window.lastAiResult) {
     // Live mode - force update
     updateAiProjectionChart(window.lastAiResult);
@@ -3264,8 +3264,8 @@ function calculatePredictionAccuracy(realCandles) {
   updateProjectionListView(expected, bullish, bearish, realCandles);
 }
 
-// Backtest simulation - run AI analysis on historical data and compare with what actually happened
-async function runBacktestSimulation() {
+// Backtest offset analysis - run AI analysis on historical data and compare with what actually happened
+async function runBacktestOffsetAnalysis() {
   const offsetSelect = document.getElementById('aiBacktestOffset');
   const offsetSeconds = parseInt(offsetSelect?.value || '0');
   

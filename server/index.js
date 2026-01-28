@@ -3126,7 +3126,7 @@ Return ONLY the JSON array, no other text. If there are no significant events to
     // Try Claude first
     try {
       const response = await anthropic.messages.create({
-        model: 'claude-sonnet',
+        model: 'claude-sonnet-4-5',
         max_tokens: 2000,
         messages: [{ role: 'user', content: prompt }]
       });
@@ -3193,7 +3193,7 @@ Respond in JSON format ONLY:
     // Try Claude first
     try {
       const response = await anthropic.messages.create({
-        model: 'claude-sonnet',
+        model: 'claude-sonnet-4-5',
         max_tokens: 300,
         messages: [{ role: 'user', content: prompt }]
       });
@@ -3240,7 +3240,7 @@ app.post('/api/ai/generate-projection', async (req, res) => {
     // Try Claude first
     try {
       const response = await anthropic.messages.create({
-        model: 'claude-sonnet',
+        model: 'claude-sonnet-4-5',
         max_tokens: 2000,
         messages: [{ role: 'user', content: prompt }]
       });
@@ -3343,7 +3343,7 @@ Be concise but helpful. Use your learned data to inform your responses. If asked
     // Try Claude first
     try {
       const response = await anthropic.messages.create({
-        model: 'claude-sonnet',
+        model: 'claude-sonnet-4-5',
         max_tokens: 1000,
         messages: [{ role: 'user', content: fullPrompt }]
       });
