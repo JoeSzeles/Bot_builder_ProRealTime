@@ -51,6 +51,25 @@ The application features a modern full-stack architecture:
   - AI analysis now references past performance and historical events in strategy generation
   - Backend API endpoints: `/api/ai-memory/brain`, `/api/ai-memory/events`, `/api/ai-memory/correlations`
 
+- **Check Online News Feature**:
+  - "Check Online" button fetches market events using AI (based on training knowledge)
+  - Review modal allows selecting which events to add to archive
+  - "Check Daily" checkbox with localStorage persistence for auto-checking on app load (once per day)
+
+- **Observe Mode Feature**:
+  - "Observe" toggle button for real-time market observation
+  - Polls price data every 30 seconds when enabled
+  - Detects patterns: trend direction (SMA crossover), momentum, volume spikes, candlestick patterns (Doji, Hammer, Shooting Star)
+  - Records directional patterns to AI brain memory
+  - Live status indicator shows "Observing..." with last update timestamp
+  - Training method: Click Observe to start, let it run while market is active, patterns accumulate in brain
+
+- **Brain Training Tutorial**:
+  - Brain trains automatically when you: 1) Run AI analysis on any asset, 2) Enable Observe mode
+  - Each prediction/observation records: direction, confidence, patterns detected
+  - Accuracy builds over time as more predictions are recorded
+  - View stats in AI Memory tab: accuracy %, predictions count, patterns learned
+
 - **AI Price Projection Chart Fix**:
   - Fixed value explosion bug where projections reached astronomical numbers (90 trillion)
   - Implemented bounded random walk algorithm (prices stay within 50%-200% of start)
