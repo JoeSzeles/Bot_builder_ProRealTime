@@ -8941,6 +8941,23 @@ function generateMockForecast(asset, priceData, brainData) {
   const prices = Array.isArray(priceData) ? priceData : (priceData?.candles || priceData?.data || []);
   if (prices.length === 0) return [];
   
+  // Get trading day settings from TIME & SESSION FILTERS
+  const tradingDays = {
+    0: document.getElementById('tradeSun')?.checked || false,  // Sunday
+    1: document.getElementById('tradeMon')?.checked ?? true,   // Monday
+    2: document.getElementById('tradeTue')?.checked ?? true,   // Tuesday
+    3: document.getElementById('tradeWed')?.checked ?? true,   // Wednesday
+    4: document.getElementById('tradeThu')?.checked ?? true,   // Thursday
+    5: document.getElementById('tradeFri')?.checked ?? true,   // Friday
+    6: document.getElementById('tradeSat')?.checked || false   // Saturday
+  };
+  
+  // Get trading hours from settings
+  const tradingStartTime = document.getElementById('tradingStartTime')?.value || '00:00';
+  const tradingEndTime = document.getElementById('tradingEndTime')?.value || '23:59';
+  const [startHour, startMin] = tradingStartTime.split(':').map(Number);
+  const [endHour, endMin] = tradingEndTime.split(':').map(Number);
+  
   // Get real current price and recent data
   const recentPrices = prices.slice(-168); // Last 7 days of hourly data
   const currentPrice = recentPrices[recentPrices.length - 1]?.close || 30;
@@ -8973,30 +8990,22 @@ function generateMockForecast(asset, priceData, brainData) {
     
     calendarOffset++;
     
-    // Skip Sunday - market completely closed
-    if (dayOfWeek === 0) continue;
+    // Skip days not enabled in TIME & SESSION FILTERS settings
+    if (!tradingDays[dayOfWeek]) continue;
     
-    // Calculate trading hours for this day
+    // Calculate trading hours for this day using settings
     let tradingStart = new Date(sydneyDate);
     let tradingEnd = new Date(sydneyDate);
-    
-    if (dayOfWeek === 1) { // Monday starts at 10am
-      tradingStart.setHours(10, 0, 0, 0);
-      tradingEnd.setHours(23, 59, 59, 999);
-    } else if (dayOfWeek === 6) { // Saturday ends at 9am
-      tradingStart.setHours(0, 0, 0, 0);
-      tradingEnd.setHours(9, 0, 0, 0);
-    } else { // Tue-Fri: full day
-      tradingStart.setHours(0, 0, 0, 0);
-      tradingEnd.setHours(23, 59, 59, 999);
-    }
+    tradingStart.setHours(startHour, startMin, 0, 0);
+    tradingEnd.setHours(endHour, endMin, 59, 999);
     
     // For today, check if trading has already ended
     const isToday = sydneyDate.toDateString() === sydneyNow.toDateString();
     if (isToday) {
       const currentHour = sydneyNow.getHours();
-      // Saturday after 9am - market closed for weekend
-      if (dayOfWeek === 6 && currentHour >= 9) continue;
+      const currentMin = sydneyNow.getMinutes();
+      // Skip if current time is past trading end time
+      if (currentHour > endHour || (currentHour === endHour && currentMin >= endMin)) continue;
     }
     
     // Use brain patterns and real volatility for prediction
@@ -9018,13 +9027,14 @@ function generateMockForecast(asset, priceData, brainData) {
     const entryPrice = predictedLow + (predictedHigh - predictedLow) * entryOffset;
     const exitPrice = predictedLow + (predictedHigh - predictedLow) * exitOffset;
     
-    // Trading hours for entry/exit (Sydney time)
-    const entryHour = dayOfWeek === 1 ? 10 + Math.floor(Math.random() * 3) : 8 + Math.floor(Math.random() * 4);
-    const exitHour = dayOfWeek === 6 ? 6 + Math.floor(Math.random() * 2) : 14 + Math.floor(Math.random() * 4);
+    // Trading hours for entry/exit using settings (Sydney time)
+    const sessionDuration = endHour - startHour;
+    const entryHour = startHour + Math.floor(Math.random() * Math.max(1, sessionDuration / 3));
+    const exitHour = Math.min(endHour - 1, startHour + Math.floor(sessionDuration * 0.6) + Math.floor(Math.random() * (sessionDuration / 3)));
     
     // Generate hourly predictions with smooth continuity
-    const tradingHours = dayOfWeek === 1 ? 14 : dayOfWeek === 6 ? 9 : 24;
-    const hourlyPrices = generateSmoothedHourlyPrices(openPrice, predictedClose, predictedHigh, predictedLow, tradingHours, dayVolatility);
+    const tradingHoursCount = Math.max(1, sessionDuration);
+    const hourlyPrices = generateSmoothedHourlyPrices(openPrice, predictedClose, predictedHigh, predictedLow, tradingHoursCount, dayVolatility);
     
     // Get actual prices for today (first trading day)
     let actualPrices = [];
