@@ -1616,26 +1616,68 @@
                     </div>
                     
                     <!-- Backtest Results -->
-                    <div id="backtestResults" class="hidden grid grid-cols-5 gap-2 text-xs">
-                      <div class="bg-white/50 dark:bg-gray-800/50 rounded-lg p-2 text-center">
-                        <div class="text-gray-500 dark:text-gray-400">Trades</div>
-                        <div id="btTotalTrades" class="font-bold text-gray-800 dark:text-gray-200">0</div>
+                    <div id="backtestResults" class="hidden">
+                      <div class="grid grid-cols-5 gap-2 text-xs mb-3">
+                        <div class="bg-white/50 dark:bg-gray-800/50 rounded-lg p-2 text-center">
+                          <div class="text-gray-500 dark:text-gray-400">Trades</div>
+                          <div id="btTotalTrades" class="font-bold text-gray-800 dark:text-gray-200">0</div>
+                        </div>
+                        <div class="bg-white/50 dark:bg-gray-800/50 rounded-lg p-2 text-center">
+                          <div class="text-gray-500 dark:text-gray-400">Win Rate</div>
+                          <div id="btWinRate" class="font-bold text-gray-600">--%</div>
+                        </div>
+                        <div class="bg-white/50 dark:bg-gray-800/50 rounded-lg p-2 text-center">
+                          <div class="text-gray-500 dark:text-gray-400">Total P/L</div>
+                          <div id="btTotalPnL" class="font-bold text-gray-600">$0</div>
+                        </div>
+                        <div class="bg-white/50 dark:bg-gray-800/50 rounded-lg p-2 text-center">
+                          <div class="text-gray-500 dark:text-gray-400">Avg Trade</div>
+                          <div id="btAvgTrade" class="font-bold text-gray-600">$0</div>
+                        </div>
+                        <div class="bg-white/50 dark:bg-gray-800/50 rounded-lg p-2 text-center">
+                          <div class="text-gray-500 dark:text-gray-400">Best Cycle</div>
+                          <div id="btBestCycle" class="font-bold text-emerald-600">$0</div>
+                        </div>
                       </div>
-                      <div class="bg-white/50 dark:bg-gray-800/50 rounded-lg p-2 text-center">
-                        <div class="text-gray-500 dark:text-gray-400">Win Rate</div>
-                        <div id="btWinRate" class="font-bold text-gray-600">--%</div>
+                      
+                      <!-- Backtest Chart with Trade Markers -->
+                      <div class="mb-3">
+                        <div class="flex items-center justify-between mb-2">
+                          <span class="text-xs font-medium text-gray-700 dark:text-gray-300">Trade Chart</span>
+                          <div class="flex items-center gap-3 text-xs">
+                            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> Long Entry</span>
+                            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-red-500"></span> Short Entry</span>
+                            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-400"></span> Exit</span>
+                          </div>
+                        </div>
+                        <div id="backtestChart" class="h-48 bg-gray-900 rounded-lg border border-gray-700"></div>
                       </div>
-                      <div class="bg-white/50 dark:bg-gray-800/50 rounded-lg p-2 text-center">
-                        <div class="text-gray-500 dark:text-gray-400">Total P/L</div>
-                        <div id="btTotalPnL" class="font-bold text-gray-600">$0</div>
+                      
+                      <!-- Trade List -->
+                      <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-medium text-gray-700 dark:text-gray-300">Trade History</span>
+                        <button id="downloadBacktestJson" class="px-2 py-1 text-xs font-medium bg-violet-600 hover:bg-violet-700 text-white rounded transition-colors flex items-center gap-1">
+                          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                          </svg>
+                          Download JSON
+                        </button>
                       </div>
-                      <div class="bg-white/50 dark:bg-gray-800/50 rounded-lg p-2 text-center">
-                        <div class="text-gray-500 dark:text-gray-400">Avg Trade</div>
-                        <div id="btAvgTrade" class="font-bold text-gray-600">$0</div>
-                      </div>
-                      <div class="bg-white/50 dark:bg-gray-800/50 rounded-lg p-2 text-center">
-                        <div class="text-gray-500 dark:text-gray-400">Best Cycle</div>
-                        <div id="btBestCycle" class="font-bold text-emerald-600">$0</div>
+                      <div id="backtestTradeList" class="max-h-40 overflow-y-auto bg-white/30 dark:bg-gray-800/30 rounded-lg border border-gray-300 dark:border-gray-600">
+                        <table class="w-full text-xs">
+                          <thead class="sticky top-0 bg-gray-100 dark:bg-gray-700">
+                            <tr class="text-gray-600 dark:text-gray-300">
+                              <th class="px-2 py-1 text-left">#</th>
+                              <th class="px-2 py-1 text-left">Type</th>
+                              <th class="px-2 py-1 text-right">Entry</th>
+                              <th class="px-2 py-1 text-right">Exit</th>
+                              <th class="px-2 py-1 text-right">P/L</th>
+                              <th class="px-2 py-1 text-left">Time</th>
+                            </tr>
+                          </thead>
+                          <tbody id="backtestTradeListBody" class="divide-y divide-gray-200 dark:divide-gray-600">
+                          </tbody>
+                        </table>
                       </div>
                     </div>
                   </div>
