@@ -2139,9 +2139,8 @@ function setupAiResultsTimeframes() {
         }
       });
       
-      // Clear cached market data to force re-fetch with new timeframe
+      // Update display for selected timeframe (reuse existing data, just recalculate projection)
       if (window.lastAiResult) {
-        window.lastAiResult.marketData = null;
         updateAiResultsForTimeframe(aiResultsTimeframe, window.lastAiResult);
       }
     });
@@ -2306,84 +2305,34 @@ async function updateAiProjectionChart(result) {
   const container = document.getElementById('aiProjectionChart');
   if (!container) return;
   
-  const forecastCandles = parseInt(document.getElementById('aiProjectionCandles')?.value || '100');
+  // Cap forecast candles for performance (max 500 for smooth rendering)
+  const rawForecast = parseInt(document.getElementById('aiProjectionCandles')?.value || '100');
+  const forecastCandles = Math.min(rawForecast, 500);
   const tf = aiResultsTimeframe;
   const tfData = result.predictions?.[tf] || result.predictions?.['5m'] || {};
   
-  // Try to get historical candles from result, or fetch fresh data
-  // For projection, we need more historical data for accurate volatility calculation
+  // Reuse cached market data if available for speed
   let historicalCandles = result.marketData || [];
   
-  // Determine how many historical candles to show based on forecast size
-  const historyToShow = Math.min(Math.max(50, Math.floor(forecastCandles / 10)), 500);
-  
+  // Only fetch if no data cached
   if (historicalCandles.length === 0) {
     const symbol = document.getElementById('aiSymbol')?.value || 'silver';
     
-    // Map timeframe to appropriate data fetch timeframe
-    // Short timeframes (seconds, 1m, 5m) need intraday data
-    // Longer timeframes can use historical database
-    const tfSeconds = { '1s': 1, '2s': 2, '3s': 3, '5s': 5, '10s': 10, '30s': 30, '1m': 60, '5m': 300, '15m': 900, '1h': 3600, '4h': 14400, '1d': 86400 };
-    const selectedTfSeconds = tfSeconds[tf] || 300;
-    const isIntradayTf = selectedTfSeconds < 3600; // Less than 1 hour
-    
-    // For intraday timeframes, always use live data from Yahoo Finance
-    if (isIntradayTf) {
-      // Use appropriate fetch timeframe based on selection
-      let fetchTf = '1m';
-      if (selectedTfSeconds >= 300) fetchTf = '5m';
-      if (selectedTfSeconds >= 900) fetchTf = '15m';
-      
-      try {
-        container.innerHTML = '<div class="h-full flex items-center justify-center text-gray-500">Loading live market data...</div>';
-        const response = await fetch(`/api/market-data/${symbol}/${fetchTf}`);
-        const data = await response.json();
-        if (data.candles && data.candles.length > 0) {
-          historicalCandles = data.candles;
-          result.marketData = historicalCandles;
-          console.log(`Loaded ${historicalCandles.length} candles for ${tf} timeframe`);
-        }
-      } catch (e) {
-        console.warn('Failed to fetch live market data:', e);
+    try {
+      container.innerHTML = '<div class="h-full flex items-center justify-center text-gray-500">Loading market data...</div>';
+      const response = await fetch(`/api/market-data/${symbol}/1h`);
+      const data = await response.json();
+      if (data.candles && data.candles.length > 0) {
+        historicalCandles = data.candles;
+        result.marketData = historicalCandles;
       }
-    }
-    // For daily/4h timeframes with large projections, try historical database
-    else if (forecastCandles >= 1000 && !isIntradayTf) {
-      try {
-        container.innerHTML = '<div class="h-full flex items-center justify-center text-gray-500">Loading historical database...</div>';
-        const metal = symbol.toLowerCase().includes('gold') ? 'gold' : 'silver';
-        const histResponse = await fetch(`/api/historical-prices/${metal}?limit=${Math.min(forecastCandles, 100000)}`);
-        const histData = await histResponse.json();
-        if (histData.candles && histData.candles.length > 100) {
-          historicalCandles = histData.candles;
-          result.marketData = historicalCandles;
-          console.log(`Loaded ${historicalCandles.length} candles from historical database`);
-        }
-      } catch (e) {
-        console.warn('Historical database not available, falling back to live data:', e);
-      }
-    }
-    
-    // Fallback to live Yahoo Finance data for longer timeframes
-    if (historicalCandles.length === 0) {
-      let fetchTf = tf;
-      // Map to supported Yahoo Finance intervals
-      if (['1s', '2s', '3s', '5s', '10s', '30s'].includes(tf)) fetchTf = '1m';
-      if (!['1m', '5m', '15m', '1h', '4h', '1d'].includes(fetchTf)) fetchTf = '1h';
-      
-      try {
-        container.innerHTML = '<div class="h-full flex items-center justify-center text-gray-500">Loading market data...</div>';
-        const response = await fetch(`/api/market-data/${symbol}/${fetchTf}`);
-        const data = await response.json();
-        if (data.candles && data.candles.length > 0) {
-          historicalCandles = data.candles;
-          result.marketData = historicalCandles;
-        }
-      } catch (e) {
-        console.warn('Failed to fetch market data for projection:', e);
-      }
+    } catch (e) {
+      console.warn('Failed to fetch market data:', e);
     }
   }
+  
+  // Determine how many historical candles to show (max 50 for clean display)
+  const historyToShow = Math.min(50, historicalCandles.length);
   
   // Use only the last portion for display, but keep all for volatility calc
   const displayCandles = historicalCandles.slice(-historyToShow);
@@ -2403,7 +2352,7 @@ async function updateAiProjectionChart(result) {
     realPriceSeries = null; // Reset real price series reference
   }
   
-  // Create chart
+  // Create chart with scroll/zoom enabled
   aiProjectionChart = createChart(container, {
     width: container.clientWidth,
     height: container.clientHeight,
@@ -2418,9 +2367,24 @@ async function updateAiProjectionChart(result) {
     timeScale: {
       borderColor: '#374151',
       timeVisible: true,
+      rightOffset: 5,
+      barSpacing: 6,
+      minBarSpacing: 2,
     },
     rightPriceScale: {
       borderColor: '#374151',
+      autoScale: true,
+    },
+    handleScroll: {
+      mouseWheel: true,
+      pressedMouseMove: true,
+      horzTouchDrag: true,
+      vertTouchDrag: false,
+    },
+    handleScale: {
+      axisPressedMouseMove: true,
+      mouseWheel: true,
+      pinch: true,
     },
   });
   
@@ -2515,7 +2479,18 @@ async function updateAiProjectionChart(result) {
   });
   expectedSeries.setData(expectedData);
   
-  aiProjectionChart.timeScale().fitContent();
+  // Scroll to start of projection (left side) showing historical + beginning of forecast
+  // Show first 20% of data by default for better initial view
+  const allData = [...displayCandles.map(c => ({ time: c.time })), ...expectedData];
+  if (allData.length > 10) {
+    const visibleBars = Math.min(100, Math.floor(allData.length * 0.2));
+    aiProjectionChart.timeScale().setVisibleLogicalRange({
+      from: 0,
+      to: visibleBars
+    });
+  } else {
+    aiProjectionChart.timeScale().fitContent();
+  }
   
   // Store projection data for list view and real price comparison
   window.projectionData = {
