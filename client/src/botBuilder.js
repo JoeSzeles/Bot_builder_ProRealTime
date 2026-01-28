@@ -2131,8 +2131,42 @@ function setupAiTradingSubTabs() {
     });
   }
   
+  // Refresh chart button
+  const refreshBtn = document.getElementById('refreshProjectionChart');
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', () => {
+      console.log('Refresh chart button clicked');
+      forceRefreshProjectionChart();
+    });
+  }
+  
   // Start real price updates for AI projection
   startRealPriceUpdates();
+}
+
+// Force refresh projection chart
+function forceRefreshProjectionChart() {
+  const backtestOffset = parseInt(document.getElementById('aiBacktestOffset')?.value || '0');
+  
+  // Clear existing chart
+  if (aiProjectionChart) {
+    aiProjectionChart.remove();
+    aiProjectionChart = null;
+  }
+  
+  if (backtestOffset > 0) {
+    // Backtest mode
+    runBacktestSimulation();
+  } else if (window.lastAiResult) {
+    // Live mode - force update
+    updateAiProjectionChart(window.lastAiResult);
+  } else {
+    // No data - show message
+    const container = document.getElementById('aiProjectionChart');
+    if (container) {
+      container.innerHTML = '<div class="h-full flex items-center justify-center text-gray-500">Run AI Analysis first to see projections</div>';
+    }
+  }
 }
 
 // Current selected AI Results timeframe
