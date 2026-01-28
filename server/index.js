@@ -2750,6 +2750,311 @@ app.get('/api/historical-prices/info', (req, res) => {
   }
 });
 
+// ============ AI MEMORY SYSTEM ============
+
+const AI_MEMORY_DIR = path.join(__dirname, '..', 'data', 'ai-memory');
+if (!fs.existsSync(AI_MEMORY_DIR)) {
+  fs.mkdirSync(AI_MEMORY_DIR, { recursive: true });
+}
+
+// Helper to read/write AI memory files
+function readAIMemory(filename) {
+  const filepath = path.join(AI_MEMORY_DIR, filename);
+  if (!fs.existsSync(filepath)) return null;
+  return JSON.parse(fs.readFileSync(filepath, 'utf-8'));
+}
+
+function writeAIMemory(filename, data) {
+  const filepath = path.join(AI_MEMORY_DIR, filename);
+  fs.writeFileSync(filepath, JSON.stringify(data, null, 2));
+}
+
+// Get AI brain status for an asset
+app.get('/api/ai-memory/brain', (req, res) => {
+  try {
+    const brain = readAIMemory('brain.json') || { assets: {}, globalStats: {} };
+    res.json(brain);
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to read brain data' });
+  }
+});
+
+app.get('/api/ai-memory/brain/:asset', (req, res) => {
+  const { asset } = req.params;
+  try {
+    const brain = readAIMemory('brain.json') || { assets: {} };
+    const assetData = brain.assets[asset] || {
+      symbol: asset.toUpperCase(),
+      totalPredictions: 0,
+      correctPredictions: 0,
+      accuracy: 0,
+      learnedPatterns: [],
+      sessionMemory: [],
+      lastUpdated: null,
+      confidenceLevel: 0
+    };
+    res.json(assetData);
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to read brain data' });
+  }
+});
+
+// Update AI brain with prediction result
+app.post('/api/ai-memory/brain/prediction', (req, res) => {
+  const { asset, prediction, actual, confidence, patterns } = req.body;
+  try {
+    const brain = readAIMemory('brain.json') || { assets: {}, globalStats: { totalAnalyses: 0, totalPatterns: 0, overallAccuracy: 0 } };
+    
+    if (!brain.assets[asset]) {
+      brain.assets[asset] = {
+        symbol: asset.toUpperCase(),
+        totalPredictions: 0,
+        correctPredictions: 0,
+        accuracy: 0,
+        learnedPatterns: [],
+        sessionMemory: [],
+        lastUpdated: null,
+        confidenceLevel: 0,
+        correlatedAssets: []
+      };
+    }
+    
+    const assetData = brain.assets[asset];
+    assetData.totalPredictions++;
+    
+    // Check if prediction was correct (direction match)
+    const predDir = prediction > 0 ? 'up' : 'down';
+    const actDir = actual > 0 ? 'up' : 'down';
+    if (predDir === actDir) {
+      assetData.correctPredictions++;
+    }
+    
+    assetData.accuracy = assetData.totalPredictions > 0 
+      ? (assetData.correctPredictions / assetData.totalPredictions * 100).toFixed(1)
+      : 0;
+    
+    // Add to session memory (keep last 100)
+    assetData.sessionMemory.unshift({
+      timestamp: new Date().toISOString(),
+      prediction,
+      actual,
+      confidence,
+      correct: predDir === actDir
+    });
+    if (assetData.sessionMemory.length > 100) {
+      assetData.sessionMemory = assetData.sessionMemory.slice(0, 100);
+    }
+    
+    // Update patterns if provided
+    if (patterns && patterns.length > 0) {
+      patterns.forEach(p => {
+        const existing = assetData.learnedPatterns.find(lp => lp.name === p.name);
+        if (existing) {
+          existing.occurrences++;
+          existing.successRate = ((existing.successRate * (existing.occurrences - 1)) + (p.success ? 100 : 0)) / existing.occurrences;
+        } else {
+          assetData.learnedPatterns.push({
+            name: p.name,
+            occurrences: 1,
+            successRate: p.success ? 100 : 0,
+            firstSeen: new Date().toISOString()
+          });
+        }
+      });
+    }
+    
+    assetData.lastUpdated = new Date().toISOString();
+    assetData.confidenceLevel = Math.min(100, assetData.totalPredictions * 2);
+    
+    // Update global stats
+    brain.globalStats.totalAnalyses++;
+    brain.globalStats.totalPatterns = Object.values(brain.assets).reduce((sum, a) => sum + (a.learnedPatterns?.length || 0), 0);
+    brain.globalStats.lastTrainingDate = new Date().toISOString();
+    
+    writeAIMemory('brain.json', brain);
+    res.json({ success: true, assetData });
+  } catch (e) {
+    console.error('Error updating brain:', e);
+    res.status(500).json({ error: 'Failed to update brain' });
+  }
+});
+
+// Get events archive
+app.get('/api/ai-memory/events', (req, res) => {
+  try {
+    const eventsData = readAIMemory('events.json') || { events: [], categories: [] };
+    res.json(eventsData);
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to read events' });
+  }
+});
+
+// Add new event to archive
+app.post('/api/ai-memory/events', (req, res) => {
+  const { title, date, category, description, affectedAssets, tags, aiConclusion } = req.body;
+  try {
+    const eventsData = readAIMemory('events.json') || { events: [], categories: [] };
+    
+    const newEvent = {
+      id: `evt_${Date.now()}`,
+      title,
+      date: date || new Date().toISOString(),
+      category: category || 'general',
+      description,
+      affectedAssets: affectedAssets || [],
+      tags: tags || [],
+      aiConclusion: aiConclusion || '',
+      createdAt: new Date().toISOString()
+    };
+    
+    eventsData.events.unshift(newEvent);
+    writeAIMemory('events.json', eventsData);
+    res.json({ success: true, event: newEvent });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to add event' });
+  }
+});
+
+// Update event
+app.put('/api/ai-memory/events/:id', (req, res) => {
+  const { id } = req.params;
+  const updates = req.body;
+  try {
+    const eventsData = readAIMemory('events.json') || { events: [] };
+    const idx = eventsData.events.findIndex(e => e.id === id);
+    if (idx === -1) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+    eventsData.events[idx] = { ...eventsData.events[idx], ...updates };
+    writeAIMemory('events.json', eventsData);
+    res.json({ success: true, event: eventsData.events[idx] });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to update event' });
+  }
+});
+
+// Delete event
+app.delete('/api/ai-memory/events/:id', (req, res) => {
+  const { id } = req.params;
+  try {
+    const eventsData = readAIMemory('events.json') || { events: [] };
+    eventsData.events = eventsData.events.filter(e => e.id !== id);
+    writeAIMemory('events.json', eventsData);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to delete event' });
+  }
+});
+
+// Get correlations
+app.get('/api/ai-memory/correlations', (req, res) => {
+  try {
+    const correlations = readAIMemory('correlations.json') || { pairs: {}, assetGroups: {} };
+    res.json(correlations);
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to read correlations' });
+  }
+});
+
+// Update correlation data
+app.post('/api/ai-memory/correlations/:pair', async (req, res) => {
+  const { pair } = req.params;
+  try {
+    const correlations = readAIMemory('correlations.json') || { pairs: {} };
+    
+    if (!correlations.pairs[pair]) {
+      return res.status(404).json({ error: 'Correlation pair not found' });
+    }
+    
+    // For gold-silver ratio, calculate from current prices
+    if (pair === 'gold-silver') {
+      // Fetch current prices
+      const [goldRes, silverRes] = await Promise.all([
+        fetch('https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=1m&range=1d'),
+        fetch('https://query1.finance.yahoo.com/v8/finance/chart/SI=F?interval=1m&range=1d')
+      ]);
+      
+      const goldData = await goldRes.json();
+      const silverData = await silverRes.json();
+      
+      const goldPrice = goldData.chart?.result?.[0]?.meta?.regularMarketPrice || 0;
+      const silverPrice = silverData.chart?.result?.[0]?.meta?.regularMarketPrice || 0;
+      
+      if (goldPrice && silverPrice) {
+        const ratio = goldPrice / silverPrice;
+        correlations.pairs[pair].currentRatio = parseFloat(ratio.toFixed(2));
+        correlations.pairs[pair].lastUpdated = new Date().toISOString();
+        
+        // Add to historical data (keep last 1000)
+        correlations.pairs[pair].historicalData.push({
+          date: new Date().toISOString(),
+          ratio: correlations.pairs[pair].currentRatio,
+          goldPrice,
+          silverPrice
+        });
+        if (correlations.pairs[pair].historicalData.length > 1000) {
+          correlations.pairs[pair].historicalData = correlations.pairs[pair].historicalData.slice(-1000);
+        }
+      }
+    }
+    
+    writeAIMemory('correlations.json', correlations);
+    res.json({ success: true, pair: correlations.pairs[pair] });
+  } catch (e) {
+    console.error('Error updating correlation:', e);
+    res.status(500).json({ error: 'Failed to update correlation' });
+  }
+});
+
+// AI Memory summary for injection into prompts
+app.get('/api/ai-memory/summary/:asset', async (req, res) => {
+  const { asset } = req.params;
+  try {
+    const brain = readAIMemory('brain.json') || { assets: {} };
+    const events = readAIMemory('events.json') || { events: [] };
+    const correlations = readAIMemory('correlations.json') || { pairs: {} };
+    
+    const assetBrain = brain.assets[asset] || {};
+    const relevantEvents = events.events.filter(e => 
+      e.affectedAssets?.some(a => a.symbol?.toLowerCase() === asset.toLowerCase())
+    ).slice(0, 10);
+    
+    // Find relevant correlations
+    const relevantCorrelations = Object.entries(correlations.pairs)
+      .filter(([key]) => key.includes(asset))
+      .map(([key, data]) => ({ pair: key, ...data }));
+    
+    const summary = {
+      asset,
+      brain: {
+        accuracy: assetBrain.accuracy || 0,
+        totalPredictions: assetBrain.totalPredictions || 0,
+        confidenceLevel: assetBrain.confidenceLevel || 0,
+        topPatterns: (assetBrain.learnedPatterns || [])
+          .sort((a, b) => b.successRate - a.successRate)
+          .slice(0, 5),
+        recentMemory: (assetBrain.sessionMemory || []).slice(0, 5)
+      },
+      events: relevantEvents.map(e => ({
+        title: e.title,
+        date: e.date,
+        conclusion: e.aiConclusion,
+        tags: e.tags
+      })),
+      correlations: relevantCorrelations.map(c => ({
+        pair: c.pair,
+        ratio: c.currentRatio,
+        correlation: c.correlation,
+        interpretation: c.interpretation
+      }))
+    };
+    
+    res.json(summary);
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to generate memory summary' });
+  }
+});
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
