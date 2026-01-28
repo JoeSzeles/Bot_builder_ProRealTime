@@ -2669,16 +2669,42 @@ Make realistic predictions that reflect actual market behavior - not random wave
       console.log('AI projection response:', data);
       
       if (data.expected && data.bullish && data.bearish) {
-        // Convert AI predictions to chart data format
+        // Calculate realistic volatility from historical data
+        const volatilities = [];
+        for (let i = 1; i < recentCandles.length; i++) {
+          volatilities.push(Math.abs(recentCandles[i].close - recentCandles[i-1].close) / recentCandles[i-1].close);
+        }
+        const avgVolatility = volatilities.reduce((a, b) => a + b, 0) / volatilities.length;
+        const volatilityMultiplier = lastPrice * avgVolatility * 0.8; // Slightly dampen for projection
+        
+        // Convert AI predictions to chart data format with realistic volatility
         const bullishData = [{ time: lastTime, value: lastPrice }];
         const bearishData = [{ time: lastTime, value: lastPrice }];
         const expectedData = [{ time: lastTime, value: lastPrice }];
         
+        // Random walk with mean reversion to AI target
+        let expPrice = lastPrice, bullPrice = lastPrice, bearPrice = lastPrice;
+        
         for (let i = 0; i < data.expected.length; i++) {
           const time = lastTime + ((i + 1) * interval);
-          expectedData.push({ time, value: parseFloat(data.expected[i]) || lastPrice });
-          bullishData.push({ time, value: parseFloat(data.bullish[i]) || lastPrice });
-          bearishData.push({ time, value: parseFloat(data.bearish[i]) || lastPrice });
+          const targetExp = parseFloat(data.expected[i]) || lastPrice;
+          const targetBull = parseFloat(data.bullish[i]) || lastPrice;
+          const targetBear = parseFloat(data.bearish[i]) || lastPrice;
+          
+          // Add realistic noise - random walk with drift toward AI target
+          const noise1 = (Math.random() - 0.5) * volatilityMultiplier * 2;
+          const noise2 = (Math.random() - 0.5) * volatilityMultiplier * 2;
+          const noise3 = (Math.random() - 0.5) * volatilityMultiplier * 2;
+          
+          // Mean reversion factor (stronger as we get further from target)
+          const reversionStrength = 0.15;
+          expPrice += (targetExp - expPrice) * reversionStrength + noise1;
+          bullPrice += (targetBull - bullPrice) * reversionStrength + noise2;
+          bearPrice += (targetBear - bearPrice) * reversionStrength + noise3;
+          
+          expectedData.push({ time, value: expPrice });
+          bullishData.push({ time, value: bullPrice });
+          bearishData.push({ time, value: bearPrice });
         }
         
         // Store reasoning for display
@@ -2696,7 +2722,7 @@ Make realistic predictions that reflect actual market behavior - not random wave
   return generateFallbackProjection(historicalCandles, lastPrice, lastTime, interval, projectionPoints, direction);
 }
 
-// Simple fallback projection based on recent trend (not a formula, just extrapolation)
+// Simple fallback projection based on recent trend with realistic volatility
 function generateFallbackProjection(historicalCandles, lastPrice, lastTime, interval, projectionPoints, direction) {
   const bullishData = [{ time: lastTime, value: lastPrice }];
   const bearishData = [{ time: lastTime, value: lastPrice }];
@@ -2705,20 +2731,36 @@ function generateFallbackProjection(historicalCandles, lastPrice, lastTime, inte
   // Calculate recent trend from last 20 candles
   const recent = historicalCandles.slice(-20);
   const avgChange = (recent[recent.length - 1].close - recent[0].close) / recent.length;
-  const volatility = Math.abs(avgChange) * 0.5;
+  
+  // Calculate realistic volatility from actual price movements
+  const volatilities = [];
+  for (let i = 1; i < recent.length; i++) {
+    volatilities.push(Math.abs(recent[i].close - recent[i-1].close));
+  }
+  const avgVolatility = volatilities.reduce((a, b) => a + b, 0) / volatilities.length;
   
   let expPrice = lastPrice;
   let bullPrice = lastPrice;
   let bearPrice = lastPrice;
   
+  // Direction bias
+  const dirBias = direction === 'Bullish' ? 1.2 : direction === 'Bearish' ? 0.8 : 1;
+  
   for (let i = 1; i <= projectionPoints; i++) {
     const time = lastTime + (i * interval);
     
-    // Continue recent trend with dampening
+    // Trend with dampening
     const trendFactor = Math.max(0.1, 1 - (i / projectionPoints) * 0.5);
-    expPrice += avgChange * trendFactor;
-    bullPrice += (avgChange + volatility) * trendFactor;
-    bearPrice += (avgChange - volatility) * trendFactor;
+    const trend = avgChange * trendFactor;
+    
+    // Random walk noise (realistic market movement)
+    const noise1 = (Math.random() - 0.5) * avgVolatility * 2;
+    const noise2 = (Math.random() - 0.5) * avgVolatility * 2;
+    const noise3 = (Math.random() - 0.5) * avgVolatility * 2;
+    
+    expPrice += trend + noise1;
+    bullPrice += trend * dirBias + Math.abs(trend * 0.5) + noise2;
+    bearPrice += trend / dirBias - Math.abs(trend * 0.5) + noise3;
     
     expectedData.push({ time, value: expPrice });
     bullishData.push({ time, value: bullPrice });
@@ -6226,8 +6268,10 @@ function getTradeSettings() {
     initialCapital: parseFloat(document.getElementById('initialCapital')?.value) || 2000,
     maxPositionSize: parseFloat(document.getElementById('maxPositionSize')?.value) || 1,
     positionSize: parseFloat(document.getElementById('positionSize')?.value) || 0.5,
+    minSize: parseFloat(document.getElementById('positionSize')?.value) || 0.05, // Alias for backtest
     useOrderFee: document.getElementById('useOrderFee')?.checked ?? true,
     orderFee: parseFloat(document.getElementById('orderFee')?.value) || 7,
+    commission: parseFloat(document.getElementById('orderFee')?.value) || 7, // Alias for backtest
     useSpread: document.getElementById('useSpread')?.checked ?? true,
     spreadPips: parseFloat(document.getElementById('spreadPips')?.value) || 2,
     stopLoss: parseFloat(document.getElementById('stopLoss')?.value) || 7000,
