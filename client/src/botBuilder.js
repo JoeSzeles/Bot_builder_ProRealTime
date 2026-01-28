@@ -2410,13 +2410,10 @@ async function updateAiProjectionChart(result) {
     console.error('Failed to fetch market data:', e);
   }
   
-  // Historical candles to display (proportional to forecast, max 100)
-  const historyToShow = Math.min(100, Math.max(20, Math.floor(forecastCandles / 100)));
+  // Display ALL fetched historical candles (already limited by forecastCandles in fetch)
+  const displayCandles = historicalCandles;
   
-  // Use only the last portion for display, but keep all for volatility calc
-  const displayCandles = historicalCandles.slice(-historyToShow);
-  
-  console.log('Data status:', { historicalCandles: historicalCandles.length, displayCandles: displayCandles.length, historyToShow });
+  console.log('Data status:', { historicalCandles: historicalCandles.length, displayCandles: displayCandles.length });
   
   if (historicalCandles.length === 0 || displayCandles.length === 0) {
     console.error('No market data available');
