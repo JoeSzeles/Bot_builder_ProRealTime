@@ -41,7 +41,28 @@ The application features a modern full-stack architecture:
 -   **Yahoo Finance API**: For live candlestick data across 50+ assets (no API key required).
 -   **MetalPriceAPI**: Fallback for real-time Silver & Gold spot prices (requires `METALS_API_KEY` secret).
 
-## Recent Changes (Jan 27, 2026)
+## Recent Changes (Jan 28, 2026)
+- **AI Price Projection Chart Fix**:
+  - Fixed value explosion bug where projections reached astronomical numbers (90 trillion)
+  - Implemented bounded random walk algorithm (prices stay within 50%-200% of start)
+  - Added container dimension checks to defer chart rendering until visible
+  - Chart now properly renders in AI Results tab with 10k forecast candles
+
+- **Backtest Simulation Feature**:
+  - New "Backtest" dropdown in AI Projection panel with time offsets:
+    - Live (now), -1 min, -10 min, -30 min, -1 hour, -4 hours, -12 hours, -1 day, -1 week
+  - Backtest accuracy summary panel shows:
+    - Direction comparison (AI prediction vs actual movement)
+    - Predicted price, Actual price, Error percentage
+    - Color-coded accuracy badge (green/yellow/red)
+  - Chart visualization shows:
+    - Gray line: Historical data before backtest point
+    - Green line: What actually happened after backtest point
+    - Blue dashed line: What AI would have predicted
+  - Re-runs AI analysis on historical data (not just reusing current prediction)
+  - Uses correct timeframe API endpoints based on selected timeframe
+
+## Previous Changes (Jan 27, 2026)
 - **Yahoo Finance Data Integration**:
   - Replaced TwelveData API with Yahoo Finance (no API key required)
   - Added 50+ popular assets across all categories:
