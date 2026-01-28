@@ -7313,18 +7313,28 @@ function renderBacktestSimChart() {
   const container = document.getElementById('backtestChart');
   console.log('renderBacktestSimChart called', { 
     container: !!container, 
-    candles: BACKTEST_DATA.candles.length,
-    trades: BACKTEST_DATA.trades.length 
+    candles: BACKTEST_DATA.candles?.length || 0,
+    trades: BACKTEST_DATA.trades?.length || 0,
+    firstTrade: BACKTEST_DATA.trades?.[0]
   });
   
-  if (!container || BACKTEST_DATA.candles.length === 0) {
-    console.log('Backtest chart: no container or no candles');
+  if (!container) {
+    console.error('Backtest chart: container not found');
+    return;
+  }
+  
+  if (!BACKTEST_DATA.candles || BACKTEST_DATA.candles.length === 0) {
+    console.error('Backtest chart: no candles data');
     return;
   }
   
   // Clear previous chart
   if (backtestChart) {
-    backtestChart.remove();
+    try {
+      backtestChart.remove();
+    } catch (e) {
+      console.warn('Error removing chart:', e);
+    }
     backtestChart = null;
   }
   
@@ -7334,6 +7344,13 @@ function renderBacktestSimChart() {
   const rect = container.getBoundingClientRect();
   console.log('Chart container rect:', rect.width, rect.height);
   
+  if (rect.width === 0 || rect.height === 0) {
+    console.error('Chart container has zero dimensions');
+    container.innerHTML = '<div class="flex items-center justify-center h-full text-gray-400">Chart loading...</div>';
+    return;
+  }
+  
+  try {
   backtestChart = createChart(container, {
     width: rect.width || 400,
     height: rect.height || 192,
@@ -7385,9 +7402,15 @@ function renderBacktestSimChart() {
   
   // Sort markers by time
   markers.sort((a, b) => a.time - b.time);
+  console.log('Setting chart markers:', markers.length, 'first:', markers[0]);
   priceSeries.setMarkers(markers);
   
   backtestChart.timeScale().fitContent();
+  console.log('Chart rendered successfully');
+  } catch (err) {
+    console.error('Error rendering backtest chart:', err);
+    container.innerHTML = `<div class="flex items-center justify-center h-full text-red-400">Chart error: ${err.message}</div>`;
+  }
 }
 
 // Render trade list table
@@ -7395,11 +7418,17 @@ function renderBacktestTradeList() {
   const tbody = document.getElementById('backtestTradeListBody');
   console.log('renderBacktestTradeList called', { 
     tbody: !!tbody, 
-    trades: BACKTEST_DATA.trades.length 
+    trades: BACKTEST_DATA.trades?.length || 0,
+    firstTrade: BACKTEST_DATA.trades?.[0]
   });
   
   if (!tbody) {
-    console.log('No tbody found');
+    console.error('Trade list: tbody not found');
+    return;
+  }
+  
+  if (!BACKTEST_DATA.trades || BACKTEST_DATA.trades.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="px-2 py-4 text-center text-gray-500">No trades found</td></tr>';
     return;
   }
   
