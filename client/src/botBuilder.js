@@ -5432,11 +5432,14 @@ function updatePatternMapDisplay(patterns) {
   gridHtml += '</div>';
   gridEl.innerHTML = gridHtml;
   
-  // Top 5 profitable patterns
+  // Store all patterns for View All popup
+  window._allPatterns = [...patterns].sort((a, b) => (b.totalPnL || 0) - (a.totalPnL || 0));
+  
+  // Top 10 profitable patterns
   const sortedPatterns = [...patterns]
     .filter(p => (p.totalPnL || 0) > 0)
     .sort((a, b) => (b.totalPnL || 0) - (a.totalPnL || 0))
-    .slice(0, 5);
+    .slice(0, 10);
   
   if (topPatternsEl) {
     if (sortedPatterns.length === 0) {
@@ -5446,20 +5449,66 @@ function updatePatternMapDisplay(patterns) {
         const pnl = p.totalPnL || 0;
         const winRate = p.successRate || 0;
         const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '📊';
+        const patternData = JSON.stringify(p).replace(/"/g, '&quot;');
         return `
-          <div class="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded">
-            <div class="flex items-center gap-2">
-              <span>${medal}</span>
-              <span class="text-xs font-medium text-gray-700 dark:text-gray-300">${p.name}</span>
+          <div class="p-2 bg-gray-50 dark:bg-gray-800 rounded pattern-card" data-pattern='${patternData}'>
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span>${medal}</span>
+                <span class="text-xs font-medium text-gray-700 dark:text-gray-300">${p.name}</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs text-gray-500">${p.occurrences || 0} trades</span>
+                <span class="text-xs ${winRate >= 60 ? 'text-green-600' : 'text-gray-600'}">${winRate.toFixed(0)}%</span>
+                <span class="text-sm font-bold ${pnl >= 0 ? 'text-green-600' : 'text-red-600'}">${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}</span>
+                <button class="expand-pattern-btn px-1.5 py-0.5 text-xs bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 rounded transition-colors" title="View details">▼</button>
+              </div>
             </div>
-            <div class="flex items-center gap-3">
-              <span class="text-xs text-gray-500">${p.occurrences || 0} trades</span>
-              <span class="text-xs ${winRate >= 60 ? 'text-green-600' : 'text-gray-600'}">${winRate.toFixed(0)}% win</span>
-              <span class="text-sm font-bold text-green-600">+$${pnl.toFixed(2)}</span>
+            <div class="pattern-details hidden mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 text-xs">
+              <div class="grid grid-cols-2 gap-2 mb-2">
+                <div><span class="text-gray-500">First Seen:</span> <span class="text-gray-700 dark:text-gray-300">${p.firstSeen ? new Date(p.firstSeen).toLocaleDateString() : 'N/A'}</span></div>
+                <div><span class="text-gray-500">Last Seen:</span> <span class="text-gray-700 dark:text-gray-300">${p.lastSeen ? new Date(p.lastSeen).toLocaleDateString() : 'N/A'}</span></div>
+                <div><span class="text-gray-500">Total P/L:</span> <span class="${pnl >= 0 ? 'text-green-600' : 'text-red-600'} font-medium">$${pnl.toFixed(2)}</span></div>
+                <div><span class="text-gray-500">Win Rate:</span> <span class="${winRate >= 60 ? 'text-green-600' : 'text-gray-700 dark:text-gray-300'}">${winRate.toFixed(1)}%</span></div>
+                <div><span class="text-gray-500">Occurrences:</span> <span class="text-gray-700 dark:text-gray-300">${p.occurrences || 0}</span></div>
+                <div><span class="text-gray-500">Avg P/L:</span> <span class="text-gray-700 dark:text-gray-300">$${((pnl) / (p.occurrences || 1)).toFixed(2)}</span></div>
+              </div>
+              <button class="copy-pattern-btn w-full px-2 py-1 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors flex items-center justify-center gap-1">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                Copy Pattern Settings
+              </button>
             </div>
           </div>
         `;
       }).join('');
+      
+      // Add expand/collapse handlers
+      topPatternsEl.querySelectorAll('.expand-pattern-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const card = btn.closest('.pattern-card');
+          const details = card.querySelector('.pattern-details');
+          const isHidden = details.classList.contains('hidden');
+          details.classList.toggle('hidden');
+          btn.textContent = isHidden ? '▲' : '▼';
+        });
+      });
+      
+      // Add copy handlers
+      topPatternsEl.querySelectorAll('.copy-pattern-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const card = btn.closest('.pattern-card');
+          const patternData = JSON.parse(card.dataset.pattern.replace(/&quot;/g, '"'));
+          const settings = `Pattern: ${patternData.name}\nP/L: $${(patternData.totalPnL || 0).toFixed(2)}\nWin Rate: ${(patternData.successRate || 0).toFixed(1)}%\nTrades: ${patternData.occurrences || 0}\nFirst Seen: ${patternData.firstSeen || 'N/A'}\nLast Seen: ${patternData.lastSeen || 'N/A'}`;
+          navigator.clipboard.writeText(settings).then(() => {
+            btn.innerHTML = '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Copied!';
+            setTimeout(() => {
+              btn.innerHTML = '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg> Copy Pattern Settings';
+            }, 1500);
+          });
+        });
+      });
     }
   }
   
@@ -5473,6 +5522,115 @@ function updatePatternMapDisplay(patterns) {
   if (totalTradesEl) totalTradesEl.textContent = totalOccurrences.toString();
   if (bestSessionEl) bestSessionEl.textContent = sessionLabels[bestSession[0]] || '--';
 }
+
+function showAllPatternsModal(sortBy = 'pnl') {
+  const patterns = window._allPatterns || [];
+  if (patterns.length === 0) {
+    alert('No patterns available');
+    return;
+  }
+  
+  // Sort patterns based on option
+  let sorted = [...patterns];
+  switch (sortBy) {
+    case 'pnl': sorted.sort((a, b) => (b.totalPnL || 0) - (a.totalPnL || 0)); break;
+    case 'winrate': sorted.sort((a, b) => (b.successRate || 0) - (a.successRate || 0)); break;
+    case 'trades': sorted.sort((a, b) => (b.occurrences || 0) - (a.occurrences || 0)); break;
+    case 'name': sorted.sort((a, b) => (a.name || '').localeCompare(b.name || '')); break;
+    case 'recent': sorted.sort((a, b) => new Date(b.lastSeen || 0) - new Date(a.lastSeen || 0)); break;
+  }
+  
+  const modal = document.createElement('div');
+  modal.id = 'allPatternsModal';
+  modal.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50';
+  
+  const patternsHtml = sorted.map((p, i) => {
+    const pnl = p.totalPnL || 0;
+    const winRate = p.successRate || 0;
+    const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`;
+    const patternData = JSON.stringify(p).replace(/"/g, '&quot;');
+    return `
+      <div class="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg pattern-card-modal" data-pattern='${patternData}'>
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-2">
+            <span class="text-sm">${medal}</span>
+            <span class="text-sm font-medium text-gray-800 dark:text-white">${p.name}</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="text-xs text-gray-500">${p.occurrences || 0} trades</span>
+            <span class="text-xs px-2 py-0.5 rounded ${winRate >= 60 ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-gray-100 dark:bg-gray-600 text-gray-600 dark:text-gray-300'}">${winRate.toFixed(0)}% win</span>
+            <span class="text-sm font-bold ${pnl >= 0 ? 'text-green-600' : 'text-red-600'}">${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}</span>
+          </div>
+        </div>
+        <div class="grid grid-cols-4 gap-2 text-xs text-gray-500 dark:text-gray-400 mb-2">
+          <div>First: ${p.firstSeen ? new Date(p.firstSeen).toLocaleDateString() : 'N/A'}</div>
+          <div>Last: ${p.lastSeen ? new Date(p.lastSeen).toLocaleDateString() : 'N/A'}</div>
+          <div>Avg: $${((pnl) / (p.occurrences || 1)).toFixed(2)}/trade</div>
+          <div class="text-right">
+            <button class="copy-modal-btn px-2 py-0.5 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs transition-colors">Copy</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  modal.innerHTML = `
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-4xl mx-4 shadow-xl max-h-[85vh] flex flex-col">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-semibold text-gray-800 dark:text-white">All Patterns (${patterns.length})</h3>
+        <div class="flex items-center gap-2">
+          <label class="text-xs text-gray-500">Sort by:</label>
+          <select id="patternSortSelect" class="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded">
+            <option value="pnl" ${sortBy === 'pnl' ? 'selected' : ''}>P/L (High to Low)</option>
+            <option value="winrate" ${sortBy === 'winrate' ? 'selected' : ''}>Win Rate</option>
+            <option value="trades" ${sortBy === 'trades' ? 'selected' : ''}>Trade Count</option>
+            <option value="name" ${sortBy === 'name' ? 'selected' : ''}>Name (A-Z)</option>
+            <option value="recent" ${sortBy === 'recent' ? 'selected' : ''}>Most Recent</option>
+          </select>
+        </div>
+      </div>
+      <div class="flex-1 overflow-y-auto space-y-2 pr-2">
+        ${patternsHtml}
+      </div>
+      <div class="flex justify-end gap-2 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <button id="closeAllPatternsBtn" class="px-4 py-2 text-sm bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 rounded-lg transition-colors">Close</button>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+  
+  // Close button
+  document.getElementById('closeAllPatternsBtn')?.addEventListener('click', () => modal.remove());
+  
+  // Sort change
+  document.getElementById('patternSortSelect')?.addEventListener('change', (e) => {
+    modal.remove();
+    showAllPatternsModal(e.target.value);
+  });
+  
+  // Copy buttons
+  modal.querySelectorAll('.copy-modal-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const card = btn.closest('.pattern-card-modal');
+      const patternData = JSON.parse(card.dataset.pattern.replace(/&quot;/g, '"'));
+      const settings = `Pattern: ${patternData.name}\nP/L: $${(patternData.totalPnL || 0).toFixed(2)}\nWin Rate: ${(patternData.successRate || 0).toFixed(1)}%\nTrades: ${patternData.occurrences || 0}\nAvg P/L: $${((patternData.totalPnL || 0) / (patternData.occurrences || 1)).toFixed(2)}\nFirst Seen: ${patternData.firstSeen || 'N/A'}\nLast Seen: ${patternData.lastSeen || 'N/A'}`;
+      navigator.clipboard.writeText(settings).then(() => {
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+      });
+    });
+  });
+  
+  // Click outside to close
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.remove();
+  });
+}
+
+// View All Patterns button listener
+document.getElementById('viewAllPatternsBtn')?.addEventListener('click', () => showAllPatternsModal());
 
 function updateEventsArchiveDisplay(events, selectedAsset) {
   const container = document.getElementById('eventsArchive');

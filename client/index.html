@@ -2155,13 +2155,16 @@ SET STOP pLOSS ATR(14) * 1.2</pre>
                     <p class="text-xs text-gray-500 italic col-span-full text-center py-4">Run backtests or auto-optimize to build pattern data</p>
                   </div>
                   
-                  <!-- Top 5 Best Patterns -->
+                  <!-- Top 10 Best Patterns -->
                   <div class="border-t border-gray-200 dark:border-gray-600 pt-3 mt-3">
-                    <h5 class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2 flex items-center gap-2">
-                      <span>Top 5 Most Profitable Patterns</span>
-                      <span class="text-green-600">$</span>
-                    </h5>
-                    <div id="topProfitablePatterns" class="space-y-2">
+                    <div class="flex items-center justify-between mb-2">
+                      <h5 class="text-xs font-medium text-gray-600 dark:text-gray-400 flex items-center gap-2">
+                        <span>Top 10 Most Profitable Patterns</span>
+                        <span class="text-green-600">$</span>
+                      </h5>
+                      <button id="viewAllPatternsBtn" class="px-2 py-1 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors">View All</button>
+                    </div>
+                    <div id="topProfitablePatterns" class="space-y-2 max-h-96 overflow-y-auto">
                       <p class="text-xs text-gray-500 italic">No profitable patterns yet</p>
                     </div>
                   </div>
