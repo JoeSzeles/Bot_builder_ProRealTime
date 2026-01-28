@@ -5958,8 +5958,8 @@ function showNewsReviewModal(events) {
         ${eventsHtml}
       </div>
       <div class="flex justify-end gap-2">
-        <button onclick="document.getElementById('newsReviewModal')?.remove()" class="px-4 py-2 text-sm bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 rounded-lg transition-colors">Cancel</button>
-        <button onclick="saveSelectedEvents()" class="px-4 py-2 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors">Add Selected</button>
+        <button id="cancelNewsBtn" class="px-4 py-2 text-sm bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 rounded-lg transition-colors">Cancel</button>
+        <button id="addSelectedEventsBtn" class="px-4 py-2 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors">Add Selected</button>
       </div>
     </div>
   `;
@@ -5967,6 +5967,15 @@ function showNewsReviewModal(events) {
   // Store events for later
   modal.dataset.events = JSON.stringify(events);
   document.body.appendChild(modal);
+  
+  // Attach event listeners after modal is in DOM
+  document.getElementById('cancelNewsBtn')?.addEventListener('click', () => {
+    document.getElementById('newsReviewModal')?.remove();
+  });
+  
+  document.getElementById('addSelectedEventsBtn')?.addEventListener('click', () => {
+    saveSelectedEvents();
+  });
   
   modal.addEventListener('click', (e) => {
     if (e.target === modal) modal.remove();
