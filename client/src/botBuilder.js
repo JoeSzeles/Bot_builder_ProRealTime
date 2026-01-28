@@ -7194,7 +7194,7 @@ async function runBacktestSimulation() {
   
   // Render chart and trade list
   setTimeout(() => {
-    renderBacktestChart();
+    renderBacktestSimChart();
     renderBacktestTradeList();
   }, 100);
   
@@ -7298,8 +7298,8 @@ let BACKTEST_DATA = {
 };
 let backtestChart = null;
 
-// Render backtest chart with trade markers
-function renderBacktestChart() {
+// Render backtest simulation chart with trade markers
+function renderBacktestSimChart() {
   const container = document.getElementById('backtestChart');
   if (!container || BACKTEST_DATA.candles.length === 0) return;
   
