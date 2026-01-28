@@ -8718,6 +8718,60 @@ function setupForecastHandlers() {
       document.getElementById('forecastDayDetails')?.classList.add('hidden');
     });
   }
+  
+  const updatePredictionBtn = document.getElementById('updateDayPredictionBtn');
+  if (updatePredictionBtn) {
+    updatePredictionBtn.addEventListener('click', () => updateCurrentDayPrediction());
+  }
+}
+
+async function updateCurrentDayPrediction() {
+  const btn = document.getElementById('updateDayPredictionBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Updating...';
+  }
+  
+  try {
+    const asset = forecastData.asset || 'silver';
+    const priceRes = await fetch(`/api/market-data/${asset}/1h`);
+    const priceResponse = await priceRes.json();
+    const priceData = Array.isArray(priceResponse) ? priceResponse : (priceResponse.candles || priceResponse.data || []);
+    
+    if (priceData.length > 0) {
+      const latestPrice = priceData[priceData.length - 1]?.close;
+      
+      if (latestPrice && forecastData.days && forecastData.days.length > 0) {
+        // Update current price for today
+        forecastData.days[0].currentPrice = latestPrice;
+        
+        // Optionally update actual prices array
+        if (!forecastData.days[0].actualPrices) {
+          forecastData.days[0].actualPrices = [];
+        }
+        forecastData.days[0].actualPrices.push(latestPrice);
+        
+        saveForecastToStorage();
+        
+        // Re-render the current day details
+        showDayDetails(0);
+        renderMiniCharts();
+        
+        // Update current price display
+        const priceValueEl = document.getElementById('forecastCurrentPriceValue');
+        if (priceValueEl) {
+          priceValueEl.textContent = `$${latestPrice.toFixed(2)}`;
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Failed to update prediction:', e);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Update Prediction';
+    }
+  }
 }
 
 function loadForecastFromStorage() {
@@ -8985,6 +9039,7 @@ function generateMockForecast(asset, priceData, brainData) {
       summary: generateDaySummary(direction === 'bullish' ? 1 : -1, confidence, asset, expectedChange, openPrice),
       predictedPrices: hourlyPrices,
       actualPrices,
+      currentPrice: days.length === 0 ? currentPrice : null, // Current price only for today (first day)
       backtestResult: null // Will be populated by runForecastBacktest
     });
     
@@ -9261,6 +9316,8 @@ function renderMiniCharts() {
     
     const predicted = day.predictedPrices || [];
     const actual = day.actualPrices || [];
+    const currentPrice = day.currentPrice;
+    const isToday = i === 0;
     
     if (predicted.length === 0) return;
     
@@ -9295,19 +9352,35 @@ function renderMiniCharts() {
       connectorCircle = `<circle cx="0" cy="${startY}" r="2" fill="#60a5fa"/>`;
     }
     
+    // Current price marker (red dot with line) for today only
+    let currentPriceMarker = '';
+    if (isToday && currentPrice) {
+      const cpY = height - ((currentPrice - globalMin) / globalRange) * height;
+      currentPriceMarker = `
+        <line x1="0" y1="${cpY}" x2="${width}" y2="${cpY}" stroke="#ef4444" stroke-width="1" stroke-dasharray="2,2"/>
+        <circle cx="${width - 4}" cy="${cpY}" r="3" fill="#ef4444" stroke="white" stroke-width="1"/>
+      `;
+    }
+    
     container.innerHTML = `
       <svg width="${width}" height="${height}" class="w-full h-full">
         ${connectorCircle}
         <path d="${predictedPath}" fill="none" stroke="#3b82f6" stroke-width="1.5" />
-        ${actualPath ? `<path d="${actualPath}" fill="none" stroke="#ef4444" stroke-width="1.5" />` : ''}
+        ${actualPath ? `<path d="${actualPath}" fill="none" stroke="#f97316" stroke-width="1.5" />` : ''}
+        ${currentPriceMarker}
       </svg>
     `;
   });
 }
 
+let currentDetailDayIndex = 0;
+
 function showDayDetails(dayIndex) {
   const day = forecastData.days[dayIndex];
   if (!day) return;
+  
+  currentDetailDayIndex = dayIndex;
+  const isToday = dayIndex === 0;
   
   const detailsEl = document.getElementById('forecastDayDetails');
   if (!detailsEl) return;
@@ -9318,6 +9391,28 @@ function showDayDetails(dayIndex) {
   const sydneyDate = toSydneyTime(date);
   
   document.getElementById('forecastDayTitle').textContent = `${day.dayName}, ${sydneyDate.getDate()}/${sydneyDate.getMonth() + 1} (AEDT)`;
+  
+  // Show/hide current price bar and update button for today only
+  const currentPriceBar = document.getElementById('forecastCurrentPriceBar');
+  const updateBtn = document.getElementById('updateDayPredictionBtn');
+  
+  if (isToday) {
+    // Always show update button for today
+    if (updateBtn) updateBtn.classList.remove('hidden');
+    
+    if (day.currentPrice) {
+      if (currentPriceBar) {
+        currentPriceBar.classList.remove('hidden');
+        document.getElementById('forecastCurrentPriceValue').textContent = `$${day.currentPrice.toFixed(2)}`;
+      }
+    } else {
+      // Hide price bar if no current price yet, but keep button visible
+      if (currentPriceBar) currentPriceBar.classList.add('hidden');
+    }
+  } else {
+    if (currentPriceBar) currentPriceBar.classList.add('hidden');
+    if (updateBtn) updateBtn.classList.add('hidden');
+  }
   document.getElementById('forecastEntryPrice').textContent = `$${day.entryPrice.toFixed(2)}`;
   document.getElementById('forecastEntryTime').textContent = day.entryTime;
   document.getElementById('forecastExitPrice').textContent = `$${day.exitPrice.toFixed(2)}`;
@@ -9396,8 +9491,11 @@ function renderDayChart(day, dayIndex) {
   
   const predicted = day.predictedPrices || [];
   const actual = day.actualPrices || [];
+  const currentPrice = day.currentPrice;
+  const isToday = dayIndex === 0;
   
   const allPrices = [...predicted, ...actual].filter(p => p != null);
+  if (currentPrice) allPrices.push(currentPrice);
   if (allPrices.length === 0) {
     container.innerHTML = '<div class="flex items-center justify-center h-full text-gray-500 text-sm">No price data</div>';
     return;
@@ -9451,6 +9549,33 @@ function renderDayChart(day, dayIndex) {
   // Time labels for trading hours
   const tradingHours = day.dayOfWeek === 1 ? '10:00-24:00' : day.dayOfWeek === 6 ? '00:00-09:00' : '00:00-24:00';
   
+  // Current price line (red horizontal line) for today
+  let currentPriceLine = '';
+  if (isToday && currentPrice) {
+    const cpY = height - padding - ((currentPrice - min) / range) * (height - padding * 2);
+    currentPriceLine = `
+      <line x1="${padding}" y1="${cpY}" x2="${width - padding}" y2="${cpY}" stroke="#ef4444" stroke-width="2" stroke-dasharray="5,3"/>
+      <rect x="${width - padding - 50}" y="${cpY - 8}" width="50" height="16" fill="#ef4444" rx="2"/>
+      <text x="${width - padding - 25}" y="${cpY + 4}" fill="white" font-size="10" text-anchor="middle">$${currentPrice.toFixed(2)}</text>
+    `;
+  }
+  
+  let legendY = 15;
+  const legendItems = [];
+  legendItems.push(`<circle cx="${width - 80}" cy="${legendY}" r="4" fill="#3b82f6"/><text x="${width - 70}" y="${legendY + 3}" fill="#9ca3af" font-size="10">Predicted</text>`);
+  legendY += 15;
+  if (isToday && currentPrice) {
+    legendItems.push(`<circle cx="${width - 80}" cy="${legendY}" r="4" fill="#ef4444"/><text x="${width - 70}" y="${legendY + 3}" fill="#9ca3af" font-size="10">Current</text>`);
+    legendY += 15;
+  }
+  if (actual.length > 0) {
+    legendItems.push(`<circle cx="${width - 80}" cy="${legendY}" r="4" fill="#f97316"/><text x="${width - 70}" y="${legendY + 3}" fill="#9ca3af" font-size="10">Actual</text>`);
+    legendY += 15;
+  }
+  if (bt && bt.trades.length > 0) {
+    legendItems.push(`<circle cx="${width - 80}" cy="${legendY}" r="4" fill="#10b981"/><text x="${width - 70}" y="${legendY + 3}" fill="#9ca3af" font-size="10">Trades</text>`);
+  }
+  
   container.innerHTML = `
     <svg width="${width}" height="${height}" class="w-full h-full">
       <defs>
@@ -9463,12 +9588,10 @@ function renderDayChart(day, dayIndex) {
       <text x="${padding}" y="${height - 5}" fill="#9ca3af" font-size="10">$${min.toFixed(2)}</text>
       <text x="${width / 2}" y="${height - 5}" fill="#9ca3af" font-size="9" text-anchor="middle">${tradingHours} AEDT</text>
       <path d="${predictedPath}" fill="none" stroke="#3b82f6" stroke-width="2" />
-      ${actualPath ? `<path d="${actualPath}" fill="none" stroke="#ef4444" stroke-width="2" />` : ''}
+      ${actualPath ? `<path d="${actualPath}" fill="none" stroke="#f97316" stroke-width="2" />` : ''}
+      ${currentPriceLine}
       ${tradeMarkers}
-      <circle cx="${width - 80}" cy="15" r="4" fill="#3b82f6"/>
-      <text x="${width - 70}" y="18" fill="#9ca3af" font-size="10">Predicted</text>
-      ${actual.length > 0 ? `<circle cx="${width - 80}" cy="30" r="4" fill="#ef4444"/><text x="${width - 70}" y="33" fill="#9ca3af" font-size="10">Actual</text>` : ''}
-      ${bt && bt.trades.length > 0 ? `<circle cx="${width - 80}" cy="${actual.length > 0 ? 45 : 30}" r="4" fill="#10b981"/><text x="${width - 70}" y="${actual.length > 0 ? 48 : 33}" fill="#9ca3af" font-size="10">Trades</text>` : ''}
+      ${legendItems.join('')}
     </svg>
   `;
 }
