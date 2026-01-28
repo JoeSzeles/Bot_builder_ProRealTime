@@ -3094,6 +3094,76 @@ app.get('/api/ai-memory/summary/:asset', async (req, res) => {
   }
 });
 
+// Fetch market news using AI
+app.get('/api/ai-memory/fetch-news', async (req, res) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const prompt = `Today is ${today}. List the most important market-moving news and economic events that happened TODAY or are scheduled for today that could affect precious metals (gold, silver), major indices (S&P 500, NASDAQ, DAX), forex, or energy markets.
+
+For each event, provide:
+1. Title (brief headline)
+2. Category (one of: Central Bank, Economic Data, Geopolitical, Earnings, Commodities, Policy, Market)
+3. Description (1-2 sentences explaining what happened and why it matters)
+4. Affected assets (which markets/assets are impacted and in which direction)
+
+Format your response as a JSON array like this:
+[
+  {
+    "title": "Fed Signals Potential Rate Pause",
+    "category": "Central Bank",
+    "date": "${today}",
+    "description": "Federal Reserve officials indicated they may pause interest rate hikes amid cooling inflation.",
+    "tags": ["Fed", "rates", "inflation"],
+    "affectedAssets": [{"symbol": "XAUUSD", "impact": "+1.5%"}, {"symbol": "SPX", "impact": "+0.8%"}],
+    "aiConclusion": "Dovish Fed stance typically bullish for gold and equities"
+  }
+]
+
+Return ONLY the JSON array, no other text. If there are no significant events today, return an empty array [].`;
+
+    let events = [];
+    
+    // Try Claude first
+    try {
+      const response = await anthropic.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2000,
+        messages: [{ role: 'user', content: prompt }]
+      });
+      
+      const content = response.content[0]?.text || '[]';
+      const jsonMatch = content.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        events = JSON.parse(jsonMatch[0]);
+      }
+    } catch (claudeError) {
+      console.error('Claude news fetch error, trying GPT:', claudeError.message);
+      
+      // Fallback to GPT
+      try {
+        const gptResponse = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          max_tokens: 2000,
+          messages: [{ role: 'user', content: prompt }]
+        });
+        
+        const content = gptResponse.choices[0]?.message?.content || '[]';
+        const jsonMatch = content.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          events = JSON.parse(jsonMatch[0]);
+        }
+      } catch (gptError) {
+        console.error('GPT news fetch error:', gptError.message);
+      }
+    }
+    
+    res.json({ events, date: today });
+  } catch (e) {
+    console.error('Error fetching news:', e);
+    res.status(500).json({ error: 'Failed to fetch market news', details: e.message });
+  }
+});
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);

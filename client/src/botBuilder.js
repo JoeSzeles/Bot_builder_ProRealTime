@@ -4881,6 +4881,35 @@ function setupAiMemoryEventListeners() {
   if (addEventBtn) {
     addEventBtn.addEventListener('click', showAddEventModal);
   }
+  
+  // Check Online news button
+  const checkOnlineBtn = document.getElementById('checkOnlineNews');
+  if (checkOnlineBtn) {
+    checkOnlineBtn.addEventListener('click', checkOnlineMarketNews);
+  }
+  
+  // Check Daily checkbox - load preference and set up listener
+  const checkDailyCheckbox = document.getElementById('checkDailyNews');
+  if (checkDailyCheckbox) {
+    const savedPref = localStorage.getItem('checkDailyNews') === 'true';
+    checkDailyCheckbox.checked = savedPref;
+    checkDailyCheckbox.addEventListener('change', (e) => {
+      localStorage.setItem('checkDailyNews', e.target.checked);
+      if (e.target.checked) {
+        checkDailyNewsOnLoad();
+      }
+    });
+    // Auto-check on load if enabled
+    if (savedPref) {
+      setTimeout(() => checkDailyNewsOnLoad(), 1000);
+    }
+  }
+  
+  // Observe toggle button
+  const observeToggle = document.getElementById('observeToggle');
+  if (observeToggle) {
+    observeToggle.addEventListener('click', toggleObserveMode);
+  }
 }
 
 function showAddEventModal() {
@@ -5030,4 +5059,290 @@ async function saveNewEvent() {
     console.error('Error saving event:', e);
     alert('Failed to save event');
   }
+}
+
+// ===== OBSERVE MODE =====
+let observeInterval = null;
+let observing = false;
+
+function toggleObserveMode() {
+  const btn = document.getElementById('observeToggle');
+  const label = document.getElementById('observeLabel');
+  
+  if (observing) {
+    // Stop observing
+    observing = false;
+    if (observeInterval) {
+      clearInterval(observeInterval);
+      observeInterval = null;
+    }
+    if (btn) {
+      btn.classList.remove('bg-green-500', 'text-white', 'animate-pulse');
+      btn.classList.add('bg-gray-200', 'dark:bg-gray-600', 'text-gray-700', 'dark:text-gray-300');
+    }
+    if (label) label.textContent = 'Observe';
+    console.log('Observe mode stopped');
+  } else {
+    // Start observing
+    observing = true;
+    if (btn) {
+      btn.classList.remove('bg-gray-200', 'dark:bg-gray-600', 'text-gray-700', 'dark:text-gray-300');
+      btn.classList.add('bg-green-500', 'text-white', 'animate-pulse');
+    }
+    if (label) label.textContent = 'Observing...';
+    console.log('Observe mode started');
+    
+    // Run immediately
+    runObservation();
+    
+    // Then every 30 seconds
+    observeInterval = setInterval(runObservation, 30000);
+  }
+}
+
+async function runObservation() {
+  if (!observing) return;
+  
+  const asset = document.getElementById('aiMemoryAsset')?.value || 'silver';
+  const symbol = asset === 'silver' ? 'XAGUSD' : 'XAUUSD';
+  
+  try {
+    // Fetch current price data
+    const response = await fetch(`/api/market-data/${asset}/1m`);
+    if (!response.ok) throw new Error('Failed to fetch market data');
+    
+    const data = await response.json();
+    if (!data.candles || data.candles.length < 10) return;
+    
+    const candles = data.candles.slice(-20); // Last 20 candles
+    const latest = candles[candles.length - 1];
+    const prev = candles[candles.length - 2];
+    
+    // Detect patterns
+    const patterns = detectPatterns(candles);
+    
+    // Filter for directional patterns only
+    const directionalPatterns = patterns.filter(p => p.direction === 'up' || p.direction === 'down');
+    
+    if (directionalPatterns.length > 0) {
+      // Record observation to brain
+      await fetch('/api/ai-memory/brain/prediction', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          asset: symbol,
+          prediction: directionalPatterns[0].direction === 'up' ? 1 : -1,
+          actual: directionalPatterns[0].direction === 'up' ? 1 : -1,
+          confidence: directionalPatterns[0].strength,
+          patterns: directionalPatterns.map(p => ({ name: p.name, success: true }))
+        })
+      });
+      
+      console.log('Observation recorded:', { asset, patterns, price: latest.close });
+    }
+    
+    // Update last updated timestamp
+    const lastUpdated = document.getElementById('brainLastUpdated');
+    if (lastUpdated) {
+      lastUpdated.textContent = `Observing: ${new Date().toLocaleTimeString()}`;
+    }
+    
+    // Refresh brain stats
+    loadAiMemoryData();
+    
+  } catch (e) {
+    console.error('Observation error:', e);
+  }
+}
+
+function detectPatterns(candles) {
+  const patterns = [];
+  const latest = candles[candles.length - 1];
+  const prev = candles[candles.length - 2];
+  
+  // Calculate moving averages
+  const closes = candles.map(c => c.close);
+  const sma5 = closes.slice(-5).reduce((a, b) => a + b, 0) / 5;
+  const sma10 = closes.slice(-10).reduce((a, b) => a + b, 0) / 10;
+  
+  // Trend detection
+  if (sma5 > sma10 * 1.001) {
+    patterns.push({ name: 'Uptrend (SMA5 > SMA10)', direction: 'up', strength: 65 });
+  } else if (sma5 < sma10 * 0.999) {
+    patterns.push({ name: 'Downtrend (SMA5 < SMA10)', direction: 'down', strength: 65 });
+  }
+  
+  // Momentum
+  const change = ((latest.close - prev.close) / prev.close) * 100;
+  if (Math.abs(change) > 0.1) {
+    const direction = change > 0 ? 'up' : 'down';
+    patterns.push({ name: `Strong momentum (${change.toFixed(2)}%)`, direction, strength: 70 });
+  }
+  
+  // Volatility spike
+  const avgVolume = candles.slice(-10).reduce((a, c) => a + (c.volume || 0), 0) / 10;
+  if (latest.volume > avgVolume * 1.5) {
+    patterns.push({ name: 'Volume spike', direction: change > 0 ? 'up' : 'down', strength: 60 });
+  }
+  
+  // Candlestick patterns
+  const bodySize = Math.abs(latest.close - latest.open);
+  const wickSize = latest.high - latest.low - bodySize;
+  
+  // Doji
+  if (bodySize < wickSize * 0.1 && wickSize > 0) {
+    patterns.push({ name: 'Doji (indecision)', direction: 'neutral', strength: 50 });
+  }
+  
+  // Hammer / Inverted Hammer
+  const lowerWick = Math.min(latest.open, latest.close) - latest.low;
+  const upperWick = latest.high - Math.max(latest.open, latest.close);
+  if (lowerWick > bodySize * 2 && upperWick < bodySize * 0.5) {
+    patterns.push({ name: 'Hammer (bullish reversal)', direction: 'up', strength: 68 });
+  }
+  if (upperWick > bodySize * 2 && lowerWick < bodySize * 0.5) {
+    patterns.push({ name: 'Shooting Star (bearish reversal)', direction: 'down', strength: 68 });
+  }
+  
+  return patterns;
+}
+
+// ===== CHECK ONLINE NEWS =====
+async function checkOnlineMarketNews() {
+  const btn = document.getElementById('checkOnlineNews');
+  const originalText = btn?.innerHTML;
+  
+  try {
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = `
+        <svg class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        </svg>
+        Searching...
+      `;
+    }
+    
+    const response = await fetch('/api/ai-memory/fetch-news');
+    if (!response.ok) throw new Error('Failed to fetch news');
+    
+    const data = await response.json();
+    
+    if (data.events && data.events.length > 0) {
+      showNewsReviewModal(data.events);
+    } else {
+      alert('No significant market events found for today.');
+    }
+    
+  } catch (e) {
+    console.error('Error fetching news:', e);
+    alert('Failed to fetch market news: ' + e.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalText;
+    }
+  }
+}
+
+function showNewsReviewModal(events) {
+  const modal = document.createElement('div');
+  modal.id = 'newsReviewModal';
+  modal.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50';
+  
+  const eventsHtml = events.map((event, idx) => `
+    <div class="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border-l-4 border-blue-500 mb-2">
+      <label class="flex items-start gap-3 cursor-pointer">
+        <input type="checkbox" checked class="mt-1 w-4 h-4 text-purple-600 rounded" data-event-idx="${idx}">
+        <div class="flex-1">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-xs font-medium text-blue-600 dark:text-blue-400">${event.category || 'Market'}</span>
+            <span class="text-xs text-gray-500">${event.date || 'Today'}</span>
+          </div>
+          <h5 class="text-sm font-medium text-gray-800 dark:text-white mb-1">${event.title}</h5>
+          <p class="text-xs text-gray-600 dark:text-gray-400">${event.description || ''}</p>
+        </div>
+      </label>
+    </div>
+  `).join('');
+  
+  modal.innerHTML = `
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-2xl mx-4 shadow-xl max-h-[80vh] overflow-y-auto">
+      <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Found ${events.length} Market Events</h3>
+      <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Review and select events to add to your archive:</p>
+      <div class="space-y-2 mb-4" id="foundEventsList">
+        ${eventsHtml}
+      </div>
+      <div class="flex justify-end gap-2">
+        <button onclick="document.getElementById('newsReviewModal')?.remove()" class="px-4 py-2 text-sm bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 rounded-lg transition-colors">Cancel</button>
+        <button onclick="saveSelectedEvents()" class="px-4 py-2 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors">Add Selected</button>
+      </div>
+    </div>
+  `;
+  
+  // Store events for later
+  modal.dataset.events = JSON.stringify(events);
+  document.body.appendChild(modal);
+  
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.remove();
+  });
+}
+
+async function saveSelectedEvents() {
+  const modal = document.getElementById('newsReviewModal');
+  if (!modal) return;
+  
+  const events = JSON.parse(modal.dataset.events || '[]');
+  const checkboxes = modal.querySelectorAll('input[type="checkbox"]:checked');
+  const selectedIndices = Array.from(checkboxes).map(cb => parseInt(cb.dataset.eventIdx));
+  
+  let savedCount = 0;
+  for (const idx of selectedIndices) {
+    const event = events[idx];
+    if (!event) continue;
+    
+    try {
+      await fetch('/api/ai-memory/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: event.title,
+          date: event.date || new Date().toISOString(),
+          category: event.category || 'Market',
+          description: event.description || '',
+          tags: event.tags || [],
+          aiConclusion: event.aiConclusion || '',
+          affectedAssets: event.affectedAssets || []
+        })
+      });
+      savedCount++;
+    } catch (e) {
+      console.error('Error saving event:', e);
+    }
+  }
+  
+  modal.remove();
+  loadAiMemoryData();
+  alert(`Added ${savedCount} events to archive.`);
+}
+
+// ===== CHECK DAILY ON LOAD =====
+async function checkDailyNewsOnLoad() {
+  const lastCheck = localStorage.getItem('lastDailyNewsCheck');
+  const today = new Date().toDateString();
+  
+  if (lastCheck === today) {
+    console.log('Daily news already checked today');
+    return;
+  }
+  
+  console.log('Running daily news check...');
+  localStorage.setItem('lastDailyNewsCheck', today);
+  
+  // Wait for UI to be ready
+  await new Promise(r => setTimeout(r, 2000));
+  
+  // Check for news
+  await checkOnlineMarketNews();
 }
