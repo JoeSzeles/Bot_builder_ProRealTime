@@ -1578,6 +1578,8 @@
                       <div>
                         <label class="text-xs text-gray-500 dark:text-gray-400 block mb-1">Timeframe</label>
                         <select id="backtestTimeframe" class="w-full px-2 py-1.5 text-xs rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+                          <option value="10s">10 sec</option>
+                          <option value="1m">1 min</option>
                           <option value="5m">5 min</option>
                           <option value="15m">15 min</option>
                           <option value="1h" selected>1 hour</option>
@@ -1650,7 +1652,7 @@
                             <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-400"></span> Exit</span>
                           </div>
                         </div>
-                        <div id="backtestChart" class="h-48 bg-gray-900 rounded-lg border border-gray-700"></div>
+                        <div id="backtestChart" class="h-64 bg-slate-900 rounded-lg border border-slate-700" style="min-width: 300px;"></div>
                       </div>
                       
                       <!-- Trade List -->

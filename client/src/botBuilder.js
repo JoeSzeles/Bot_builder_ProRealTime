@@ -7067,6 +7067,8 @@ async function runBacktestSimulation() {
   
   // Fetch historical data
   const tfMap = {
+    '10s': { api: '1m', interval: 10 },
+    '1m': { api: '1m', interval: 60 },
     '5m': { api: '5m', interval: 300 },
     '15m': { api: '15m', interval: 900 },
     '1h': { api: '1h', interval: 3600 },
@@ -7199,11 +7201,12 @@ async function runBacktestSimulation() {
   // Show results
   resultsPanel.classList.remove('hidden');
   
-  // Render chart and trade list
+  // Render chart and trade list (wait for DOM to update dimensions)
   setTimeout(() => {
+    console.log('Rendering backtest chart and trade list...');
     renderBacktestSimChart();
     renderBacktestTradeList();
-  }, 100);
+  }, 200);
   
   resetBacktestUI('Complete');
 }
@@ -7335,26 +7338,26 @@ function renderBacktestSimChart() {
     width: rect.width || 400,
     height: rect.height || 192,
     layout: {
-      background: { type: ColorType.Solid, color: '#111827' },
-      textColor: '#9ca3af',
+      background: { type: ColorType.Solid, color: '#0f172a' },
+      textColor: '#94a3b8',
     },
     grid: {
-      vertLines: { color: '#374151' },
-      horzLines: { color: '#374151' },
+      vertLines: { color: '#1e293b' },
+      horzLines: { color: '#1e293b' },
     },
     timeScale: {
-      borderColor: '#374151',
+      borderColor: '#334155',
       timeVisible: true,
     },
     rightPriceScale: {
-      borderColor: '#374151',
+      borderColor: '#334155',
     },
   });
   
-  // Add price line
+  // Add price line with gradient blue color
   const priceSeries = backtestChart.addSeries(LineSeries, {
-    color: '#9ca3af',
-    lineWidth: 1,
+    color: '#3b82f6',
+    lineWidth: 2,
     priceLineVisible: false,
   });
   priceSeries.setData(BACKTEST_DATA.candles.map(c => ({ time: c.time, value: c.close })));
