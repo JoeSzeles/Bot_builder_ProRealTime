@@ -1,0 +1,51 @@
+SES Removing unpermitted intrinsics lockdown-install.js:1:203117
+  Removing intrinsics.%MapPrototype%.getOrInsert lockdown-install.js:1:202962
+  Removing intrinsics.%MapPrototype%.getOrInsertComputed lockdown-install.js:1:202962
+  Removing intrinsics.%WeakMapPrototype%.getOrInsert lockdown-install.js:1:202962
+  Removing intrinsics.%WeakMapPrototype%.getOrInsertComputed lockdown-install.js:1:202962
+  Removing intrinsics.%DatePrototype%.toTemporalInstant lockdown-install.js:1:202962
+[vite] connecting... client:495:9
+Using localStorage cache for silver_1m botBuilder.js:75:15
+updateAiProjectionChart called with result: 
+Object { context: {…}, hypotheses: (3) […], learning: {…}, predictions: {…}, marketData: (30) […] }
+botBuilder.js:2312:11
+Container dimensions: 
+Object { width: 0, height: 0 }
+botBuilder.js:2323:13
+[vite] connected. client:618:15
+Uncaught (in promise) TypeError: candleSeries.setMarkers is not a function
+    clearAllDrawings botBuilder.js:987
+    loadChartData botBuilder.js:270
+botBuilder.js:987:16
+SES_UNHANDLED_REJECTION: TypeError: candleSeries.setMarkers is not a function
+    clearAllDrawings botBuilder.js:987
+    loadChartData botBuilder.js:270
+lockdown-install.js:1:145776
+updateAiProjectionChart called with result: 
+Object { context: {…}, hypotheses: (3) […], learning: {…}, marketData: (30) […], predictions: {…} }
+botBuilder.js:2312:11
+Container dimensions: 
+Object { width: 0, height: 0 }
+botBuilder.js:2323:13
+updateAiProjectionChart called with result: 
+Object { context: {…}, hypotheses: (3) […], learning: {…}, marketData: (30) […], predictions: {…} }
+botBuilder.js:2312:11
+Container dimensions: 
+Object { width: 1020, height: 288 }
+botBuilder.js:2323:13
+Projection params: 
+Object { forecastCandles: 10000, tf: "5m", tfData: {…}, hasPredictions: true }
+botBuilder.js:2336:13
+Initial historicalCandles length: 30 botBuilder.js:2344:11
+Data status: 
+Object { historicalCandles: 30, displayCandles: 30, historyToShow: 100 }
+botBuilder.js:2371:11
+Projection: 10000 forecast candles, 30 historical candles available, displaying 30 botBuilder.js:2380:11
+Error in updateAiProjectionChart: Error: Assertion failed: Line series item data value must be between -90071992547409.91 and 90071992547409.91, got=number, value=90498409856816.44
+    assert lightweight-charts.development.mjs:118
+    checkLineItem lightweight-charts.development.mjs:12244
+    checkSeriesValuesType lightweight-charts.development.mjs:12214
+    setData lightweight-charts.development.mjs:12356
+    updateAiProjectionChart botBuilder.js:2538
+    setupAiTradingSubTabs botBuilder.js:2074
+botBuilder.js:2593:13

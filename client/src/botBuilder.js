@@ -2470,59 +2470,61 @@ async function updateAiProjectionChart(result) {
     return (randomSeed / 0x7fffffff) * 2 - 1; // Returns -1 to 1
   };
   
-  // Scale volatility for more dramatic swings (multiply by sqrt of forecast length)
-  const scaledVol = volatility * Math.sqrt(forecastCandles / 100) * 3;
+  // Per-step volatility (scaled down for large forecasts to prevent explosion)
+  const stepVol = volatility / Math.sqrt(forecastCandles) * 10;
   
-  // Initialize prices at last known price
+  // Total expected move over the forecast period (as % of price)
+  const totalBullMove = 0.15; // +15% max bullish move
+  const totalBearMove = -0.15; // -15% max bearish move
+  const totalExpMove = direction === 'Long' ? 0.08 : (direction === 'Short' ? -0.08 : 0);
+  
+  // Drift per step
+  const bullDrift = totalBullMove / forecastCandles;
+  const bearDrift = totalBearMove / forecastCandles;
+  const expDrift = totalExpMove / forecastCandles;
+  
+  // Initialize prices
   let bullPrice = lastPrice;
   let bearPrice = lastPrice;
   let expPrice = lastPrice;
   
-  // Trend bias per step
-  const bullDrift = scaledVol * 0.02;  // Upward bias
-  const bearDrift = -scaledVol * 0.02; // Downward bias
-  let expDrift = 0;
-  if (direction === 'Long') expDrift = scaledVol * 0.012;
-  else if (direction === 'Short') expDrift = -scaledVol * 0.012;
-  
-  // Track momentum for more realistic swings
+  // Track momentum for smoother swings
   let bullMomentum = 0, bearMomentum = 0, expMomentum = 0;
   
   for (let i = 0; i <= forecastCandles; i++) {
     const time = lastTime + (i * interval);
     
     if (i === 0) {
-      // First point is the last known price
       bullishData.push({ time, value: bullPrice });
       bearishData.push({ time, value: bearPrice });
       expectedData.push({ time, value: expPrice });
       continue;
     }
     
-    // Random components with occasional larger moves
+    // Random components
     const rand1 = seededRandom();
     const rand2 = seededRandom();
     const rand3 = seededRandom();
     
-    // Occasional spike (5% chance of 3x normal move)
-    const spike1 = seededRandom() > 0.95 ? 3 : 1;
-    const spike2 = seededRandom() > 0.95 ? 3 : 1;
-    const spike3 = seededRandom() > 0.95 ? 3 : 1;
+    // Occasional larger move (5% chance)
+    const spike1 = seededRandom() > 0.95 ? 2 : 1;
+    const spike2 = seededRandom() > 0.95 ? 2 : 1;
+    const spike3 = seededRandom() > 0.95 ? 2 : 1;
     
-    // Update momentum (smooths out jagged movements, creates trends)
-    bullMomentum = bullMomentum * 0.9 + rand1 * 0.1;
-    bearMomentum = bearMomentum * 0.9 + rand2 * 0.1;
-    expMomentum = expMomentum * 0.9 + rand3 * 0.1;
+    // Update momentum (creates trends)
+    bullMomentum = bullMomentum * 0.95 + rand1 * 0.05;
+    bearMomentum = bearMomentum * 0.95 + rand2 * 0.05;
+    expMomentum = expMomentum * 0.95 + rand3 * 0.05;
     
-    // Calculate step changes as percentage
-    const bullStep = bullDrift + scaledVol * (rand1 * 0.7 + bullMomentum * 0.3) * spike1 / Math.sqrt(forecastCandles);
-    const bearStep = bearDrift + scaledVol * (rand2 * 0.7 + bearMomentum * 0.3) * spike2 / Math.sqrt(forecastCandles);
-    const expStep = expDrift + scaledVol * (rand3 * 0.7 + expMomentum * 0.3) * spike3 / Math.sqrt(forecastCandles);
+    // Calculate step changes (bounded to prevent explosion)
+    const bullStep = bullDrift + stepVol * (rand1 * 0.6 + bullMomentum * 0.4) * spike1;
+    const bearStep = bearDrift + stepVol * (rand2 * 0.6 + bearMomentum * 0.4) * spike2;
+    const expStep = expDrift + stepVol * (rand3 * 0.6 + expMomentum * 0.4) * spike3;
     
-    // Apply changes (random walk - accumulates over time)
-    bullPrice = bullPrice * (1 + bullStep);
-    bearPrice = bearPrice * (1 + bearStep);
-    expPrice = expPrice * (1 + expStep);
+    // Apply changes with bounds check
+    bullPrice = Math.max(lastPrice * 0.5, Math.min(lastPrice * 2, bullPrice * (1 + bullStep)));
+    bearPrice = Math.max(lastPrice * 0.5, Math.min(lastPrice * 2, bearPrice * (1 + bearStep)));
+    expPrice = Math.max(lastPrice * 0.5, Math.min(lastPrice * 2, expPrice * (1 + expStep)));
     
     bullishData.push({ time, value: bullPrice });
     bearishData.push({ time, value: bearPrice });
