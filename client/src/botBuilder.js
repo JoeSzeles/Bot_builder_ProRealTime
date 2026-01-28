@@ -7179,6 +7179,13 @@ async function runBacktestSimulation() {
     cycles: actualCycles
   };
   
+  console.log('Backtest complete:', {
+    candles: BACKTEST_DATA.candles.length,
+    trades: BACKTEST_DATA.trades.length,
+    totalPnL,
+    winRate
+  });
+  
   // Update results display
   document.getElementById('btTotalTrades').textContent = totalTrades;
   document.getElementById('btWinRate').textContent = `${winRate}%`;
@@ -7230,15 +7237,15 @@ async function runCycleBacktest(candles, holdCandles, settings, pointValue) {
     const rs = losses > 0 ? gains / losses : 100;
     const rsi = 100 - (100 / (1 + rs));
     
-    // Determine signal
+    // Determine signal - looser conditions for more trades
     let signal = null;
-    if (rsi < 30 && priceChange < -0.005) {
+    if (rsi < 35) {
       signal = 'long'; // Oversold, expect bounce
-    } else if (rsi > 70 && priceChange > 0.005) {
+    } else if (rsi > 65) {
       signal = 'short'; // Overbought, expect pullback
-    } else if (currentPrice > sma * 1.002 && priceChange > 0.003) {
+    } else if (currentPrice > sma * 1.001 && priceChange > 0.001) {
       signal = 'long'; // Trend following
-    } else if (currentPrice < sma * 0.998 && priceChange < -0.003) {
+    } else if (currentPrice < sma * 0.999 && priceChange < -0.001) {
       signal = 'short'; // Trend following
     }
     
@@ -7301,7 +7308,16 @@ let backtestChart = null;
 // Render backtest simulation chart with trade markers
 function renderBacktestSimChart() {
   const container = document.getElementById('backtestChart');
-  if (!container || BACKTEST_DATA.candles.length === 0) return;
+  console.log('renderBacktestSimChart called', { 
+    container: !!container, 
+    candles: BACKTEST_DATA.candles.length,
+    trades: BACKTEST_DATA.trades.length 
+  });
+  
+  if (!container || BACKTEST_DATA.candles.length === 0) {
+    console.log('Backtest chart: no container or no candles');
+    return;
+  }
   
   // Clear previous chart
   if (backtestChart) {
@@ -7309,7 +7325,11 @@ function renderBacktestSimChart() {
     backtestChart = null;
   }
   
+  // Clear container
+  container.innerHTML = '';
+  
   const rect = container.getBoundingClientRect();
+  console.log('Chart container rect:', rect.width, rect.height);
   
   backtestChart = createChart(container, {
     width: rect.width || 400,
@@ -7370,7 +7390,15 @@ function renderBacktestSimChart() {
 // Render trade list table
 function renderBacktestTradeList() {
   const tbody = document.getElementById('backtestTradeListBody');
-  if (!tbody) return;
+  console.log('renderBacktestTradeList called', { 
+    tbody: !!tbody, 
+    trades: BACKTEST_DATA.trades.length 
+  });
+  
+  if (!tbody) {
+    console.log('No tbody found');
+    return;
+  }
   
   tbody.innerHTML = '';
   
