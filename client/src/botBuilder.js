@@ -2347,7 +2347,7 @@ async function updateAiProjectionChart(result) {
   // Use only the last portion for display, but keep all for volatility calc
   const displayCandles = historicalCandles.slice(-historyToShow);
   
-  if (historicalCandles.length === 0) {
+  if (historicalCandles.length === 0 || displayCandles.length === 0) {
     container.innerHTML = '<div class="h-full flex items-center justify-center text-red-500 font-medium">No market data available - Please run AI analysis first</div>';
     return;
   }
@@ -2440,10 +2440,10 @@ async function updateAiProjectionChart(result) {
   const expectedData = [];
   
   // Seeded pseudo-random number generator for consistent but random-looking results
-  let seed = Math.floor(lastPrice * 1000 + lastTime);
+  let randomSeed = Math.floor(lastPrice * 1000 + lastTime);
   const seededRandom = () => {
-    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
-    return (seed / 0x7fffffff) * 2 - 1; // Returns -1 to 1
+    randomSeed = (randomSeed * 1103515245 + 12345) & 0x7fffffff;
+    return (randomSeed / 0x7fffffff) * 2 - 1; // Returns -1 to 1
   };
   
   // Scale volatility for more dramatic swings (multiply by sqrt of forecast length)
