@@ -2366,6 +2366,352 @@ function updateProbabilityCurve(tfData) {
   }
 }
 
+// Fetch higher timeframe data for multi-timeframe context
+async function fetchHigherTimeframeContext(symbol, currentTF, currentInterval) {
+  // Map current timeframe to higher timeframe for context
+  const higherTFMap = {
+    '1s': '1m', '2s': '1m', '3s': '1m', '5s': '1m', '10s': '1m', '30s': '1m',
+    '1m': '1h', '5m': '1h', '15m': '4h',
+    '1h': '4h', '4h': '1d', '1d': '1d'
+  };
+  
+  const higherTF = higherTFMap[currentTF] || '1d';
+  
+  // Map to API timeframe
+  const apiMap = { '1m': '1m', '5m': '5m', '15m': '15m', '1h': '1h', '4h': '4h', '1d': '1d' };
+  const apiTimeframe = apiMap[higherTF] || '1h';
+  
+  try {
+    const response = await fetch(`/api/market-data/${symbol}/${apiTimeframe}`);
+    if (!response.ok) return null;
+    
+    const data = await response.json();
+    if (!data.candles || data.candles.length < 30) return null;
+    
+    // Analyze higher timeframe data
+    return analyzeHistoricalData(data.candles);
+  } catch (e) {
+    console.error('Failed to fetch higher TF data:', e);
+    return null;
+  }
+}
+
+// Multi-timeframe wave analysis for projections
+function analyzeHistoricalData(candles) {
+  const closes = candles.map(c => c.close);
+  const highs = candles.map(c => c.high);
+  const lows = candles.map(c => c.low);
+  const n = closes.length;
+  
+  if (n < 20) {
+    return { trend: 0, volatility: 0.01, waveInfo: null, indicators: {} };
+  }
+  
+  // Calculate SMAs for trend detection
+  const sma20 = closes.slice(-20).reduce((a, b) => a + b, 0) / 20;
+  const sma50 = n >= 50 ? closes.slice(-50).reduce((a, b) => a + b, 0) / 50 : sma20;
+  const sma100 = n >= 100 ? closes.slice(-100).reduce((a, b) => a + b, 0) / 100 : sma50;
+  const sma200 = n >= 200 ? closes.slice(-200).reduce((a, b) => a + b, 0) / 200 : sma100;
+  
+  // EMA calculation
+  const calcEMA = (data, period) => {
+    const k = 2 / (period + 1);
+    let ema = data.slice(0, Math.min(period, data.length)).reduce((a, b) => a + b, 0) / Math.min(period, data.length);
+    for (let i = Math.min(period, data.length); i < data.length; i++) {
+      ema = data[i] * k + ema * (1 - k);
+    }
+    return ema;
+  };
+  
+  const ema9 = calcEMA(closes, 9);
+  const ema21 = calcEMA(closes, 21);
+  const ema50 = calcEMA(closes, Math.min(50, n));
+  
+  // RSI
+  let gains = 0, losses = 0;
+  const rsiPeriod = Math.min(14, n - 1);
+  for (let i = n - rsiPeriod; i < n; i++) {
+    const change = closes[i] - closes[i - 1];
+    if (change > 0) gains += change;
+    else losses -= change;
+  }
+  const avgGain = gains / rsiPeriod;
+  const avgLoss = losses / rsiPeriod;
+  const rsi = avgLoss === 0 ? 100 : 100 - (100 / (1 + avgGain / avgLoss));
+  
+  // MACD
+  const ema12 = calcEMA(closes, Math.min(12, n));
+  const ema26 = calcEMA(closes, Math.min(26, n));
+  const macd = ema12 - ema26;
+  
+  // Volatility (standard deviation of returns)
+  let priceChanges = [];
+  for (let i = 1; i < n; i++) {
+    priceChanges.push((closes[i] - closes[i-1]) / closes[i-1]);
+  }
+  const avgChange = priceChanges.reduce((a, b) => a + b, 0) / priceChanges.length;
+  const volatility = Math.sqrt(priceChanges.reduce((sum, c) => sum + Math.pow(c - avgChange, 2), 0) / priceChanges.length) || 0.01;
+  
+  // Trend strength (-1 to +1)
+  let trendScore = 0;
+  const currentPrice = closes[n - 1];
+  
+  // SMA alignment
+  if (currentPrice > sma20) trendScore += 0.15;
+  else trendScore -= 0.15;
+  if (currentPrice > sma50) trendScore += 0.15;
+  else trendScore -= 0.15;
+  if (currentPrice > sma100) trendScore += 0.1;
+  else trendScore -= 0.1;
+  if (currentPrice > sma200) trendScore += 0.1;
+  else trendScore -= 0.1;
+  
+  // EMA alignment
+  if (ema9 > ema21) trendScore += 0.15;
+  else trendScore -= 0.15;
+  if (ema21 > ema50) trendScore += 0.1;
+  else trendScore -= 0.1;
+  
+  // RSI contribution
+  if (rsi > 50) trendScore += (rsi - 50) / 200;
+  else trendScore -= (50 - rsi) / 200;
+  
+  // MACD contribution
+  if (macd > 0) trendScore += 0.1;
+  else trendScore -= 0.1;
+  
+  // Clamp trend score
+  trendScore = Math.max(-1, Math.min(1, trendScore));
+  
+  // Detect wave structure (swing highs/lows)
+  const swings = detectSwings(candles);
+  const waveInfo = analyzeWaveStructure(swings, currentPrice);
+  
+  // Higher timeframe trend (using longer lookback)
+  const longTermTrend = n >= 100 ? 
+    (closes[n-1] - closes[n-100]) / closes[n-100] : 
+    (closes[n-1] - closes[0]) / closes[0];
+  
+  return {
+    trend: trendScore,
+    longTermTrend,
+    volatility,
+    waveInfo,
+    indicators: {
+      sma20, sma50, sma100, sma200,
+      ema9, ema21, ema50,
+      rsi, macd,
+      currentPrice
+    }
+  };
+}
+
+// Detect swing highs and lows
+function detectSwings(candles, lookback = 5) {
+  const swings = [];
+  const n = candles.length;
+  
+  for (let i = lookback; i < n - lookback; i++) {
+    let isHigh = true, isLow = true;
+    
+    for (let j = i - lookback; j <= i + lookback; j++) {
+      if (j === i) continue;
+      if (candles[j].high >= candles[i].high) isHigh = false;
+      if (candles[j].low <= candles[i].low) isLow = false;
+    }
+    
+    if (isHigh) {
+      swings.push({ type: 'high', price: candles[i].high, time: candles[i].time, index: i });
+    }
+    if (isLow) {
+      swings.push({ type: 'low', price: candles[i].low, time: candles[i].time, index: i });
+    }
+  }
+  
+  return swings.sort((a, b) => a.index - b.index);
+}
+
+// Analyze wave structure from swings
+function analyzeWaveStructure(swings, currentPrice) {
+  if (swings.length < 4) {
+    return { waveCount: 0, avgWaveHeight: 0, avgWaveLength: 0, currentPhase: 'unknown' };
+  }
+  
+  // Calculate average wave characteristics
+  const waves = [];
+  for (let i = 1; i < swings.length; i++) {
+    const prev = swings[i-1];
+    const curr = swings[i];
+    waves.push({
+      height: Math.abs(curr.price - prev.price),
+      length: curr.index - prev.index,
+      direction: curr.type === 'high' ? 'up' : 'down'
+    });
+  }
+  
+  const avgWaveHeight = waves.reduce((a, w) => a + w.height, 0) / waves.length;
+  const avgWaveLength = waves.reduce((a, w) => a + w.length, 0) / waves.length;
+  
+  // Determine current phase
+  const lastSwing = swings[swings.length - 1];
+  const distFromSwing = currentPrice - lastSwing.price;
+  const progressFromSwing = Math.abs(distFromSwing) / avgWaveHeight;
+  
+  let currentPhase;
+  if (lastSwing.type === 'low') {
+    if (distFromSwing > 0) currentPhase = 'upwave';
+    else currentPhase = 'breakdown';
+  } else {
+    if (distFromSwing < 0) currentPhase = 'downwave';
+    else currentPhase = 'breakout';
+  }
+  
+  // Detect nested waves (larger cycle)
+  const highs = swings.filter(s => s.type === 'high').map(s => s.price);
+  const lows = swings.filter(s => s.type === 'low').map(s => s.price);
+  const overallHigh = Math.max(...highs);
+  const overallLow = Math.min(...lows);
+  const positionInCycle = highs.length > 0 && lows.length > 0 ? 
+    (currentPrice - overallLow) / (overallHigh - overallLow) : 0.5;
+  
+  return {
+    waveCount: waves.length,
+    avgWaveHeight,
+    avgWaveLength,
+    currentPhase,
+    progressFromSwing,
+    positionInCycle,
+    lastSwingType: lastSwing.type,
+    lastSwingPrice: lastSwing.price
+  };
+}
+
+// Generate wave-based projections
+function generateWaveProjections(historicalCandles, lastPrice, lastTime, interval, forecastCandles, direction, analysis) {
+  const bullishData = [];
+  const bearishData = [];
+  const expectedData = [];
+  
+  const { trend, longTermTrend, volatility, waveInfo, indicators } = analysis;
+  
+  // Get higher timeframe context (if available)
+  const higherTFTrend = analysis.higherTFTrend || trend;
+  const higherTFLongTermTrend = analysis.higherTFLongTermTrend || longTermTrend;
+  const higherTFVolatility = analysis.higherTFVolatility || volatility;
+  
+  console.log('Wave generation inputs:', {
+    localTrend: trend?.toFixed(3),
+    higherTFTrend: higherTFTrend?.toFixed(3),
+    volatility: volatility?.toFixed(4),
+    waveHeight: waveInfo?.avgWaveHeight?.toFixed(4),
+    waveLength: waveInfo?.avgWaveLength?.toFixed(1)
+  });
+  
+  // Seeded random for consistency
+  let randomSeed = Math.floor(lastPrice * 1000 + lastTime);
+  const seededRandom = () => {
+    randomSeed = (randomSeed * 1103515245 + 12345) & 0x7fffffff;
+    return (randomSeed / 0x7fffffff) * 2 - 1;
+  };
+  
+  // Wave parameters based on analysis with proper fallbacks
+  // Use volatility-based fallback when swing detection is insufficient
+  const minWaveHeight = lastPrice * volatility * 5; // At least 5x volatility
+  const avgWaveLength = waveInfo?.avgWaveLength > 5 ? waveInfo.avgWaveLength : 50;
+  const avgWaveHeight = waveInfo?.avgWaveHeight > minWaveHeight ? waveInfo.avgWaveHeight : minWaveHeight;
+  const positionInCycle = waveInfo?.positionInCycle ?? 0.5;
+  
+  // Determine primary wave frequency (longer cycle) - scale with forecast length
+  const scaleFactor = Math.max(1, forecastCandles / 500);
+  const primaryWaveLength = avgWaveLength * 4 * scaleFactor; // Large wave
+  const secondaryWaveLength = avgWaveLength * scaleFactor; // Medium wave
+  const tertiaryWaveLength = Math.max(5, avgWaveLength / 4); // Small wave (ripples)
+  
+  // Combined trend from local + higher TF (higher TF weighted more heavily)
+  const combinedTrend = (trend * 0.3 + higherTFTrend * 0.7);
+  
+  // Trend-based drift incorporating higher TF
+  const trendDrift = combinedTrend * volatility * 0.3;
+  const longTermDrift = higherTFLongTermTrend > 0.01 ? 0.0002 : (higherTFLongTermTrend < -0.01 ? -0.0002 : 0);
+  
+  // Direction bias from AI prediction
+  const directionBias = direction === 'Long' ? 0.0003 : (direction === 'Short' ? -0.0003 : 0);
+  
+  // Initialize prices
+  let bullPrice = lastPrice;
+  let bearPrice = lastPrice;
+  let expPrice = lastPrice;
+  
+  // Phase offsets for waves (based on current position in cycle)
+  const basePhase = positionInCycle * Math.PI * 2;
+  const bullPhaseOffset = -Math.PI / 6; // Slightly ahead
+  const bearPhaseOffset = Math.PI / 6; // Slightly behind
+  
+  for (let i = 0; i <= forecastCandles; i++) {
+    const time = lastTime + (i * interval);
+    
+    if (i === 0) {
+      bullishData.push({ time, value: bullPrice });
+      bearishData.push({ time, value: bearPrice });
+      expectedData.push({ time, value: expPrice });
+      continue;
+    }
+    
+    // Calculate wave components
+    const t = i;
+    
+    // Primary wave (long cycle) - main market wave
+    const primaryWave = Math.sin((t / primaryWaveLength) * Math.PI * 2 + basePhase);
+    
+    // Secondary wave (medium cycle) - within the primary
+    const secondaryWave = Math.sin((t / secondaryWaveLength) * Math.PI * 2 + basePhase * 1.5) * 0.4;
+    
+    // Tertiary wave (short cycle) - ripples/noise
+    const tertiaryWave = Math.sin((t / tertiaryWaveLength) * Math.PI * 2 + basePhase * 2) * 0.15;
+    
+    // Combined wave with noise
+    const noise = seededRandom() * 0.2;
+    const combinedWave = primaryWave + secondaryWave + tertiaryWave + noise;
+    
+    // Calculate wave amplitude based on volatility and time
+    const waveAmplitude = avgWaveHeight * 0.5;
+    
+    // Bullish projection (higher highs, trend up)
+    const bullWaveOffset = Math.sin((t / primaryWaveLength) * Math.PI * 2 + basePhase + bullPhaseOffset);
+    const bullChange = (combinedWave * 0.5 + bullWaveOffset * 0.5 + 0.3) * waveAmplitude / lastPrice * 0.01;
+    bullPrice = bullPrice * (1 + bullChange + trendDrift * 1.5 + longTermDrift * 2 + directionBias);
+    
+    // Bearish projection (lower lows, trend down)
+    const bearWaveOffset = Math.sin((t / primaryWaveLength) * Math.PI * 2 + basePhase + bearPhaseOffset);
+    const bearChange = (combinedWave * 0.5 + bearWaveOffset * 0.5 - 0.3) * waveAmplitude / lastPrice * 0.01;
+    bearPrice = bearPrice * (1 + bearChange - trendDrift * 1.5 + longTermDrift * 0.5 - directionBias);
+    
+    // Expected projection (follows trend + waves)
+    const expChange = combinedWave * waveAmplitude / lastPrice * 0.008 + trendDrift + longTermDrift + directionBias;
+    expPrice = expPrice * (1 + expChange);
+    
+    // Occasional spike/dip (5% chance) based on volatility
+    if (Math.abs(seededRandom()) > 0.95) {
+      const spikeSize = seededRandom() * volatility * 2;
+      bullPrice *= (1 + Math.abs(spikeSize));
+      bearPrice *= (1 - Math.abs(spikeSize));
+      expPrice *= (1 + spikeSize * 0.5);
+    }
+    
+    // Keep within reasonable bounds (prevent runaway)
+    const maxMove = 0.5; // Max 50% from start
+    bullPrice = Math.max(lastPrice * (1 - maxMove), Math.min(lastPrice * (1 + maxMove), bullPrice));
+    bearPrice = Math.max(lastPrice * (1 - maxMove), Math.min(lastPrice * (1 + maxMove), bearPrice));
+    expPrice = Math.max(lastPrice * (1 - maxMove * 0.7), Math.min(lastPrice * (1 + maxMove * 0.7), expPrice));
+    
+    bullishData.push({ time, value: bullPrice });
+    bearishData.push({ time, value: bearPrice });
+    expectedData.push({ time, value: expPrice });
+  }
+  
+  return { bullishData, bearishData, expectedData };
+}
+
 // AI Projection Chart using Lightweight Charts
 let aiProjectionChart = null;
 let aiProjectionSeries = [];
@@ -2551,87 +2897,30 @@ async function updateAiProjectionChart(result) {
   const lastTime = lastCandle.time;
   const direction = tfData.direction || 'Neutral';
   
-  // Calculate actual volatility from historical data
-  let priceChanges = [];
-  for (let i = 1; i < historicalCandles.length; i++) {
-    const change = (historicalCandles[i].close - historicalCandles[i-1].close) / historicalCandles[i-1].close;
-    priceChanges.push(change);
+  // Analyze historical data for patterns and indicators
+  const analysis = analyzeHistoricalData(historicalCandles);
+  
+  // Fetch higher timeframe data for multi-timeframe analysis
+  const higherTFAnalysis = await fetchHigherTimeframeContext(symbol, tf, interval);
+  
+  // Merge higher TF trend into analysis
+  if (higherTFAnalysis) {
+    analysis.higherTFTrend = higherTFAnalysis.trend;
+    analysis.higherTFLongTermTrend = higherTFAnalysis.longTermTrend;
+    analysis.higherTFVolatility = higherTFAnalysis.volatility;
+    console.log('Higher TF analysis:', { trend: higherTFAnalysis.trend, longTermTrend: higherTFAnalysis.longTermTrend?.toFixed(4) });
   }
-  const avgChange = priceChanges.reduce((a, b) => a + b, 0) / priceChanges.length;
-  const volatility = Math.sqrt(priceChanges.reduce((sum, c) => sum + Math.pow(c - avgChange, 2), 0) / priceChanges.length) || 0.002;
   
-  // Generate realistic projections using random walk with drift
-  const bullishData = [];
-  const bearishData = [];
-  const expectedData = [];
-  
-  // Seeded pseudo-random number generator for consistent but random-looking results
-  let randomSeed = Math.floor(lastPrice * 1000 + lastTime);
-  const seededRandom = () => {
-    randomSeed = (randomSeed * 1103515245 + 12345) & 0x7fffffff;
-    return (randomSeed / 0x7fffffff) * 2 - 1; // Returns -1 to 1
-  };
-  
-  // Per-step volatility (scaled down for large forecasts to prevent explosion)
-  const stepVol = volatility / Math.sqrt(forecastCandles) * 10;
-  
-  // Total expected move over the forecast period (as % of price)
-  const totalBullMove = 0.15; // +15% max bullish move
-  const totalBearMove = -0.15; // -15% max bearish move
-  const totalExpMove = direction === 'Long' ? 0.08 : (direction === 'Short' ? -0.08 : 0);
-  
-  // Drift per step
-  const bullDrift = totalBullMove / forecastCandles;
-  const bearDrift = totalBearMove / forecastCandles;
-  const expDrift = totalExpMove / forecastCandles;
-  
-  // Initialize prices
-  let bullPrice = lastPrice;
-  let bearPrice = lastPrice;
-  let expPrice = lastPrice;
-  
-  // Track momentum for smoother swings
-  let bullMomentum = 0, bearMomentum = 0, expMomentum = 0;
-  
-  for (let i = 0; i <= forecastCandles; i++) {
-    const time = lastTime + (i * interval);
-    
-    if (i === 0) {
-      bullishData.push({ time, value: bullPrice });
-      bearishData.push({ time, value: bearPrice });
-      expectedData.push({ time, value: expPrice });
-      continue;
-    }
-    
-    // Random components
-    const rand1 = seededRandom();
-    const rand2 = seededRandom();
-    const rand3 = seededRandom();
-    
-    // Occasional larger move (5% chance)
-    const spike1 = seededRandom() > 0.95 ? 2 : 1;
-    const spike2 = seededRandom() > 0.95 ? 2 : 1;
-    const spike3 = seededRandom() > 0.95 ? 2 : 1;
-    
-    // Update momentum (creates trends)
-    bullMomentum = bullMomentum * 0.95 + rand1 * 0.05;
-    bearMomentum = bearMomentum * 0.95 + rand2 * 0.05;
-    expMomentum = expMomentum * 0.95 + rand3 * 0.05;
-    
-    // Calculate step changes (bounded to prevent explosion)
-    const bullStep = bullDrift + stepVol * (rand1 * 0.6 + bullMomentum * 0.4) * spike1;
-    const bearStep = bearDrift + stepVol * (rand2 * 0.6 + bearMomentum * 0.4) * spike2;
-    const expStep = expDrift + stepVol * (rand3 * 0.6 + expMomentum * 0.4) * spike3;
-    
-    // Apply changes with bounds check
-    bullPrice = Math.max(lastPrice * 0.5, Math.min(lastPrice * 2, bullPrice * (1 + bullStep)));
-    bearPrice = Math.max(lastPrice * 0.5, Math.min(lastPrice * 2, bearPrice * (1 + bearStep)));
-    expPrice = Math.max(lastPrice * 0.5, Math.min(lastPrice * 2, expPrice * (1 + expStep)));
-    
-    bullishData.push({ time, value: bullPrice });
-    bearishData.push({ time, value: bearPrice });
-    expectedData.push({ time, value: expPrice });
-  }
+  // Generate projections using multi-timeframe wave analysis
+  const { bullishData, bearishData, expectedData } = generateWaveProjections(
+    historicalCandles, 
+    lastPrice, 
+    lastTime, 
+    interval, 
+    forecastCandles, 
+    direction,
+    analysis
+  );
   
   // Bullish line (green, dashed)
   const bullishSeries = aiProjectionChart.addSeries(LineSeries, {
@@ -5129,6 +5418,9 @@ function toggleObserveMode() {
   }
 }
 
+// Store pending predictions to verify later
+let pendingPredictions = [];
+
 async function runObservation() {
   if (!observing) return;
   
@@ -5141,47 +5433,212 @@ async function runObservation() {
     if (!response.ok) throw new Error('Failed to fetch market data');
     
     const data = await response.json();
-    if (!data.candles || data.candles.length < 10) return;
+    if (!data.candles || data.candles.length < 30) return;
     
-    const candles = data.candles.slice(-20); // Last 20 candles
+    const candles = data.candles.slice(-30); // Last 30 candles
     const latest = candles[candles.length - 1];
-    const prev = candles[candles.length - 2];
+    const currentPrice = latest.close;
+    const currentTime = Date.now();
     
-    // Detect patterns
-    const patterns = detectPatterns(candles);
+    // First, verify any pending predictions that are now old enough
+    const verifiedPredictions = [];
+    const stillPending = [];
     
-    // Filter for directional patterns only
+    for (const pred of pendingPredictions) {
+      // Check predictions after 5 minutes (10 observation cycles)
+      if (currentTime - pred.timestamp > 5 * 60 * 1000) {
+        const priceChange = currentPrice - pred.priceAtPrediction;
+        const actualDirection = priceChange > 0 ? 1 : (priceChange < 0 ? -1 : 0);
+        const wasCorrect = pred.prediction === actualDirection;
+        
+        // Record verified prediction to brain
+        await fetch('/api/ai-memory/brain/prediction', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            asset: symbol,
+            prediction: pred.prediction,
+            actual: actualDirection,
+            confidence: pred.confidence,
+            patterns: pred.patterns.map(p => ({ name: p.name, success: wasCorrect }))
+          })
+        });
+        
+        console.log('Verified prediction:', { 
+          predicted: pred.prediction > 0 ? 'UP' : 'DOWN', 
+          actual: actualDirection > 0 ? 'UP' : 'DOWN',
+          correct: wasCorrect,
+          priceChange: priceChange.toFixed(4)
+        });
+        
+        verifiedPredictions.push(pred);
+      } else {
+        stillPending.push(pred);
+      }
+    }
+    pendingPredictions = stillPending;
+    
+    // Make a new prediction using multi-timeframe analysis
+    const patterns = detectAdvancedPatterns(candles);
     const directionalPatterns = patterns.filter(p => p.direction === 'up' || p.direction === 'down');
     
     if (directionalPatterns.length > 0) {
-      // Record observation to brain
-      await fetch('/api/ai-memory/brain/prediction', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          asset: symbol,
-          prediction: directionalPatterns[0].direction === 'up' ? 1 : -1,
-          actual: directionalPatterns[0].direction === 'up' ? 1 : -1,
-          confidence: directionalPatterns[0].strength,
-          patterns: directionalPatterns.map(p => ({ name: p.name, success: true }))
-        })
+      // Calculate weighted prediction from all patterns
+      let upWeight = 0, downWeight = 0;
+      directionalPatterns.forEach(p => {
+        if (p.direction === 'up') upWeight += p.strength;
+        else if (p.direction === 'down') downWeight += p.strength;
       });
       
-      console.log('Observation recorded:', { asset, patterns, price: latest.close });
+      const predictedDirection = upWeight > downWeight ? 1 : -1;
+      const confidence = Math.max(upWeight, downWeight) / (upWeight + downWeight) * 100;
+      
+      // Store prediction to verify later
+      pendingPredictions.push({
+        timestamp: currentTime,
+        priceAtPrediction: currentPrice,
+        prediction: predictedDirection,
+        confidence,
+        patterns: directionalPatterns
+      });
+      
+      console.log('New prediction:', { 
+        direction: predictedDirection > 0 ? 'UP' : 'DOWN', 
+        confidence: confidence.toFixed(1) + '%',
+        patterns: directionalPatterns.map(p => p.name),
+        pendingCount: pendingPredictions.length
+      });
     }
     
     // Update last updated timestamp
     const lastUpdated = document.getElementById('brainLastUpdated');
     if (lastUpdated) {
-      lastUpdated.textContent = `Observing: ${new Date().toLocaleTimeString()}`;
+      const pendingInfo = pendingPredictions.length > 0 ? ` (${pendingPredictions.length} pending)` : '';
+      lastUpdated.textContent = `Observing: ${new Date().toLocaleTimeString()}${pendingInfo}`;
     }
     
-    // Refresh brain stats
-    loadAiMemoryData();
+    // Refresh brain stats if we verified any predictions
+    if (verifiedPredictions.length > 0) {
+      loadAiMemoryData();
+    }
     
   } catch (e) {
     console.error('Observation error:', e);
   }
+}
+
+// Advanced pattern detection with multi-timeframe indicators
+function detectAdvancedPatterns(candles) {
+  const patterns = [];
+  const closes = candles.map(c => c.close);
+  const highs = candles.map(c => c.high);
+  const lows = candles.map(c => c.low);
+  const n = closes.length;
+  
+  // Short-term indicators (last 5-10 candles)
+  const sma5 = closes.slice(-5).reduce((a, b) => a + b, 0) / 5;
+  const sma10 = closes.slice(-10).reduce((a, b) => a + b, 0) / 10;
+  const sma20 = closes.slice(-20).reduce((a, b) => a + b, 0) / Math.min(20, closes.length);
+  
+  // Calculate EMA
+  const calcEMA = (data, period) => {
+    const k = 2 / (period + 1);
+    let ema = data.slice(0, period).reduce((a, b) => a + b, 0) / period;
+    for (let i = period; i < data.length; i++) {
+      ema = data[i] * k + ema * (1 - k);
+    }
+    return ema;
+  };
+  
+  const ema9 = calcEMA(closes, 9);
+  const ema21 = calcEMA(closes, 21);
+  
+  // RSI calculation
+  let gains = 0, losses = 0;
+  for (let i = n - 14; i < n; i++) {
+    const change = closes[i] - closes[i - 1];
+    if (change > 0) gains += change;
+    else losses -= change;
+  }
+  const avgGain = gains / 14;
+  const avgLoss = losses / 14;
+  const rsi = avgLoss === 0 ? 100 : 100 - (100 / (1 + avgGain / avgLoss));
+  
+  // MACD
+  const ema12 = calcEMA(closes, 12);
+  const ema26 = calcEMA(closes, Math.min(26, closes.length));
+  const macd = ema12 - ema26;
+  
+  // Price momentum
+  const momentum = (closes[n-1] - closes[n-5]) / closes[n-5] * 100;
+  const longMomentum = (closes[n-1] - closes[n-20]) / closes[n-20] * 100;
+  
+  // Wave detection - find recent swing highs/lows
+  const recentHigh = Math.max(...highs.slice(-10));
+  const recentLow = Math.min(...lows.slice(-10));
+  const currentPrice = closes[n-1];
+  const priceRange = recentHigh - recentLow;
+  const positionInRange = priceRange > 0 ? (currentPrice - recentLow) / priceRange : 0.5;
+  
+  // Trend detection based on multiple indicators
+  // SMA crossover
+  if (sma5 > sma10 && sma10 > sma20) {
+    patterns.push({ name: 'Strong uptrend (SMA alignment)', direction: 'up', strength: 75 });
+  } else if (sma5 < sma10 && sma10 < sma20) {
+    patterns.push({ name: 'Strong downtrend (SMA alignment)', direction: 'down', strength: 75 });
+  } else if (sma5 > sma10) {
+    patterns.push({ name: 'Uptrend (SMA5 > SMA10)', direction: 'up', strength: 55 });
+  } else if (sma5 < sma10) {
+    patterns.push({ name: 'Downtrend (SMA5 < SMA10)', direction: 'down', strength: 55 });
+  }
+  
+  // EMA crossover
+  if (ema9 > ema21) {
+    patterns.push({ name: 'Bullish EMA crossover', direction: 'up', strength: 60 });
+  } else {
+    patterns.push({ name: 'Bearish EMA crossover', direction: 'down', strength: 60 });
+  }
+  
+  // RSI signals
+  if (rsi < 30) {
+    patterns.push({ name: 'Oversold (RSI < 30)', direction: 'up', strength: 70 });
+  } else if (rsi > 70) {
+    patterns.push({ name: 'Overbought (RSI > 70)', direction: 'down', strength: 70 });
+  } else if (rsi < 40) {
+    patterns.push({ name: 'Low RSI zone', direction: 'up', strength: 40 });
+  } else if (rsi > 60) {
+    patterns.push({ name: 'High RSI zone', direction: 'down', strength: 40 });
+  }
+  
+  // MACD signal
+  if (macd > 0) {
+    patterns.push({ name: 'MACD bullish', direction: 'up', strength: 55 });
+  } else {
+    patterns.push({ name: 'MACD bearish', direction: 'down', strength: 55 });
+  }
+  
+  // Momentum signal
+  if (momentum > 0.5) {
+    patterns.push({ name: `Strong momentum (+${momentum.toFixed(2)}%)`, direction: 'up', strength: 65 });
+  } else if (momentum < -0.5) {
+    patterns.push({ name: `Strong momentum (${momentum.toFixed(2)}%)`, direction: 'down', strength: 65 });
+  }
+  
+  // Long-term momentum
+  if (longMomentum > 2) {
+    patterns.push({ name: 'Long-term uptrend', direction: 'up', strength: 50 });
+  } else if (longMomentum < -2) {
+    patterns.push({ name: 'Long-term downtrend', direction: 'down', strength: 50 });
+  }
+  
+  // Wave position (mean reversion)
+  if (positionInRange > 0.9) {
+    patterns.push({ name: 'Near resistance (top of range)', direction: 'down', strength: 45 });
+  } else if (positionInRange < 0.1) {
+    patterns.push({ name: 'Near support (bottom of range)', direction: 'up', strength: 45 });
+  }
+  
+  return patterns;
 }
 
 function detectPatterns(candles) {

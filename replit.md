@@ -56,13 +56,15 @@ The application features a modern full-stack architecture:
   - Review modal allows selecting which events to add to archive
   - "Check Daily" checkbox with localStorage persistence for auto-checking on app load (once per day)
 
-- **Observe Mode Feature**:
+- **Observe Mode Feature** (Fixed & Enhanced):
   - "Observe" toggle button for real-time market observation
   - Polls price data every 30 seconds when enabled
-  - Detects patterns: trend direction (SMA crossover), momentum, volume spikes, candlestick patterns (Doji, Hammer, Shooting Star)
-  - Records directional patterns to AI brain memory
-  - Live status indicator shows "Observing..." with last update timestamp
-  - Training method: Click Observe to start, let it run while market is active, patterns accumulate in brain
+  - **Fixed prediction tracking**: Now properly records predictions and verifies them 5 minutes later against actual price movement
+  - **Advanced pattern detection**: Uses SMA/EMA alignment, RSI, MACD, momentum, and wave position analysis
+  - Weighted confidence scoring from multiple indicators
+  - Pending predictions queue shows count during observation
+  - Patterns now track actual success rate (not self-fulfilling like before)
+  - Live status indicator shows "Observing: [time] (X pending)"
 
 - **Brain Training Tutorial**:
   - Brain trains automatically when you: 1) Run AI analysis on any asset, 2) Enable Observe mode
@@ -70,13 +72,16 @@ The application features a modern full-stack architecture:
   - Accuracy builds over time as more predictions are recorded
   - View stats in AI Memory tab: accuracy %, predictions count, patterns learned
 
-- **AI Price Projection Chart Fix**:
-  - Fixed value explosion bug where projections reached astronomical numbers (90 trillion)
-  - Implemented bounded random walk algorithm (prices stay within 50%-200% of start)
-  - Added container dimension checks to defer chart rendering until visible
-  - Chart now properly renders in AI Results tab with 10k forecast candles
-  - **Timeframe-specific data fetching**: Each timeframe now fetches fresh data instead of reusing cache
-  - **Full historical display**: Charts show all available historical candles (not limited to 100)
+- **AI Price Projection Chart** (Major Algorithm Upgrade):
+  - **Multi-timeframe wave analysis**: Projections now use indicator-based trend detection
+  - Analyzes SMA20/50/100/200, EMA9/21/50, RSI, MACD for trend scoring
+  - Detects swing highs/lows to identify wave structure
+  - **Nested wave generation**: Primary wave (long cycle), secondary wave, tertiary wave (ripples)
+  - Wave parameters derived from actual historical price patterns
+  - Trend drift incorporates long-term momentum and AI direction bias
+  - **Timeframe label & data info**: Shows current timeframe badge and candle date range
+  - **Time axis formatting**: Adapts display format based on timeframe (seconds/minutes/hours/days)
+  - Bounded projections stay within reasonable range (max 50% from start)
 
 - **Backtest Simulation Feature**:
   - New "Backtest" dropdown in AI Projection panel with time offsets:
