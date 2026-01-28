@@ -2441,10 +2441,20 @@ async function updateAiProjectionChart(result) {
   if (interval <= 30) barSpacing = Math.max(0.3, barSpacing * 0.5);
   else if (interval >= 3600) barSpacing = Math.min(10, barSpacing * 1.5);
   
+  // Get actual dimensions from bounding rect
+  const chartRect = container.getBoundingClientRect();
+  const chartWidth = Math.max(chartRect.width, 400);
+  const chartHeight = Math.max(chartRect.height, 200);
+  
+  console.log('Creating chart with dimensions:', { chartWidth, chartHeight });
+  
+  // Clear container before creating chart
+  container.innerHTML = '';
+  
   // Create chart with scroll/zoom enabled
   aiProjectionChart = createChart(container, {
-    width: container.clientWidth,
-    height: container.clientHeight,
+    width: chartWidth,
+    height: chartHeight,
     layout: {
       background: { type: ColorType.Solid, color: '#111827' },
       textColor: '#9ca3af',
