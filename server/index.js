@@ -3103,6 +3103,68 @@ app.post('/api/ai-memory/brain/backtest', (req, res) => {
   }
 });
 
+// Save best optimized parameters to brain
+app.post('/api/ai-memory/brain/params', (req, res) => {
+  const { asset, timeframe, params, pnl, timestamp } = req.body;
+  
+  if (!asset || !params) {
+    return res.status(400).json({ error: 'Missing required fields: asset or params' });
+  }
+  
+  try {
+    const brain = readAIMemory('brain.json') || { assets: {}, globalStats: {} };
+    
+    if (!brain.assets[asset]) {
+      brain.assets[asset] = {
+        symbol: asset.toUpperCase(),
+        totalPredictions: 0,
+        learnedPatterns: [],
+        backtestHistory: [],
+        bestParams: null,
+        paramsHistory: []
+      };
+    }
+    
+    const assetData = brain.assets[asset];
+    
+    // Only update best params if this run was profitable and better than previous
+    const currentBestPnL = assetData.bestParams?.pnl || -Infinity;
+    if (pnl > currentBestPnL) {
+      assetData.bestParams = {
+        ...params,
+        pnl,
+        timeframe,
+        timestamp,
+        discoveredAt: new Date().toISOString()
+      };
+    }
+    
+    // Keep history of optimized params (last 20)
+    if (!assetData.paramsHistory) assetData.paramsHistory = [];
+    assetData.paramsHistory.unshift({
+      params,
+      pnl,
+      timeframe,
+      timestamp
+    });
+    if (assetData.paramsHistory.length > 20) {
+      assetData.paramsHistory = assetData.paramsHistory.slice(0, 20);
+    }
+    
+    assetData.lastUpdated = new Date().toISOString();
+    writeAIMemory('brain.json', brain);
+    
+    res.json({ 
+      success: true, 
+      isBest: pnl > currentBestPnL,
+      bestParams: assetData.bestParams 
+    });
+  } catch (e) {
+    console.error('Error saving params to brain:', e);
+    res.status(500).json({ error: 'Failed to save params' });
+  }
+});
+
 // AI Query endpoint - answer natural language questions about predictions
 app.post('/api/ai/query', async (req, res) => {
   const { question, asset, timeframe } = req.body;

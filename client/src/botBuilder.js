@@ -7054,6 +7054,12 @@ function initBacktest() {
     stopContinuousBtn.addEventListener('click', stopContinuousBacktest);
   }
   
+  // Auto-Optimize button
+  const autoOptimizeBtn = document.getElementById('autoOptimizeBtn');
+  if (autoOptimizeBtn) {
+    autoOptimizeBtn.addEventListener('click', startAutoOptimize);
+  }
+  
   // AI Query input
   const aiQueryBtn = document.getElementById('aiQueryBtn');
   if (aiQueryBtn) {
@@ -7080,6 +7086,9 @@ async function runBacktestSimulation() {
   
   // Get trading settings
   const settings = getTradeSettings();
+  
+  // Get optimization parameters (random, learned, or default)
+  const params = await getCurrentParams(symbol, settings);
   
   // Update UI
   const startBtn = document.getElementById('startBacktest');
@@ -7176,8 +7185,8 @@ async function runBacktestSimulation() {
     
     if (cycleCandles.length < 50) continue;
     
-    // Run backtest on cycle data with dynamic exit strategy
-    const cycleResult = await runCycleBacktest(cycleCandles, exitStrategy, settings, pointValue);
+    // Run backtest on cycle data with dynamic exit strategy and optimizable params
+    const cycleResult = await runCycleBacktest(cycleCandles, exitStrategy, settings, pointValue, params);
     cycleResults.push(cycleResult);
     
     // Collect all trades
@@ -7208,8 +7217,15 @@ async function runBacktestSimulation() {
     avgTrade: parseFloat(avgTrade),
     bestCycle,
     cycles: actualCycles,
-    exitStrategy: exitStrategy
+    exitStrategy: exitStrategy,
+    params: ACTIVE_PARAMS
   };
+  
+  // Track best params found during optimization
+  if (totalPnL > BEST_PARAMS_PNL && ACTIVE_PARAMS) {
+    BEST_PARAMS_PNL = totalPnL;
+    BEST_PARAMS = { ...ACTIVE_PARAMS };
+  }
   
   console.log('Backtest complete:', {
     candles: BACKTEST_DATA.candles.length,
@@ -7349,10 +7365,89 @@ function stopContinuousBacktest() {
   const continuousControls = document.getElementById('continuousControls');
   const startContinuousBtn = document.getElementById('startContinuousBtn');
   const runUntilProfitBtn = document.getElementById('runUntilProfitBtn');
+  const autoOptimizeBtn = document.getElementById('autoOptimizeBtn');
   
   if (continuousControls) continuousControls.classList.add('hidden');
   if (startContinuousBtn) startContinuousBtn.classList.remove('hidden');
   if (runUntilProfitBtn) runUntilProfitBtn.classList.remove('hidden');
+  if (autoOptimizeBtn) autoOptimizeBtn.classList.remove('hidden');
+  
+  // If we found better params during optimization, save them (even if negative, save the best found)
+  if (BEST_PARAMS && CONTINUOUS_BACKTEST.mode === 'optimize') {
+    saveBestParams();
+  }
+}
+
+// Auto-optimize mode - runs many iterations with random params to find best combination
+async function startAutoOptimize() {
+  if (BACKTEST_RUNNING || CONTINUOUS_BACKTEST.running) {
+    console.log('Backtest already running');
+    return;
+  }
+  
+  // Reset best params tracking
+  BEST_PARAMS = null;
+  BEST_PARAMS_PNL = -Infinity;
+  
+  // Force randomize mode for optimization
+  const randomizeEl = document.getElementById('randomizeParams');
+  const useLearnedEl = document.getElementById('useLearnedParams');
+  if (randomizeEl) randomizeEl.checked = true;
+  if (useLearnedEl) useLearnedEl.checked = false;
+  
+  // Start continuous mode with 50 iterations
+  CONTINUOUS_BACKTEST = {
+    running: true,
+    mode: 'optimize',
+    iterations: 0,
+    bestPnL: -Infinity,
+    maxIterations: 50
+  };
+  
+  const continuousControls = document.getElementById('continuousControls');
+  const startContinuousBtn = document.getElementById('startContinuousBtn');
+  const runUntilProfitBtn = document.getElementById('runUntilProfitBtn');
+  const autoOptimizeBtn = document.getElementById('autoOptimizeBtn');
+  const continuousIterations = document.getElementById('continuousIterations');
+  const continuousBestPnL = document.getElementById('continuousBestPnL');
+  
+  if (continuousControls) continuousControls.classList.remove('hidden');
+  if (startContinuousBtn) startContinuousBtn.classList.add('hidden');
+  if (runUntilProfitBtn) runUntilProfitBtn.classList.add('hidden');
+  if (autoOptimizeBtn) autoOptimizeBtn.classList.add('hidden');
+  if (continuousIterations) continuousIterations.textContent = '0';
+  if (continuousBestPnL) continuousBestPnL.textContent = '$0.00';
+  
+  runBacktestSimulation();
+}
+
+// Save best parameters to brain
+async function saveBestParams() {
+  if (!BEST_PARAMS) return;
+  
+  const symbol = document.getElementById('aiSymbol')?.value || 'silver';
+  const timeframe = document.getElementById('backtestTimeframe')?.value || '1h';
+  
+  try {
+    const response = await fetch('/api/ai-memory/brain/params', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        asset: symbol,
+        timeframe,
+        params: BEST_PARAMS,
+        pnl: BEST_PARAMS_PNL,
+        timestamp: new Date().toISOString()
+      })
+    });
+    
+    if (response.ok) {
+      console.log('Best params saved to brain:', BEST_PARAMS, 'P/L:', BEST_PARAMS_PNL);
+      updateParamsDisplay(BEST_PARAMS, 'Best Found!');
+    }
+  } catch (e) {
+    console.error('Failed to save best params:', e);
+  }
 }
 
 // AI Query functionality
@@ -7401,8 +7496,157 @@ async function submitAiQuery() {
   }
 }
 
+// Parameter ranges for optimization
+const PARAM_RANGES = {
+  takeProfitPct: { min: 0.003, max: 0.05, default: 0.015 },    // 0.3% to 5%
+  stopLossPct: { min: 0.003, max: 0.03, default: 0.01 },       // 0.3% to 3%
+  trailingStopPct: { min: 0.003, max: 0.02, default: 0.008 },  // 0.3% to 2%
+  atrMultiplier: { min: 0.5, max: 4.0, default: 2.0 },         // 0.5x to 4x ATR
+  rsiOversold: { min: 20, max: 40, default: 30 },              // RSI oversold threshold
+  rsiOverbought: { min: 60, max: 80, default: 70 },            // RSI overbought threshold
+  positionSizePct: { min: 0.01, max: 0.2, default: 0.05 }      // 1% to 20% of capital
+};
+
+// Current active parameters (can be default, random, or learned)
+let ACTIVE_PARAMS = null;
+let BEST_PARAMS = null;
+let BEST_PARAMS_PNL = -Infinity;
+
+// Get default parameters
+function getDefaultParams() {
+  return {
+    takeProfitPct: PARAM_RANGES.takeProfitPct.default,
+    stopLossPct: PARAM_RANGES.stopLossPct.default,
+    trailingStopPct: PARAM_RANGES.trailingStopPct.default,
+    atrMultiplier: PARAM_RANGES.atrMultiplier.default,
+    rsiOversold: PARAM_RANGES.rsiOversold.default,
+    rsiOverbought: PARAM_RANGES.rsiOverbought.default,
+    positionSizePct: PARAM_RANGES.positionSizePct.default
+  };
+}
+
+// Generate random parameters within ranges with validation
+function getRandomParams(capital) {
+  const maxPositionPct = capital ? Math.min(PARAM_RANGES.positionSizePct.max, 1) : PARAM_RANGES.positionSizePct.max;
+  
+  // Generate take profit first, then ensure stop loss is smaller
+  const takeProfitPct = PARAM_RANGES.takeProfitPct.min + Math.random() * (PARAM_RANGES.takeProfitPct.max - PARAM_RANGES.takeProfitPct.min);
+  const maxStopLoss = Math.min(PARAM_RANGES.stopLossPct.max, takeProfitPct * 0.8); // SL must be < TP
+  const stopLossPct = PARAM_RANGES.stopLossPct.min + Math.random() * (maxStopLoss - PARAM_RANGES.stopLossPct.min);
+  
+  // Trailing stop should be less than or equal to take profit
+  const maxTrailing = Math.min(PARAM_RANGES.trailingStopPct.max, takeProfitPct);
+  const trailingStopPct = PARAM_RANGES.trailingStopPct.min + Math.random() * (maxTrailing - PARAM_RANGES.trailingStopPct.min);
+  
+  return {
+    takeProfitPct,
+    stopLossPct,
+    trailingStopPct,
+    atrMultiplier: PARAM_RANGES.atrMultiplier.min + Math.random() * (PARAM_RANGES.atrMultiplier.max - PARAM_RANGES.atrMultiplier.min),
+    rsiOversold: Math.floor(PARAM_RANGES.rsiOversold.min + Math.random() * (PARAM_RANGES.rsiOversold.max - PARAM_RANGES.rsiOversold.min)),
+    rsiOverbought: Math.floor(PARAM_RANGES.rsiOverbought.min + Math.random() * (PARAM_RANGES.rsiOverbought.max - PARAM_RANGES.rsiOverbought.min)),
+    positionSizePct: PARAM_RANGES.positionSizePct.min + Math.random() * (maxPositionPct - PARAM_RANGES.positionSizePct.min)
+  };
+}
+
+// Fetch learned parameters from brain - sanitize to only include numeric params
+async function getLearnedParams(asset) {
+  try {
+    const response = await fetch('/api/ai-memory/brain');
+    if (!response.ok) return null;
+    const brain = await response.json();
+    const assetData = brain.assets?.[asset] || brain.assets?.[asset?.toLowerCase()];
+    const stored = assetData?.bestParams;
+    
+    if (!stored) return null;
+    
+    // Extract only the numeric trading parameters, not metadata
+    return {
+      takeProfitPct: stored.takeProfitPct ?? PARAM_RANGES.takeProfitPct.default,
+      stopLossPct: stored.stopLossPct ?? PARAM_RANGES.stopLossPct.default,
+      trailingStopPct: stored.trailingStopPct ?? PARAM_RANGES.trailingStopPct.default,
+      atrMultiplier: stored.atrMultiplier ?? PARAM_RANGES.atrMultiplier.default,
+      rsiOversold: stored.rsiOversold ?? PARAM_RANGES.rsiOversold.default,
+      rsiOverbought: stored.rsiOverbought ?? PARAM_RANGES.rsiOverbought.default,
+      positionSizePct: stored.positionSizePct ?? PARAM_RANGES.positionSizePct.default
+    };
+  } catch (e) {
+    console.error('Failed to fetch learned params:', e);
+    return null;
+  }
+}
+
+// Update parameters display in UI
+function updateParamsDisplay(params, source) {
+  const dispTP = document.getElementById('dispTP');
+  const dispSL = document.getElementById('dispSL');
+  const dispTrail = document.getElementById('dispTrail');
+  const dispATR = document.getElementById('dispATR');
+  const dispRSI = document.getElementById('dispRSI');
+  const dispSize = document.getElementById('dispSize');
+  const paramSource = document.getElementById('paramSource');
+  
+  if (dispTP) dispTP.textContent = (params.takeProfitPct * 100).toFixed(1) + '%';
+  if (dispSL) dispSL.textContent = (params.stopLossPct * 100).toFixed(1) + '%';
+  if (dispTrail) dispTrail.textContent = (params.trailingStopPct * 100).toFixed(1) + '%';
+  if (dispATR) dispATR.textContent = params.atrMultiplier.toFixed(1);
+  if (dispRSI) dispRSI.textContent = `${params.rsiOversold}/${params.rsiOverbought}`;
+  if (dispSize) dispSize.textContent = (params.positionSizePct * 100).toFixed(0) + '%';
+  if (paramSource) paramSource.textContent = source;
+}
+
+// Get current parameters based on settings
+async function getCurrentParams(asset, settings) {
+  const useLearnedEl = document.getElementById('useLearnedParams');
+  const randomizeEl = document.getElementById('randomizeParams');
+  const useLearned = useLearnedEl?.checked || false;
+  const randomize = randomizeEl?.checked || false;
+  
+  let params;
+  let source = 'Default';
+  
+  if (useLearned) {
+    params = await getLearnedParams(asset);
+    if (params) {
+      source = 'Learned';
+    } else {
+      params = getDefaultParams();
+      source = 'Default (no learned)';
+    }
+  } else if (randomize) {
+    params = getRandomParams(settings.capital);
+    source = 'Random';
+  } else {
+    params = getDefaultParams();
+    source = 'Default';
+  }
+  
+  // Enforce portfolio protection - position size cannot exceed capital limits
+  // Max drawdown protection: never risk more than 2% of capital per trade
+  const maxRiskPerTrade = 0.02; // 2% max risk per trade
+  if (settings.capital && settings.capital > 0) {
+    // Calculate max position based on capital allocation
+    const maxPositionByCapital = settings.capital * params.positionSizePct;
+    // Calculate max position based on risk: if SL triggers, max loss = 2% of capital
+    const maxPositionByRisk = (settings.capital * maxRiskPerTrade) / params.stopLossPct;
+    // Use the more conservative limit, but ensure we use at least minSize
+    const capitalLimit = Math.min(maxPositionByCapital, maxPositionByRisk);
+    // effectiveSize is capped by capital limits, using minSize as baseline
+    params.effectiveSize = Math.min(capitalLimit / 100, settings.minSize * 10); // Cap at 10x minSize
+    params.effectiveSize = Math.max(params.effectiveSize, settings.minSize); // But at least minSize
+    params.maxDrawdownPct = maxRiskPerTrade;
+  } else {
+    params.effectiveSize = settings.minSize;
+    params.maxDrawdownPct = maxRiskPerTrade;
+  }
+  
+  updateParamsDisplay(params, source);
+  ACTIVE_PARAMS = params;
+  return params;
+}
+
 // Run a single backtest cycle on candle data - returns trade details with dynamic exits
-async function runCycleBacktest(candles, exitStrategy, settings, pointValue) {
+async function runCycleBacktest(candles, exitStrategy, settings, pointValue, params) {
   let trades = 0;
   let wins = 0;
   let pnl = 0;
@@ -7412,13 +7656,8 @@ async function runCycleBacktest(candles, exitStrategy, settings, pointValue) {
   const lookback = 14;
   const maxHoldCandles = 50; // Maximum hold period to prevent infinite holds
   
-  // Dynamic exit parameters - these could be learned/optimized
-  const exitParams = {
-    takeProfitPct: 0.015, // 1.5% take profit
-    stopLossPct: 0.01,    // 1% stop loss
-    trailingStopPct: 0.008, // 0.8% trailing stop
-    atrMultiplier: 2.0    // ATR-based exits
-  };
+  // Use provided params or defaults
+  const exitParams = params || getDefaultParams();
   
   // Calculate ATR for volatility-based exits
   function calcATR(candleSlice) {
@@ -7590,11 +7829,11 @@ async function runCycleBacktest(candles, exitStrategy, settings, pointValue) {
     let signal = null;
     let signalStrength = 0;
     
-    // RSI signals
-    if (rsi < 30) {
+    // RSI signals - use dynamic thresholds from params
+    if (rsi < exitParams.rsiOversold) {
       signalStrength += 2;
       signal = 'long';
-    } else if (rsi > 70) {
+    } else if (rsi > exitParams.rsiOverbought) {
       signalStrength += 2;
       signal = 'short';
     }
