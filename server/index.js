@@ -2952,7 +2952,7 @@ app.post('/api/ai-memory/brain/backtest', (req, res) => {
       assetData.backtestHistory = [];
     }
     
-    // Add backtest results
+    // Add backtest results with exit strategy info
     const backtestEntry = {
       timestamp: new Date().toISOString(),
       timeframe,
@@ -2960,7 +2960,8 @@ app.post('/api/ai-memory/brain/backtest', (req, res) => {
       winRate: summary.winRate,
       totalPnL: summary.totalPnL,
       avgTrade: summary.avgTrade,
-      cycles: summary.cycles
+      cycles: summary.cycles,
+      exitStrategy: summary.exitStrategy || 'dynamic'
     };
     
     assetData.backtestHistory.unshift(backtestEntry);
@@ -2972,12 +2973,62 @@ app.post('/api/ai-memory/brain/backtest', (req, res) => {
     const winningTrades = trades.filter(t => t.win);
     const losingTrades = trades.filter(t => !t.win);
     
-    // Analyze patterns from trades
+    // Track exit strategy performance
+    if (!assetData.exitStrategyStats) {
+      assetData.exitStrategyStats = {};
+    }
+    
+    const exitReasonStats = {};
+    trades.forEach(trade => {
+      const strategy = trade.exitStrategy || 'dynamic';
+      const reason = trade.exitReason || 'unknown';
+      
+      // Track by strategy
+      if (!assetData.exitStrategyStats[strategy]) {
+        assetData.exitStrategyStats[strategy] = { wins: 0, losses: 0, totalPnL: 0, samples: 0 };
+      }
+      assetData.exitStrategyStats[strategy].samples++;
+      if (trade.win) {
+        assetData.exitStrategyStats[strategy].wins++;
+      } else {
+        assetData.exitStrategyStats[strategy].losses++;
+      }
+      assetData.exitStrategyStats[strategy].totalPnL += trade.pnl || 0;
+      
+      // Track by exit reason
+      if (!exitReasonStats[reason]) {
+        exitReasonStats[reason] = { wins: 0, losses: 0, totalPnL: 0, avgHold: 0, samples: 0 };
+      }
+      exitReasonStats[reason].samples++;
+      if (trade.win) exitReasonStats[reason].wins++;
+      else exitReasonStats[reason].losses++;
+      exitReasonStats[reason].totalPnL += trade.pnl || 0;
+      exitReasonStats[reason].avgHold += trade.holdDuration || 0;
+    });
+    
+    // Update exit reason performance in brain
+    if (!assetData.exitReasonStats) {
+      assetData.exitReasonStats = {};
+    }
+    Object.entries(exitReasonStats).forEach(([reason, stats]) => {
+      if (!assetData.exitReasonStats[reason]) {
+        assetData.exitReasonStats[reason] = { wins: 0, losses: 0, totalPnL: 0, avgHold: 0, samples: 0 };
+      }
+      assetData.exitReasonStats[reason].samples += stats.samples;
+      assetData.exitReasonStats[reason].wins += stats.wins;
+      assetData.exitReasonStats[reason].losses += stats.losses;
+      assetData.exitReasonStats[reason].totalPnL += stats.totalPnL;
+      assetData.exitReasonStats[reason].avgHold = 
+        (assetData.exitReasonStats[reason].avgHold + stats.avgHold / stats.samples) / 2;
+    });
+    
+    // Analyze patterns from trades - include exit reason for learning
     const patternStats = {};
     trades.forEach(trade => {
-      const hour = new Date(trade.entryTime * 1000).getHours();
-      const session = hour >= 22 || hour < 6 ? 'Asian' : (hour >= 6 && hour < 14 ? 'London' : 'NY');
-      const pattern = `${session}_${trade.type}_${trade.rsi > 50 ? 'highRSI' : 'lowRSI'}`;
+      const hour = new Date(trade.entryTime * 1000).getUTCHours();
+      const session = trade.session || (hour >= 0 && hour < 8 ? 'Asian' : (hour >= 8 && hour < 13 ? 'London' : 'NY'));
+      const exitReason = trade.exitReason || 'unknown';
+      const pattern = `${session}_${trade.type}_${trade.rsi > 50 ? 'highRSI' : 'lowRSI'}_${exitReason}`;
       
       if (!patternStats[pattern]) {
         patternStats[pattern] = { wins: 0, losses: 0, totalPnL: 0 };

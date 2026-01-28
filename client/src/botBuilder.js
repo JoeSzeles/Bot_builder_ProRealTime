@@ -7075,7 +7075,7 @@ async function runBacktestSimulation() {
   
   const cycles = parseInt(document.getElementById('backtestCycles')?.value || '10');
   const timeframe = document.getElementById('backtestTimeframe')?.value || '1h';
-  const holdCandles = parseInt(document.getElementById('backtestHold')?.value || '3');
+  const exitStrategy = document.getElementById('backtestExitStrategy')?.value || 'dynamic';
   const symbol = document.getElementById('aiSymbol')?.value || 'silver';
   
   // Get trading settings
@@ -7171,13 +7171,13 @@ async function runBacktestSimulation() {
     
     // Get candles for this cycle
     const startIdx = cycle * candlesPerCycle;
-    const endIdx = Math.min(startIdx + candlesPerCycle, candles.length - holdCandles - 1);
-    const cycleCandles = candles.slice(startIdx, endIdx + holdCandles + 1);
+    const endIdx = Math.min(startIdx + candlesPerCycle, candles.length - 50); // Need room for max 50 candle hold
+    const cycleCandles = candles.slice(startIdx, endIdx + 50);
     
     if (cycleCandles.length < 50) continue;
     
-    // Run backtest on cycle data with correct contract specs
-    const cycleResult = await runCycleBacktest(cycleCandles, holdCandles, settings, pointValue);
+    // Run backtest on cycle data with dynamic exit strategy
+    const cycleResult = await runCycleBacktest(cycleCandles, exitStrategy, settings, pointValue);
     cycleResults.push(cycleResult);
     
     // Collect all trades
@@ -7207,7 +7207,8 @@ async function runBacktestSimulation() {
     totalPnL,
     avgTrade: parseFloat(avgTrade),
     bestCycle,
-    cycles: actualCycles
+    cycles: actualCycles,
+    exitStrategy: exitStrategy
   };
   
   console.log('Backtest complete:', {
@@ -7285,7 +7286,12 @@ async function saveBacktestToBrain(asset, timeframe, trades, summary) {
           exitTime: t.exitTime,
           pnl: t.pnl,
           rsi: t.rsi,
-          win: t.win
+          win: t.win,
+          exitStrategy: t.exitStrategy,
+          exitReason: t.exitReason,
+          holdDuration: t.holdDuration,
+          session: t.session,
+          signalStrength: t.signalStrength
         })),
         summary
       })
@@ -7395,58 +7401,237 @@ async function submitAiQuery() {
   }
 }
 
-// Run a single backtest cycle on candle data - returns trade details
-async function runCycleBacktest(candles, holdCandles, settings, pointValue) {
+// Run a single backtest cycle on candle data - returns trade details with dynamic exits
+async function runCycleBacktest(candles, exitStrategy, settings, pointValue) {
   let trades = 0;
   let wins = 0;
   let pnl = 0;
   const tradeList = [];
   
-  // Simple momentum-based trading logic (similar to live AI trading)
-  const lookback = 10;
+  // Lookback for indicator calculations
+  const lookback = 14;
+  const maxHoldCandles = 50; // Maximum hold period to prevent infinite holds
   
-  for (let i = lookback; i < candles.length - holdCandles; i++) {
-    // Calculate simple indicators
-    const recentCandles = candles.slice(i - lookback, i);
-    const sma = recentCandles.reduce((sum, c) => sum + c.close, 0) / lookback;
-    const currentPrice = candles[i].close;
-    
-    // Calculate momentum
-    const priceChange = (currentPrice - candles[i - lookback].close) / candles[i - lookback].close;
-    
-    // Simple RSI approximation
+  // Dynamic exit parameters - these could be learned/optimized
+  const exitParams = {
+    takeProfitPct: 0.015, // 1.5% take profit
+    stopLossPct: 0.01,    // 1% stop loss
+    trailingStopPct: 0.008, // 0.8% trailing stop
+    atrMultiplier: 2.0    // ATR-based exits
+  };
+  
+  // Calculate ATR for volatility-based exits
+  function calcATR(candleSlice) {
+    if (candleSlice.length < 2) return 0;
+    let trSum = 0;
+    for (let j = 1; j < candleSlice.length; j++) {
+      const high = candleSlice[j].high;
+      const low = candleSlice[j].low;
+      const prevClose = candleSlice[j-1].close;
+      const tr = Math.max(high - low, Math.abs(high - prevClose), Math.abs(low - prevClose));
+      trSum += tr;
+    }
+    return trSum / (candleSlice.length - 1);
+  }
+  
+  // Calculate RSI
+  function calcRSI(candleSlice) {
     let gains = 0, losses = 0;
-    for (let j = 1; j < recentCandles.length; j++) {
-      const diff = recentCandles[j].close - recentCandles[j-1].close;
+    for (let j = 1; j < candleSlice.length; j++) {
+      const diff = candleSlice[j].close - candleSlice[j-1].close;
       if (diff > 0) gains += diff;
       else losses -= diff;
     }
     const rs = losses > 0 ? gains / losses : 100;
-    const rsi = 100 - (100 / (1 + rs));
+    return 100 - (100 / (1 + rs));
+  }
+  
+  // Find dynamic exit point based on strategy
+  function findExitPoint(entryIdx, signal, entryPrice) {
+    let exitIdx = entryIdx + 1;
+    let exitReason = 'max_hold';
+    let highestPrice = entryPrice;
+    let lowestPrice = entryPrice;
     
-    // Determine signal - looser conditions for more trades
-    let signal = null;
-    if (rsi < 35) {
-      signal = 'long'; // Oversold, expect bounce
-    } else if (rsi > 65) {
-      signal = 'short'; // Overbought, expect pullback
-    } else if (currentPrice > sma * 1.001 && priceChange > 0.001) {
-      signal = 'long'; // Trend following
-    } else if (currentPrice < sma * 0.999 && priceChange < -0.001) {
-      signal = 'short'; // Trend following
+    // Calculate ATR with minimum floor to prevent immediate exits
+    let atr = calcATR(candles.slice(Math.max(0, entryIdx - lookback), entryIdx));
+    const minATR = entryPrice * 0.002; // Minimum 0.2% of price as ATR floor
+    if (atr < minATR) atr = minATR;
+    
+    // Ensure we don't go beyond candles array
+    const maxExitIdx = Math.min(entryIdx + maxHoldCandles, candles.length - 1);
+    
+    for (let j = entryIdx + 1; j <= maxExitIdx; j++) {
+      const candle = candles[j];
+      const currentPrice = candle.close;
+      
+      // Update trailing high/low
+      if (signal === 'long') {
+        highestPrice = Math.max(highestPrice, candle.high);
+      } else {
+        lowestPrice = Math.min(lowestPrice, candle.low);
+      }
+      
+      // Exit Strategy: AI Dynamic - uses multiple conditions
+      if (exitStrategy === 'dynamic') {
+        const priceMove = signal === 'long' 
+          ? (currentPrice - entryPrice) / entryPrice
+          : (entryPrice - currentPrice) / entryPrice;
+        
+        // ATR-based dynamic take profit
+        const dynamicTP = (atr * exitParams.atrMultiplier) / entryPrice;
+        if (priceMove >= dynamicTP) {
+          exitIdx = j;
+          exitReason = 'dynamic_tp';
+          break;
+        }
+        
+        // ATR-based dynamic stop loss
+        const dynamicSL = (atr * 1.5) / entryPrice;
+        if (priceMove <= -dynamicSL) {
+          exitIdx = j;
+          exitReason = 'dynamic_sl';
+          break;
+        }
+        
+        // RSI reversal exit
+        const currentRSI = calcRSI(candles.slice(Math.max(0, j - lookback), j + 1));
+        if (signal === 'long' && currentRSI > 70) {
+          exitIdx = j;
+          exitReason = 'rsi_overbought';
+          break;
+        }
+        if (signal === 'short' && currentRSI < 30) {
+          exitIdx = j;
+          exitReason = 'rsi_oversold';
+          break;
+        }
+      }
+      
+      // Exit Strategy: Trailing Stop
+      else if (exitStrategy === 'trailing') {
+        if (signal === 'long') {
+          const trailStop = highestPrice * (1 - exitParams.trailingStopPct);
+          if (candle.low <= trailStop) {
+            exitIdx = j;
+            exitReason = 'trailing_stop';
+            break;
+          }
+        } else {
+          const trailStop = lowestPrice * (1 + exitParams.trailingStopPct);
+          if (candle.high >= trailStop) {
+            exitIdx = j;
+            exitReason = 'trailing_stop';
+            break;
+          }
+        }
+      }
+      
+      // Exit Strategy: Fixed TP/SL Target
+      else if (exitStrategy === 'target') {
+        const priceMove = signal === 'long' 
+          ? (currentPrice - entryPrice) / entryPrice
+          : (entryPrice - currentPrice) / entryPrice;
+        
+        if (priceMove >= exitParams.takeProfitPct) {
+          exitIdx = j;
+          exitReason = 'take_profit';
+          break;
+        }
+        if (priceMove <= -exitParams.stopLossPct) {
+          exitIdx = j;
+          exitReason = 'stop_loss';
+          break;
+        }
+      }
+      
+      // Exit Strategy: Signal Reversal - wait for opposite signal
+      else if (exitStrategy === 'reversal') {
+        const recentSlice = candles.slice(Math.max(0, j - lookback), j + 1);
+        const currentRSI = calcRSI(recentSlice);
+        const sma = recentSlice.reduce((sum, c) => sum + c.close, 0) / recentSlice.length;
+        
+        // Check for signal reversal
+        if (signal === 'long' && (currentRSI > 70 || currentPrice < sma * 0.995)) {
+          exitIdx = j;
+          exitReason = 'signal_reversal';
+          break;
+        }
+        if (signal === 'short' && (currentRSI < 30 || currentPrice > sma * 1.005)) {
+          exitIdx = j;
+          exitReason = 'signal_reversal';
+          break;
+        }
+      }
     }
     
-    if (!signal) continue;
+    // Ensure exitIdx is within bounds (fallback to last valid candle)
+    if (exitIdx >= candles.length) {
+      exitIdx = candles.length - 1;
+      exitReason = 'max_hold';
+    }
+    
+    return { exitIdx, exitReason };
+  }
+  
+  // Main trading loop
+  for (let i = lookback; i < candles.length - maxHoldCandles; i++) {
+    // Calculate indicators
+    const recentCandles = candles.slice(i - lookback, i);
+    const sma = recentCandles.reduce((sum, c) => sum + c.close, 0) / lookback;
+    const currentPrice = candles[i].close;
+    const rsi = calcRSI(recentCandles);
+    const atr = calcATR(recentCandles);
+    
+    // Calculate momentum
+    const priceChange = (currentPrice - candles[i - lookback].close) / candles[i - lookback].close;
+    
+    // Determine entry signal with multiple confirmations
+    let signal = null;
+    let signalStrength = 0;
+    
+    // RSI signals
+    if (rsi < 30) {
+      signalStrength += 2;
+      signal = 'long';
+    } else if (rsi > 70) {
+      signalStrength += 2;
+      signal = 'short';
+    }
+    
+    // Trend signals
+    if (currentPrice > sma * 1.002 && priceChange > 0.002) {
+      signalStrength += (signal === 'long' || !signal) ? 1 : -1;
+      signal = signal || 'long';
+    } else if (currentPrice < sma * 0.998 && priceChange < -0.002) {
+      signalStrength += (signal === 'short' || !signal) ? 1 : -1;
+      signal = signal || 'short';
+    }
+    
+    // Need minimum signal strength
+    if (signalStrength < 1 || !signal) continue;
     
     // Skip if trade type doesn't match
     if (settings.tradeType === 'long' && signal === 'short') continue;
     if (settings.tradeType === 'short' && signal === 'long') continue;
     
-    // Execute trade
+    // Find dynamic exit point
     const entryCandle = candles[i];
-    const exitCandle = candles[i + holdCandles];
     const entryPrice = entryCandle.close;
+    const { exitIdx, exitReason } = findExitPoint(i, signal, entryPrice);
+    
+    // Bounds check - ensure exitIdx is valid
+    if (exitIdx >= candles.length) {
+      continue; // Skip this trade if no valid exit
+    }
+    
+    const exitCandle = candles[exitIdx];
+    if (!exitCandle) {
+      continue; // Skip if exit candle doesn't exist
+    }
+    
     const exitPrice = exitCandle.close;
+    const holdDuration = exitIdx - i;
     
     // Calculate P/L with spread using asset-specific point value
     const spreadCost = settings.spreadPips * 0.01;
@@ -7461,7 +7646,14 @@ async function runCycleBacktest(candles, holdCandles, settings, pointValue) {
     // Apply commission
     tradePnL -= settings.commission * 2; // Entry + exit
     
-    // Store trade details
+    // Determine session based on entry time
+    const entryHour = new Date(entryCandle.time * 1000).getUTCHours();
+    let session = 'other';
+    if (entryHour >= 0 && entryHour < 8) session = 'asian';
+    else if (entryHour >= 8 && entryHour < 13) session = 'london';
+    else if (entryHour >= 13 && entryHour < 21) session = 'ny';
+    
+    // Store trade details with exit strategy info
     tradeList.push({
       type: signal,
       entryTime: entryCandle.time,
@@ -7470,15 +7662,21 @@ async function runCycleBacktest(candles, holdCandles, settings, pointValue) {
       exitPrice: exitPrice,
       pnl: tradePnL,
       rsi: rsi.toFixed(1),
-      win: tradePnL > 0
+      win: tradePnL > 0,
+      exitStrategy: exitStrategy,
+      exitReason: exitReason,
+      holdDuration: holdDuration,
+      session: session,
+      atr: atr.toFixed(4),
+      signalStrength: signalStrength
     });
     
     trades++;
     pnl += tradePnL;
     if (tradePnL > 0) wins++;
     
-    // Skip ahead past the hold period
-    i += holdCandles;
+    // Skip ahead past the exit point
+    i = exitIdx;
   }
   
   return { trades, wins, pnl, tradeList };
@@ -7654,7 +7852,7 @@ function downloadBacktestJson() {
     symbol: document.getElementById('aiSymbol')?.value || 'unknown',
     timeframe: document.getElementById('backtestTimeframe')?.value || '1h',
     cycles: document.getElementById('backtestCycles')?.value || '10',
-    holdCandles: document.getElementById('backtestHold')?.value || '3',
+    exitStrategy: document.getElementById('backtestExitStrategy')?.value || 'dynamic',
     summary: BACKTEST_DATA.summary,
     trades: BACKTEST_DATA.trades.map(t => ({
       ...t,
