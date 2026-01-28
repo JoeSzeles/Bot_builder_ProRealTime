@@ -8960,16 +8960,21 @@ function generateMockForecast(asset, priceData, brainData) {
   
   const days = [];
   const now = new Date();
+  const sydneyNow = toSydneyTime(now);
   let lastClose = currentPrice;
+  let calendarOffset = 0;
   
-  for (let i = 0; i < 7; i++) {
+  // Keep adding days until we have 7 trading days
+  while (days.length < 7 && calendarOffset < 14) {
     const dayDate = new Date(now);
-    dayDate.setDate(dayDate.getDate() + i);
+    dayDate.setDate(dayDate.getDate() + calendarOffset);
     const sydneyDate = toSydneyTime(dayDate);
     const dayOfWeek = sydneyDate.getDay();
     
-    // Skip non-trading days (Sunday, Saturday after 9am)
-    if (dayOfWeek === 0) continue; // Skip Sunday
+    calendarOffset++;
+    
+    // Skip Sunday - market completely closed
+    if (dayOfWeek === 0) continue;
     
     // Calculate trading hours for this day
     let tradingStart = new Date(sydneyDate);
@@ -8984,6 +8989,14 @@ function generateMockForecast(asset, priceData, brainData) {
     } else { // Tue-Fri: full day
       tradingStart.setHours(0, 0, 0, 0);
       tradingEnd.setHours(23, 59, 59, 999);
+    }
+    
+    // For today, check if trading has already ended
+    const isToday = sydneyDate.toDateString() === sydneyNow.toDateString();
+    if (isToday) {
+      const currentHour = sydneyNow.getHours();
+      // Saturday after 9am - market closed for weekend
+      if (dayOfWeek === 6 && currentHour >= 9) continue;
     }
     
     // Use brain patterns and real volatility for prediction
@@ -9013,9 +9026,9 @@ function generateMockForecast(asset, priceData, brainData) {
     const tradingHours = dayOfWeek === 1 ? 14 : dayOfWeek === 6 ? 9 : 24;
     const hourlyPrices = generateSmoothedHourlyPrices(openPrice, predictedClose, predictedHigh, predictedLow, tradingHours, dayVolatility);
     
-    // Get actual prices for today (day 0)
+    // Get actual prices for today (first trading day)
     let actualPrices = [];
-    if (i === 0 && recentPrices.length >= 24) {
+    if (isToday && recentPrices.length >= 24) {
       actualPrices = recentPrices.slice(-24).map(p => p.close);
     }
     
