@@ -42,6 +42,20 @@ The application features a modern full-stack architecture:
 -   **MetalPriceAPI**: Fallback for real-time Silver & Gold spot prices (requires `METALS_API_KEY` secret).
 
 ## Recent Changes (Jan 28, 2026)
+- **Backtest Simulation Panel** (New Feature):
+  - New panel in AI Results for running historical backtest simulations
+  - **Cycles selector**: Run 1, 5, 10, 25, 50, or 100 simulation rounds
+  - **Timeframe selector**: 5m, 15m, 1h, 4h, 1d, 1w, 1M
+  - **Trade hold duration**: Hold trades for 1, 3, 5, or 10 candles
+  - **Progress bar**: Shows cycle progress during simulation
+  - **Results display**: Total trades, win rate, P/L, avg trade, best cycle
+  - Asset-specific contract specs for accurate P/L calculation
+  - Automatically caps cycles based on available data
+
+- **New Timeframes Added**:
+  - Weekly (1w) and Monthly (1M) timeframes added to chart and projection
+  - Backtest simulation supports all timeframes
+
 - **AI Memory System** (New Feature):
   - New "AI Memory" sub-tab in AI Trading section
   - **Brain Status Panel**: Shows accuracy %, total predictions, patterns learned, confidence level per asset
@@ -88,7 +102,7 @@ The application features a modern full-stack architecture:
   - **AI reasoning displayed**: Shows why AI made its prediction
   - Falls back to trend extrapolation only if AI fails
   - **Timeframe label & data info**: Shows current timeframe badge and candle date range
-  - Limited to 100 projection points for AI efficiency
+  - Increased to 500 projection points for better forecast visualization
 
 - **AI Trading Panel** (New Feature):
   - New "AI Trading" panel in AI Results tab above Prediction Accuracy
