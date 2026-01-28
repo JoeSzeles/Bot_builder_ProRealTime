@@ -2309,13 +2309,31 @@ let aiProjectionChart = null;
 let aiProjectionSeries = [];
 
 async function updateAiProjectionChart(result) {
-  const container = document.getElementById('aiProjectionChart');
-  if (!container) return;
+  console.log('updateAiProjectionChart called with result:', result);
   
-  // Get forecast candles from selector (default 10k)
-  const forecastCandles = parseInt(document.getElementById('aiProjectionCandles')?.value || '10000');
-  const tf = aiResultsTimeframe;
-  const tfData = result.predictions?.[tf] || result.predictions?.['5m'] || {};
+  try {
+    const container = document.getElementById('aiProjectionChart');
+    if (!container) {
+      console.error('Projection chart container not found');
+      return;
+    }
+    
+    // Check if container is visible (has dimensions)
+    const containerRect = container.getBoundingClientRect();
+    console.log('Container dimensions:', { width: containerRect.width, height: containerRect.height });
+    
+    if (containerRect.width === 0 || containerRect.height === 0) {
+      console.warn('Chart container not visible yet, deferring render');
+      container.innerHTML = '<div class="h-full flex items-center justify-center text-gray-500">Chart will render when AI Results tab is visible</div>';
+      return;
+    }
+    
+    // Get forecast candles from selector (default 10k)
+    const forecastCandles = parseInt(document.getElementById('aiProjectionCandles')?.value || '10000');
+    const tf = aiResultsTimeframe;
+    const tfData = result.predictions?.[tf] || result.predictions?.['5m'] || {};
+    
+    console.log('Projection params:', { forecastCandles, tf, tfData, hasPredictions: !!result.predictions });
   
   // Timeframe intervals in seconds
   const tfSeconds = { '1s': 1, '2s': 2, '3s': 3, '5s': 5, '10s': 10, '30s': 30, '1m': 60, '5m': 300, '15m': 900, '1h': 3600, '4h': 14400, '1d': 86400 };
@@ -2323,21 +2341,24 @@ async function updateAiProjectionChart(result) {
   
   // Reuse cached market data if available
   let historicalCandles = result.marketData || [];
+  console.log('Initial historicalCandles length:', historicalCandles.length);
   
   // Only fetch if no data cached
   if (historicalCandles.length === 0) {
     const symbol = document.getElementById('aiSymbol')?.value || 'silver';
+    console.log('Fetching market data for symbol:', symbol);
     
     try {
       container.innerHTML = '<div class="h-full flex items-center justify-center text-gray-500">Loading market data...</div>';
       const response = await fetch(`/api/market-data/${symbol}/1h`);
       const data = await response.json();
+      console.log('Market data response:', { status: response.status, candleCount: data.candles?.length });
       if (data.candles && data.candles.length > 0) {
         historicalCandles = data.candles;
         result.marketData = historicalCandles;
       }
     } catch (e) {
-      console.warn('Failed to fetch market data:', e);
+      console.error('Failed to fetch market data:', e);
     }
   }
   
@@ -2347,7 +2368,10 @@ async function updateAiProjectionChart(result) {
   // Use only the last portion for display, but keep all for volatility calc
   const displayCandles = historicalCandles.slice(-historyToShow);
   
+  console.log('Data status:', { historicalCandles: historicalCandles.length, displayCandles: displayCandles.length, historyToShow });
+  
   if (historicalCandles.length === 0 || displayCandles.length === 0) {
+    console.error('No market data available');
     container.innerHTML = '<div class="h-full flex items-center justify-center text-red-500 font-medium">No market data available - Please run AI analysis first</div>';
     return;
   }
@@ -2539,10 +2563,16 @@ async function updateAiProjectionChart(result) {
   const viewStart = Math.max(0, projectionStart - Math.floor(visibleBars * 0.3));
   const viewEnd = viewStart + visibleBars;
   
-  aiProjectionChart.timeScale().setVisibleLogicalRange({
-    from: viewStart,
-    to: Math.min(viewEnd, displayCandles.length + forecastCandles)
-  });
+  try {
+    aiProjectionChart.timeScale().setVisibleLogicalRange({
+      from: viewStart,
+      to: Math.min(viewEnd, displayCandles.length + forecastCandles)
+    });
+  } catch (e) {
+    console.error('Error setting visible range:', e);
+  }
+  
+  console.log('Chart created successfully with', { bullishDataLength: bullishData.length, bearishDataLength: bearishData.length, expectedDataLength: expectedData.length });
   
   // Store projection data for list view and real price comparison
   window.projectionData = {
@@ -2554,8 +2584,18 @@ async function updateAiProjectionChart(result) {
     startTime: lastTime
   };
   
+  console.log('Updating list view...');
+  
   // Update list view
   updateProjectionListView(expectedData, bullishData, bearishData);
+  
+  } catch (error) {
+    console.error('Error in updateAiProjectionChart:', error);
+    const container = document.getElementById('aiProjectionChart');
+    if (container) {
+      container.innerHTML = `<div class="h-full flex items-center justify-center text-red-500 font-medium">Error rendering chart: ${error.message}</div>`;
+    }
+  }
 }
 
 // Real price line series reference
@@ -2670,10 +2710,16 @@ function calculatePredictionAccuracy(realCandles) {
 }
 
 function updateProjectionListView(expected, bullish, bearish, actualData = []) {
+  console.log('updateProjectionListView called with:', { expectedLen: expected.length, bullishLen: bullish.length, bearishLen: bearish.length });
+  
   const tbody = document.getElementById('projectionListBody');
-  if (!tbody) return;
+  if (!tbody) {
+    console.error('projectionListBody not found');
+    return;
+  }
   
   if (expected.length === 0) {
+    console.warn('No expected data for list view');
     tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-gray-500">No projection data available</td></tr>';
     return;
   }
