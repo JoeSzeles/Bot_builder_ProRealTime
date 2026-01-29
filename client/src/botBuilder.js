@@ -10832,7 +10832,7 @@ async function loadNewscastFromStorage() {
             if (audioResponse.ok) {
               newscastAudio = new Audio(newscastAudioUrl);
               newscastAudio.addEventListener('loadedmetadata', () => {
-                const progressContainer = document.getElementById('newscastProgressContainer');
+                const progressContainer = document.getElementById('newscastAudioProgress');
                 progressContainer?.classList.remove('hidden');
                 updateNewscastDuration();
               });
