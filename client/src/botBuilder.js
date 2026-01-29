@@ -10028,20 +10028,15 @@ function renderDayChart(day, dayIndex) {
   let lastRealX = paddingLeft;
   let lastRealY = paddingTop + chartHeight / 2;
   
-  // Get today's midnight timestamp for proper time mapping
-  const todayMidnight = new Date();
-  todayMidnight.setHours(0, 0, 0, 0);
-  const midnightTimestamp = Math.floor(todayMidnight.getTime() / 1000);
-  
   if (actualCandles.length > 0) {
-    // Filter and sort candles from today only
-    const todayCandles = actualCandles
-      .filter(c => c.time && c.time >= midnightTimestamp)
+    // Sort candles by time and map to chart positions
+    const sortedCandles = actualCandles
+      .filter(c => c.time != null)
       .sort((a, b) => a.time - b.time);
     
-    if (todayCandles.length > 0) {
-      todayCandles.forEach((c, j) => {
-        // Map candle time to X position within 24h chart
+    if (sortedCandles.length > 0) {
+      sortedCandles.forEach((c, j) => {
+        // Map candle time to X position within 24h chart (use local hour)
         const candleDate = new Date(c.time * 1000);
         const hourDecimal = candleDate.getHours() + candleDate.getMinutes() / 60;
         const x = paddingLeft + (hourDecimal / 24) * chartWidth;
@@ -10051,9 +10046,10 @@ function renderDayChart(day, dayIndex) {
         lastRealY = y;
       });
     } else {
-      // Fallback: spread candles evenly if no valid timestamps
+      // Fallback: candles have no timestamps, spread based on index (assuming 1 per hour)
       actualCandles.forEach((c, j) => {
-        const x = paddingLeft + (j / Math.max(actualCandles.length - 1, 1)) * chartWidth * (actualCandles.length / 24);
+        const hourDecimal = j; // Each candle represents ~1 hour
+        const x = paddingLeft + (hourDecimal / 24) * chartWidth;
         const y = paddingTop + ((max - c.close) / range) * chartHeight;
         realPricePath += j === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`;
         lastRealX = x;
@@ -10061,10 +10057,10 @@ function renderDayChart(day, dayIndex) {
       });
     }
   } else if (actual.length > 0) {
-    // Use actualPrices array - spread evenly based on count
-    const hoursElapsed = Math.min(actual.length, 24);
+    // Use actualPrices array - spread by index (assuming 1 per hour)
     actual.forEach((p, j) => {
-      const x = paddingLeft + (j / 24) * chartWidth;
+      const hourDecimal = j;
+      const x = paddingLeft + (hourDecimal / 24) * chartWidth;
       const y = paddingTop + ((max - p) / range) * chartHeight;
       realPricePath += j === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`;
       lastRealX = x;
