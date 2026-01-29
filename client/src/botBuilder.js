@@ -9957,20 +9957,10 @@ function renderDayChart(day, dayIndex) {
   const chartWidth = width - paddingLeft - paddingRight;
   const chartHeight = height - paddingTop - paddingBottom;
   
-  // Get trading hours from settings
-  const tradingStartTime = document.getElementById('tradingStartTime')?.value || '00:00';
-  const tradingEndTime = document.getElementById('tradingEndTime')?.value || '23:59';
-  const [startHour] = tradingStartTime.split(':').map(Number);
-  const [endHour] = tradingEndTime.split(':').map(Number);
-  
-  // Calculate session hours (handle overnight)
-  const sessionHours = [];
-  if (endHour >= startHour) {
-    for (let h = startHour; h <= endHour; h++) sessionHours.push(h);
-  } else {
-    for (let h = startHour; h < 24; h++) sessionHours.push(h);
-    for (let h = 0; h <= endHour; h++) sessionHours.push(h);
-  }
+  // Always show full 24h chart from 00:00 to 24:00
+  const chartStartHour = 0;
+  const chartEndHour = 24;
+  const totalChartHours = 24;
   
   // === GRID LINES ===
   let gridLines = '';
@@ -9980,8 +9970,8 @@ function renderDayChart(day, dayIndex) {
     gridLines += `<line x1="${paddingLeft}" y1="${y}" x2="${width - paddingRight}" y2="${y}" stroke="#374151" stroke-width="1" stroke-opacity="0.3"/>`;
   }
   
-  // Vertical grid lines (for each time interval)
-  const numVerticalLines = Math.min(sessionHours.length, 12);
+  // Vertical grid lines (every 4 hours)
+  const numVerticalLines = 6; // 0, 4, 8, 12, 16, 20, 24
   for (let i = 0; i <= numVerticalLines; i++) {
     const x = paddingLeft + (i / numVerticalLines) * chartWidth;
     gridLines += `<line x1="${x}" y1="${paddingTop}" x2="${x}" y2="${height - paddingBottom}" stroke="#374151" stroke-width="1" stroke-opacity="0.3"/>`;
@@ -9998,50 +9988,30 @@ function renderDayChart(day, dayIndex) {
   yAxisLabels += `<line x1="${paddingLeft}" y1="${paddingTop}" x2="${paddingLeft}" y2="${height - paddingBottom}" stroke="#6b7280" stroke-width="1"/>`;
   yAxisLabels += `<text x="${15}" y="${height / 2}" fill="#9ca3af" font-size="11" text-anchor="middle" transform="rotate(-90, 15, ${height / 2})">Price (USD)</text>`;
   
-  // === X-AXIS (Time) ===
+  // === X-AXIS (Time) - Fixed 24h from 00:00 to 24:00 ===
   let xAxisLabels = '';
-  const timeLabels = sessionHours.length > 0 ? sessionHours : [0, 6, 12, 18, 24];
-  const labelStep = Math.ceil(timeLabels.length / 8); // Show max 8 labels
-  for (let i = 0; i < timeLabels.length; i += labelStep) {
-    const x = paddingLeft + (i / (timeLabels.length - 1 || 1)) * chartWidth;
-    const hour = timeLabels[i];
-    const timeStr = `${hour.toString().padStart(2, '0')}:00`;
+  const timeLabels = [0, 4, 8, 12, 16, 20, 24];
+  for (let i = 0; i < timeLabels.length; i++) {
+    const x = paddingLeft + (timeLabels[i] / 24) * chartWidth;
+    const timeStr = `${timeLabels[i].toString().padStart(2, '0')}:00`;
     xAxisLabels += `<text x="${x}" y="${height - paddingBottom + 18}" fill="#9ca3af" font-size="10" text-anchor="middle" font-family="monospace">${timeStr}</text>`;
   }
   // X-axis line
   xAxisLabels += `<line x1="${paddingLeft}" y1="${height - paddingBottom}" x2="${width - paddingRight}" y2="${height - paddingBottom}" stroke="#6b7280" stroke-width="1"/>`;
   xAxisLabels += `<text x="${paddingLeft + chartWidth / 2}" y="${height - 8}" fill="#9ca3af" font-size="11" text-anchor="middle">Time (AEDT)</text>`;
   
-  // Calculate total session duration in hours for proper time mapping
-  const totalSessionHours = sessionHours.length;
-  
-  // Helper: Map hour index to X coordinate based on session
-  const hourToX = (hourIdx) => {
-    return paddingLeft + (hourIdx / (totalSessionHours - 1 || 1)) * chartWidth;
+  // Helper: Map hour (0-24) to X coordinate
+  const hourToX = (hour) => {
+    return paddingLeft + (hour / 24) * chartWidth;
   };
   
-  // Helper: Map actual timestamp to X coordinate
+  // Helper: Map actual timestamp to X coordinate (based on hour of day, 0-24)
   const timeToX = (timestamp) => {
     const date = new Date(timestamp * 1000);
     const hour = date.getHours();
     const minute = date.getMinutes();
-    
-    // Find position in session
-    let hoursFromStart = 0;
-    if (endHour >= startHour) {
-      hoursFromStart = (hour - startHour) + minute / 60;
-    } else {
-      // Overnight session
-      if (hour >= startHour) {
-        hoursFromStart = (hour - startHour) + minute / 60;
-      } else {
-        hoursFromStart = (24 - startHour + hour) + minute / 60;
-      }
-    }
-    
-    // Clamp to valid range
-    hoursFromStart = Math.max(0, Math.min(hoursFromStart, totalSessionHours - 1));
-    return paddingLeft + (hoursFromStart / (totalSessionHours - 1 || 1)) * chartWidth;
+    const hourDecimal = hour + minute / 60;
+    return paddingLeft + (hourDecimal / 24) * chartWidth;
   };
   
   // === PREDICTED LINE (blue) ===
