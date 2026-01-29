@@ -3902,7 +3902,15 @@ Be concise but helpful. Use your learned data to inform your responses. If asked
 
 // Generate AI Market Newscast Text
 app.post('/api/newscast/generate', async (req, res) => {
-  const { forecastData, asset, currentPrice, brainData, presenter } = req.body;
+  const { forecastData, asset, currentPrice, brainData, presenter, includeIntroAd, includeOutroAd } = req.body;
+  
+  const introAd = `[AD BREAK] Hey future trading legends! Ever look at your portfolio and think "I need to return some videotapes"? Bot Builder is here - the AI-powered bot generator that makes you feel like you have that superior brain. Craft ProRealTime bots with the precision of a business card in Silian Rail. Your algorithms will be so clean, so tastefully thick. Bot Builder - because your strategy should be killer. Now back to the show!
+
+`;
+  
+  const outroAd = `
+
+[SPONSOR MESSAGE] This broadcast was brought to you by Bot Builder - where AI meets trading excellence. Build smarter bots, execute better trades, and never miss another market opportunity. Bot Builder: Feed me a stray cat? No thanks, we'd rather feed you profits! Visit Bot Builder today.`;
   
   try {
     const now = new Date();
@@ -4005,8 +4013,13 @@ Remember to sound natural and conversational, like you're speaking to a friend w
       newscastText = gptResponse.choices[0]?.message?.content || '';
     }
     
+    let finalText = '';
+    if (includeIntroAd) finalText += introAd;
+    finalText += newscastText;
+    if (includeOutroAd) finalText += outroAd;
+    
     res.json({ 
-      text: newscastText,
+      text: finalText,
       timestamp: now.toISOString(),
       asset: assetName,
       presenter: presenterName

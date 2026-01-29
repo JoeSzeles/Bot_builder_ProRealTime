@@ -10920,6 +10920,11 @@ async function generateNewscast() {
       if (brainRes.ok) brainData = await brainRes.json();
     } catch (e) {}
     
+    const introAdCheckbox = document.getElementById('newscastIntroAdCheck');
+    const outroAdCheckbox = document.getElementById('newscastOutroAdCheck');
+    const includeIntroAd = introAdCheckbox ? introAdCheckbox.checked : false;
+    const includeOutroAd = outroAdCheckbox ? outroAdCheckbox.checked : false;
+    
     const response = await fetch('/api/newscast/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -10928,7 +10933,9 @@ async function generateNewscast() {
         asset,
         currentPrice,
         brainData,
-        presenter: selectedPresenter
+        presenter: selectedPresenter,
+        includeIntroAd,
+        includeOutroAd
       })
     });
     
