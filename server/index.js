@@ -4027,10 +4027,10 @@ app.post('/api/newscast/speak', async (req, res) => {
   
   try {
     const isSophie = presenter !== 'jack';
-    const voice = isSophie ? 'coral' : 'onyx';
+    const voice = isSophie ? 'shimmer' : 'onyx';
     const presenterName = isSophie ? 'Sophie Mitchell' : 'Jack Thompson';
     const presenterDesc = isSophie 
-      ? 'a super cute and bubbly Japanese anime girl with an adorable, high-energy voice' 
+      ? 'a super cute and bubbly girl with an adorable, youthful, high-energy voice' 
       : 'a confident and relaxed Australian radio presenter with a natural masculine voice';
     
     const speakStyle = isSophie
