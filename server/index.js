@@ -4088,7 +4088,7 @@ app.post('/api/newscast/speak', async (req, res) => {
       model: 'gpt-audio-mini',
       modalities: ['text', 'audio'],
       audio: { voice: voice, format: 'mp3' },
-      max_completion_tokens: 2048,
+      max_completion_tokens: 8192,
       messages: [
         { 
           role: 'system', 
