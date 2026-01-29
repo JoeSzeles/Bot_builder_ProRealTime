@@ -9221,13 +9221,17 @@ function generateMockForecast(asset, priceData, brainData) {
     
     // === DETAILED TRADE INFORMATION (using Backtest Simulation settings) ===
     const tradeDirection = direction === 'bullish' ? 'LONG' : 'SHORT';
-    const positionSize = backtestSettings.positionSize;
-    const spreadCost = backtestSettings.spreadCost * positionSize;
+    const positionSize = backtestSettings.positionSize; // $/point (e.g., $1/point)
     const fees = backtestSettings.orderFee * 2; // Entry + exit fees
     const priceDiff = direction === 'bullish' ? exitPrice - entryPrice : entryPrice - exitPrice;
-    const grossPnL = priceDiff * positionSize;
+    // Convert price difference to points (1 point = $0.01 for commodities like silver/gold)
+    const pointValue = 0.01; // Standard: 1 cent = 1 point
+    const priceDiffInPoints = priceDiff / pointValue; // e.g., $2.99 / 0.01 = 299 points
+    const grossPnL = priceDiffInPoints * positionSize; // 299 points * $1/point = $299
+    const spreadCostPoints = backtestSettings.spreadCost / pointValue; // Convert spread to points
+    const spreadCost = spreadCostPoints * positionSize;
     const netPnL = grossPnL - spreadCost - fees;
-    const capitalUsed = entryPrice * positionSize;
+    const capitalUsed = backtestSettings.capital; // Use capital from settings, not entry * position
     const returnPct = (netPnL / capitalUsed) * 100;
     
     // Trading hours for entry/exit using settings (Sydney time)
@@ -9283,6 +9287,8 @@ function generateMockForecast(asset, priceData, brainData) {
         positionSize,
         entryPrice,
         exitPrice,
+        priceDiff, // Actual price difference in $
+        points: priceDiffInPoints, // Points (1 point = $0.01)
         grossPnL,
         netPnL,
         fees,
@@ -9376,13 +9382,15 @@ async function runForecastBacktest(dayIndex) {
     close
   }));
   
-  // Simple backtest simulation
+  // Simple backtest simulation with point-based P/L
   const settings = {
     initialCapital: parseFloat(document.getElementById('initialCapital')?.value) || 2000,
+    positionSize: parseFloat(document.getElementById('backtestPositionSize')?.value) || 1, // $/point
     stopLoss: parseFloat(document.getElementById('stopLossPercent')?.value) || 2,
     takeProfit: parseFloat(document.getElementById('takeProfitPercent')?.value) || 5,
     orderFee: parseFloat(document.getElementById('orderFee')?.value) || 7
   };
+  const pointValue = 0.01; // 1 point = $0.01 (1 cent)
   
   const trades = [];
   let capital = settings.initialCapital;
@@ -9424,7 +9432,12 @@ async function runForecastBacktest(dayIndex) {
         trade.exitIdx = i;
         trade.exitPrice = c.close;
         trade.exitTime = `Hour ${i}`;
-        trade.pnl = (pnlPercent / 100) * capital - settings.orderFee * 2;
+        // Point-based P/L calculation (same as forecast trade)
+        const priceDiff = trade.type === 'long' ? (c.close - entryPrice) : (entryPrice - c.close);
+        const priceDiffInPoints = priceDiff / pointValue; // Convert $ to points
+        const grossPnl = priceDiffInPoints * settings.positionSize; // points × $/point
+        trade.points = priceDiffInPoints;
+        trade.pnl = grossPnl - settings.orderFee * 2; // Net P/L after fees
         trade.pnlPercent = pnlPercent;
         capital += trade.pnl;
         inPosition = false;
@@ -9719,7 +9732,7 @@ function showDayDetails(dayIndex) {
               <span class="font-bold">$${trade.capital.toLocaleString()}</span>
             </div>
           </div>
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm mt-2">
+          <div class="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm mt-2">
             <div>
               <span class="text-gray-500">Entry:</span>
               <span class="font-bold">$${trade.entryPrice.toFixed(2)}</span>
@@ -9727,6 +9740,10 @@ function showDayDetails(dayIndex) {
             <div>
               <span class="text-gray-500">Exit:</span>
               <span class="font-bold">$${trade.exitPrice.toFixed(2)}</span>
+            </div>
+            <div>
+              <span class="text-gray-500">Points:</span>
+              <span class="font-bold ${pnlClass}">${trade.points >= 0 ? '+' : ''}${trade.points.toFixed(0)}</span>
             </div>
             <div>
               <span class="text-gray-500">Gross P/L:</span>
