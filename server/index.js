@@ -4406,12 +4406,16 @@ app.get('/share/:audioId', (req, res) => {
   <meta property="og:audio:secure_url" content="${absoluteAudioUrl}">
   <meta property="og:audio:type" content="audio/mpeg">
   
-  <!-- Twitter -->
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:url" content="${shareUrl}">
+  <!-- Twitter Player Card - enables inline audio playback -->
+  <meta name="twitter:card" content="player">
   <meta name="twitter:title" content="${metadata.title}">
-  <meta name="twitter:description" content="Listen to this market broadcast from ${metadata.presenterName}">
+  <meta name="twitter:description" content="Listen to this market broadcast from ${metadata.presenterName} on ${metadata.stationName}">
   <meta name="twitter:image" content="${absoluteAvatarUrl}">
+  <meta name="twitter:player" content="${baseUrl}/embed/${audioId}">
+  <meta name="twitter:player:width" content="480">
+  <meta name="twitter:player:height" content="120">
+  <meta name="twitter:player:stream" content="${absoluteAudioUrl}">
+  <meta name="twitter:player:stream:content_type" content="audio/mpeg">
   
   <!-- oEmbed for rich embeds -->
   <link rel="alternate" type="application/json+oembed" href="${baseUrl}/oembed?url=${encodeURIComponent(shareUrl)}" title="${metadata.title}">
@@ -4538,6 +4542,102 @@ app.get('/oembed', (req, res) => {
     width: 480,
     height: 200
   });
+});
+
+// Minimal embed player for Twitter Player Cards
+app.get('/embed/:audioId', (req, res) => {
+  const { audioId } = req.params;
+  const audioDir = path.join(__dirname, '..', 'downloads', 'broadcasts');
+  const metaPath = path.join(audioDir, `${audioId}.json`);
+  
+  let metadata = {
+    title: 'Market Radio Broadcast',
+    presenterName: 'Market Radio',
+    avatar: '/images/presenter-caelix.png',
+    audioUrl: `/downloads/broadcasts/${audioId}.mp3`
+  };
+  
+  if (fs.existsSync(metaPath)) {
+    try {
+      metadata = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+    } catch (e) {}
+  }
+  
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  
+  // Minimal responsive player optimized for Twitter iframe embed
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${metadata.title}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { 
+      width: 100%; 
+      height: 100%; 
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    }
+    .player {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      height: 100%;
+      width: 100%;
+    }
+    .avatar {
+      width: 60px;
+      height: 60px;
+      border-radius: 8px;
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+    .info {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+    }
+    .title {
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 4px;
+    }
+    .presenter {
+      color: #ff6b9d;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 12px;
+    }
+    audio {
+      width: 100%;
+      height: 32px;
+      margin-top: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="player">
+    <img src="${metadata.avatar}" alt="${metadata.presenterName}" class="avatar">
+    <div class="info">
+      <div class="title">${metadata.title}</div>
+      <div class="presenter">${metadata.presenterName}</div>
+      <audio controls preload="auto">
+        <source src="${metadata.audioUrl}" type="audio/mpeg">
+      </audio>
+    </div>
+  </div>
+</body>
+</html>`;
+  
+  res.setHeader('Content-Type', 'text/html');
+  res.setHeader('X-Frame-Options', 'ALLOWALL');
+  res.send(html);
 });
 
 const PORT = process.env.PORT || 3001;

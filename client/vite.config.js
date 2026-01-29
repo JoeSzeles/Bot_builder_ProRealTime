@@ -19,6 +19,10 @@ export default defineConfig({
         target: 'http://localhost:3001',
         changeOrigin: true
       },
+      '/embed': {
+        target: 'http://localhost:3001',
+        changeOrigin: true
+      },
       '/oembed': {
         target: 'http://localhost:3001',
         changeOrigin: true
