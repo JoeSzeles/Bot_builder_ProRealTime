@@ -542,10 +542,21 @@
               </div>
               
               <!-- Day Chart (Blue=Predicted, Red=Actual) -->
-              <div class="flex items-center justify-end mb-1 gap-2">
-                <label class="text-xs text-gray-400">Height:</label>
-                <input type="range" id="forecastDayChartHeight" min="192" max="512" value="320" class="w-20 h-1 accent-blue-500">
-                <span id="forecastDayChartHeightLabel" class="text-xs text-gray-400 w-8">320</span>
+              <div class="flex items-center justify-end mb-1 gap-3">
+                <div class="flex items-center gap-1">
+                  <label class="text-xs text-gray-400" title="Higher granularity uses more data points for volatility analysis">Analysis:</label>
+                  <select id="forecastTimeframeSelect" class="bg-gray-800 text-white text-xs rounded px-2 py-1 border border-gray-600" title="Data granularity for volatility pattern analysis">
+                    <option value="1m">1m (high detail)</option>
+                    <option value="5m">5m</option>
+                    <option value="15m">15m</option>
+                    <option value="1h" selected>1h (default)</option>
+                  </select>
+                </div>
+                <div class="flex items-center gap-1">
+                  <label class="text-xs text-gray-400">Height:</label>
+                  <input type="range" id="forecastDayChartHeight" min="192" max="512" value="320" class="w-20 h-1 accent-blue-500">
+                  <span id="forecastDayChartHeightLabel" class="text-xs text-gray-400 w-8">320</span>
+                </div>
               </div>
               <div id="forecastDayChart" class="bg-gray-900 rounded-lg mb-2" style="height: 320px;"></div>
               
@@ -564,6 +575,15 @@
                   <p id="forecastExitPrice" class="text-lg font-bold text-red-700 dark:text-red-300">--</p>
                   <p id="forecastExitTime" class="text-xs text-red-600">--</p>
                 </div>
+              </div>
+              
+              <!-- AI Suggested Trades (multiple, future only) -->
+              <div id="forecastSuggestedTradesSection" class="hidden mb-4">
+                <div class="flex items-center justify-between mb-2">
+                  <h5 class="text-sm font-semibold text-purple-600 dark:text-purple-400">AI Trade Suggestions (Future Only)</h5>
+                  <span id="forecastTradeCount" class="text-xs text-gray-500">0 trades</span>
+                </div>
+                <div id="forecastSuggestedTradesList" class="space-y-2 max-h-40 overflow-y-auto"></div>
               </div>
               
               <!-- Direction & Confidence -->
