@@ -1168,9 +1168,14 @@
                       <div class="w-3 h-0.5 bg-cyan-400"></div>
                       <span class="text-gray-500 dark:text-gray-400">Equity</span>
                     </div>
+                    <div class="flex items-center gap-1 ml-4">
+                      <label class="text-gray-500 dark:text-gray-400">Height:</label>
+                      <input type="range" id="equityChartHeight" min="128" max="512" value="256" class="w-20 h-1 accent-cyan-500">
+                      <span id="equityChartHeightLabel" class="text-gray-500 dark:text-gray-400 w-8">256</span>
+                    </div>
                   </div>
                 </div>
-                <div id="equityCurveChart" class="h-32 w-full"></div>
+                <div id="equityCurveChart" class="w-full" style="height: 256px;"></div>
               </div>
 
               <!-- Price Chart with Trade Markers -->

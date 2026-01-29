@@ -4051,6 +4051,22 @@ function setupSimulator() {
   if (resetVarsBtn) {
     resetVarsBtn.addEventListener('click', resetVariablesToOriginal);
   }
+  
+  // Equity chart height slider
+  const equityHeightSlider = document.getElementById('equityChartHeight');
+  const equityHeightLabel = document.getElementById('equityChartHeightLabel');
+  if (equityHeightSlider) {
+    equityHeightSlider.addEventListener('input', () => {
+      const height = equityHeightSlider.value;
+      if (equityHeightLabel) equityHeightLabel.textContent = height;
+      // Resize chart if it exists
+      const container = document.getElementById('equityCurveChart');
+      if (container && equityChart) {
+        container.style.height = `${height}px`;
+        equityChart.resize(container.clientWidth, parseInt(height));
+      }
+    });
+  }
 }
 
 async function runSimulationWithModifiedVars() {
@@ -4903,10 +4919,14 @@ function createEquityCurveChart(equityData) {
   }
   
   const isDark = document.documentElement.classList.contains('dark');
+  const chartHeight = parseInt(document.getElementById('equityChartHeight')?.value) || 256;
+  
+  // Update container height
+  container.style.height = `${chartHeight}px`;
   
   equityChart = createChart(container, {
     width: container.clientWidth,
-    height: 128,
+    height: chartHeight,
     layout: {
       background: { type: ColorType.Solid, color: 'transparent' },
       textColor: isDark ? '#9ca3af' : '#6b7280',
