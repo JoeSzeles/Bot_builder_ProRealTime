@@ -9913,6 +9913,9 @@ function showDayDetails(dayIndex) {
   renderDayChart(day, dayIndex);
 }
 
+// Interval for forecast day chart price updates
+let forecastDayPriceInterval = null;
+
 function renderDayChart(day, dayIndex) {
   const container = document.getElementById('forecastDayChart');
   if (!container) return;
@@ -9942,121 +9945,329 @@ function renderDayChart(day, dayIndex) {
   const max = Math.max(...allPrices) * 1.002;
   const range = max - min || 1;
   
-  const width = container.clientWidth || 400;
+  const width = container.clientWidth || 500;
   const height = parseInt(document.getElementById('forecastDayChartHeight')?.value) || 320;
   container.style.height = `${height}px`;
-  const padding = 40;
   
-  // Draw predicted path
+  // Increased padding for axes
+  const paddingLeft = 70;
+  const paddingRight = 100;
+  const paddingTop = 30;
+  const paddingBottom = 50;
+  const chartWidth = width - paddingLeft - paddingRight;
+  const chartHeight = height - paddingTop - paddingBottom;
+  
+  // Get trading hours from settings
+  const tradingStartTime = document.getElementById('tradingStartTime')?.value || '00:00';
+  const tradingEndTime = document.getElementById('tradingEndTime')?.value || '23:59';
+  const [startHour] = tradingStartTime.split(':').map(Number);
+  const [endHour] = tradingEndTime.split(':').map(Number);
+  
+  // Calculate session hours (handle overnight)
+  const sessionHours = [];
+  if (endHour >= startHour) {
+    for (let h = startHour; h <= endHour; h++) sessionHours.push(h);
+  } else {
+    for (let h = startHour; h < 24; h++) sessionHours.push(h);
+    for (let h = 0; h <= endHour; h++) sessionHours.push(h);
+  }
+  
+  // === GRID LINES ===
+  let gridLines = '';
+  const numHorizontalLines = 5;
+  for (let i = 0; i <= numHorizontalLines; i++) {
+    const y = paddingTop + (i / numHorizontalLines) * chartHeight;
+    gridLines += `<line x1="${paddingLeft}" y1="${y}" x2="${width - paddingRight}" y2="${y}" stroke="#374151" stroke-width="1" stroke-opacity="0.3"/>`;
+  }
+  
+  // Vertical grid lines (for each time interval)
+  const numVerticalLines = Math.min(sessionHours.length, 12);
+  for (let i = 0; i <= numVerticalLines; i++) {
+    const x = paddingLeft + (i / numVerticalLines) * chartWidth;
+    gridLines += `<line x1="${x}" y1="${paddingTop}" x2="${x}" y2="${height - paddingBottom}" stroke="#374151" stroke-width="1" stroke-opacity="0.3"/>`;
+  }
+  
+  // === Y-AXIS (Price) ===
+  let yAxisLabels = '';
+  for (let i = 0; i <= numHorizontalLines; i++) {
+    const y = paddingTop + (i / numHorizontalLines) * chartHeight;
+    const price = max - (i / numHorizontalLines) * range;
+    yAxisLabels += `<text x="${paddingLeft - 8}" y="${y + 4}" fill="#9ca3af" font-size="11" text-anchor="end" font-family="monospace">$${price.toFixed(2)}</text>`;
+  }
+  // Y-axis line
+  yAxisLabels += `<line x1="${paddingLeft}" y1="${paddingTop}" x2="${paddingLeft}" y2="${height - paddingBottom}" stroke="#6b7280" stroke-width="1"/>`;
+  yAxisLabels += `<text x="${15}" y="${height / 2}" fill="#9ca3af" font-size="11" text-anchor="middle" transform="rotate(-90, 15, ${height / 2})">Price (USD)</text>`;
+  
+  // === X-AXIS (Time) ===
+  let xAxisLabels = '';
+  const timeLabels = sessionHours.length > 0 ? sessionHours : [0, 6, 12, 18, 24];
+  const labelStep = Math.ceil(timeLabels.length / 8); // Show max 8 labels
+  for (let i = 0; i < timeLabels.length; i += labelStep) {
+    const x = paddingLeft + (i / (timeLabels.length - 1 || 1)) * chartWidth;
+    const hour = timeLabels[i];
+    const timeStr = `${hour.toString().padStart(2, '0')}:00`;
+    xAxisLabels += `<text x="${x}" y="${height - paddingBottom + 18}" fill="#9ca3af" font-size="10" text-anchor="middle" font-family="monospace">${timeStr}</text>`;
+  }
+  // X-axis line
+  xAxisLabels += `<line x1="${paddingLeft}" y1="${height - paddingBottom}" x2="${width - paddingRight}" y2="${height - paddingBottom}" stroke="#6b7280" stroke-width="1"/>`;
+  xAxisLabels += `<text x="${paddingLeft + chartWidth / 2}" y="${height - 8}" fill="#9ca3af" font-size="11" text-anchor="middle">Time (AEDT)</text>`;
+  
+  // Calculate total session duration in hours for proper time mapping
+  const totalSessionHours = sessionHours.length;
+  
+  // Helper: Map hour index to X coordinate based on session
+  const hourToX = (hourIdx) => {
+    return paddingLeft + (hourIdx / (totalSessionHours - 1 || 1)) * chartWidth;
+  };
+  
+  // Helper: Map actual timestamp to X coordinate
+  const timeToX = (timestamp) => {
+    const date = new Date(timestamp * 1000);
+    const hour = date.getHours();
+    const minute = date.getMinutes();
+    
+    // Find position in session
+    let hoursFromStart = 0;
+    if (endHour >= startHour) {
+      hoursFromStart = (hour - startHour) + minute / 60;
+    } else {
+      // Overnight session
+      if (hour >= startHour) {
+        hoursFromStart = (hour - startHour) + minute / 60;
+      } else {
+        hoursFromStart = (24 - startHour + hour) + minute / 60;
+      }
+    }
+    
+    // Clamp to valid range
+    hoursFromStart = Math.max(0, Math.min(hoursFromStart, totalSessionHours - 1));
+    return paddingLeft + (hoursFromStart / (totalSessionHours - 1 || 1)) * chartWidth;
+  };
+  
+  // === PREDICTED LINE (blue) ===
   let predictedPath = '';
   predicted.forEach((p, j) => {
-    const x = padding + (j / (predicted.length - 1)) * (width - padding * 2);
-    const y = height - padding - ((p - min) / range) * (height - padding * 2);
+    // Predicted prices are evenly distributed across the session
+    const x = paddingLeft + (j / (predicted.length - 1 || 1)) * chartWidth;
+    const y = paddingTop + ((max - p) / range) * chartHeight;
     predictedPath += j === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`;
   });
   
-  // Draw actual candlesticks if available, otherwise draw line
-  let actualElements = '';
-  if (isToday && actualCandles.length > 0) {
-    // Render candlesticks for current day actual data
-    const candleWidth = Math.max(3, (width - padding * 2) / (Math.max(predicted.length, actualCandles.length) * 1.5));
+  // === REAL PRICE LINE (red) - from actualCandles, TIME-ALIGNED ===
+  let realPricePath = '';
+  let lastRealX = paddingLeft;
+  let lastRealY = paddingTop + chartHeight / 2;
+  
+  if (actualCandles.length > 0) {
     actualCandles.forEach((c, j) => {
-      const x = padding + (j / (actualCandles.length - 1 || 1)) * (width - padding * 2);
-      const openY = height - padding - ((c.open - min) / range) * (height - padding * 2);
-      const closeY = height - padding - ((c.close - min) / range) * (height - padding * 2);
-      const highY = height - padding - ((c.high - min) / range) * (height - padding * 2);
-      const lowY = height - padding - ((c.low - min) / range) * (height - padding * 2);
-      
-      const isBullish = c.close >= c.open;
-      const color = isBullish ? '#10b981' : '#ef4444';
-      const bodyTop = Math.min(openY, closeY);
-      const bodyHeight = Math.max(1, Math.abs(closeY - openY));
-      
-      // Wick (high-low line)
-      actualElements += `<line x1="${x}" y1="${highY}" x2="${x}" y2="${lowY}" stroke="${color}" stroke-width="1"/>`;
-      // Body (open-close rectangle)
-      actualElements += `<rect x="${x - candleWidth/2}" y="${bodyTop}" width="${candleWidth}" height="${bodyHeight}" fill="${isBullish ? color : color}" stroke="${color}" stroke-width="1"/>`;
+      // Use actual timestamp for X position
+      const x = c.time ? timeToX(c.time) : paddingLeft + (j / (actualCandles.length - 1 || 1)) * chartWidth;
+      const y = paddingTop + ((max - c.close) / range) * chartHeight;
+      realPricePath += j === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`;
+      lastRealX = x;
+      lastRealY = y;
     });
   } else if (actual.length > 0) {
-    // Fallback: draw line for actual prices
-    let actualPath = '';
     actual.forEach((p, j) => {
-      const x = padding + (j / (actual.length - 1)) * (width - padding * 2);
-      const y = height - padding - ((p - min) / range) * (height - padding * 2);
-      actualPath += j === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`;
+      const x = paddingLeft + (j / (actual.length - 1 || 1)) * chartWidth;
+      const y = paddingTop + ((max - p) / range) * chartHeight;
+      realPricePath += j === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`;
+      lastRealX = x;
+      lastRealY = y;
     });
-    actualElements = `<path d="${actualPath}" fill="none" stroke="#f97316" stroke-width="2" />`;
   }
   
-  // Mark entry and exit points from backtest
+  // === CURRENT PRICE DOT (blinking yellow 4px) ===
+  let currentPriceDot = '';
+  if (isToday && currentPrice) {
+    // Position at the last actual candle's time position (not chart edge)
+    const dotX = lastRealX;
+    const dotY = paddingTop + ((max - currentPrice) / range) * chartHeight;
+    
+    currentPriceDot = `
+      <circle cx="${dotX}" cy="${dotY}" r="4" fill="#fbbf24" class="forecast-price-dot">
+        <animate attributeName="opacity" values="1;0.4;1" dur="0.8s" repeatCount="indefinite"/>
+      </circle>
+      <rect x="${dotX + 8}" y="${dotY - 10}" width="60" height="20" fill="#fbbf24" rx="3"/>
+      <text x="${dotX + 38}" y="${dotY + 4}" fill="#1f2937" font-size="11" text-anchor="middle" font-weight="bold">$${currentPrice.toFixed(2)}</text>
+    `;
+  }
+  
+  // === TRADE MARKERS ===
   let tradeMarkers = '';
   const bt = day.backtestResult;
   if (bt && bt.trades.length > 0) {
     bt.trades.forEach(trade => {
-      const entryX = padding + (trade.entryIdx / (predicted.length - 1)) * (width - padding * 2);
-      const entryY = height - padding - ((trade.entryPrice - min) / range) * (height - padding * 2);
-      const exitX = padding + (trade.exitIdx / (predicted.length - 1)) * (width - padding * 2);
-      const exitY = height - padding - ((trade.exitPrice - min) / range) * (height - padding * 2);
+      const entryX = paddingLeft + (trade.entryIdx / (predicted.length - 1 || 1)) * chartWidth;
+      const entryY = paddingTop + ((max - trade.entryPrice) / range) * chartHeight;
+      const exitX = paddingLeft + (trade.exitIdx / (predicted.length - 1 || 1)) * chartWidth;
+      const exitY = paddingTop + ((max - trade.exitPrice) / range) * chartHeight;
       
       const color = trade.pnl >= 0 ? '#10b981' : '#ef4444';
       tradeMarkers += `
-        <line x1="${entryX}" y1="${entryY}" x2="${exitX}" y2="${exitY}" stroke="${color}" stroke-width="1" stroke-dasharray="3,2"/>
-        <circle cx="${entryX}" cy="${entryY}" r="4" fill="#3b82f6" stroke="white" stroke-width="1"/>
-        <circle cx="${exitX}" cy="${exitY}" r="4" fill="${color}" stroke="white" stroke-width="1"/>
+        <line x1="${entryX}" y1="${entryY}" x2="${exitX}" y2="${exitY}" stroke="${color}" stroke-width="2" stroke-dasharray="4,3"/>
+        <circle cx="${entryX}" cy="${entryY}" r="5" fill="#3b82f6" stroke="white" stroke-width="2"/>
+        <circle cx="${exitX}" cy="${exitY}" r="5" fill="${color}" stroke="white" stroke-width="2"/>
       `;
     });
   }
   
-  // Time labels for trading hours (from settings)
-  const tradingHours = day.tradingStart && day.tradingEnd ? 
-    `${day.tradingStart.split(' ')[0]} - ${day.tradingEnd.split(' ')[0]}` : 
-    `${document.getElementById('tradingStartTime')?.value || '00:00'} - ${document.getElementById('tradingEndTime')?.value || '23:59'}`;
+  // === LEGEND BOX ===
+  const legendX = width - paddingRight + 10;
+  let legendY = paddingTop + 10;
+  let legendItems = `
+    <rect x="${legendX - 5}" y="${legendY - 8}" width="90" height="${isToday && currentPrice ? 85 : 55}" fill="#1f2937" fill-opacity="0.9" rx="4" stroke="#374151"/>
+    <text x="${legendX}" y="${legendY + 5}" fill="#d1d5db" font-size="10" font-weight="bold">LEGEND</text>
+  `;
+  legendY += 18;
   
-  // Current price line (red horizontal line) for today
-  let currentPriceLine = '';
-  if (isToday && currentPrice) {
-    const cpY = height - padding - ((currentPrice - min) / range) * (height - padding * 2);
-    currentPriceLine = `
-      <line x1="${padding}" y1="${cpY}" x2="${width - padding}" y2="${cpY}" stroke="#ef4444" stroke-width="2" stroke-dasharray="5,3"/>
-      <rect x="${width - padding - 50}" y="${cpY - 8}" width="50" height="16" fill="#ef4444" rx="2"/>
-      <text x="${width - padding - 25}" y="${cpY + 4}" fill="white" font-size="10" text-anchor="middle">$${currentPrice.toFixed(2)}</text>
-    `;
+  // Predicted
+  legendItems += `<line x1="${legendX}" y1="${legendY}" x2="${legendX + 15}" y2="${legendY}" stroke="#3b82f6" stroke-width="2"/>`;
+  legendItems += `<text x="${legendX + 20}" y="${legendY + 4}" fill="#9ca3af" font-size="10">Predicted</text>`;
+  legendY += 16;
+  
+  // Actual/Real
+  if (realPricePath) {
+    legendItems += `<line x1="${legendX}" y1="${legendY}" x2="${legendX + 15}" y2="${legendY}" stroke="#ef4444" stroke-width="2"/>`;
+    legendItems += `<text x="${legendX + 20}" y="${legendY + 4}" fill="#9ca3af" font-size="10">Actual</text>`;
+    legendY += 16;
   }
   
-  let legendY = 15;
-  const legendItems = [];
-  legendItems.push(`<circle cx="${width - 80}" cy="${legendY}" r="4" fill="#3b82f6"/><text x="${width - 70}" y="${legendY + 3}" fill="#9ca3af" font-size="10">Predicted</text>`);
-  legendY += 15;
+  // Current Price
   if (isToday && currentPrice) {
-    legendItems.push(`<circle cx="${width - 80}" cy="${legendY}" r="4" fill="#ef4444"/><text x="${width - 70}" y="${legendY + 3}" fill="#9ca3af" font-size="10">Current</text>`);
-    legendY += 15;
+    legendItems += `<circle cx="${legendX + 7}" cy="${legendY}" r="4" fill="#fbbf24"/>`;
+    legendItems += `<text x="${legendX + 20}" y="${legendY + 4}" fill="#9ca3af" font-size="10">Current</text>`;
+    legendY += 16;
   }
-  if (actualCandles.length > 0 || actual.length > 0) {
-    legendItems.push(`<rect x="${width - 82}" y="${legendY - 4}" width="5" height="8" fill="#10b981"/><text x="${width - 70}" y="${legendY + 3}" fill="#9ca3af" font-size="10">Actual</text>`);
-    legendY += 15;
-  }
+  
+  // Trades
   if (bt && bt.trades.length > 0) {
-    legendItems.push(`<circle cx="${width - 80}" cy="${legendY}" r="4" fill="#10b981"/><text x="${width - 70}" y="${legendY + 3}" fill="#9ca3af" font-size="10">Trades</text>`);
+    legendItems += `<circle cx="${legendX + 7}" cy="${legendY}" r="4" fill="#10b981"/>`;
+    legendItems += `<text x="${legendX + 20}" y="${legendY + 4}" fill="#9ca3af" font-size="10">Trades</text>`;
   }
   
+  // === RENDER SVG ===
   container.innerHTML = `
-    <svg width="${width}" height="${height}" class="w-full h-full">
+    <svg width="${width}" height="${height}" class="w-full h-full" style="background: #111827; border-radius: 8px;">
       <defs>
-        <linearGradient id="predictedGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.3"/>
+        <linearGradient id="predictedAreaGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.2"/>
           <stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/>
         </linearGradient>
       </defs>
-      <text x="${padding}" y="15" fill="#9ca3af" font-size="10">$${max.toFixed(2)}</text>
-      <text x="${padding}" y="${height - 5}" fill="#9ca3af" font-size="10">$${min.toFixed(2)}</text>
-      <text x="${width / 2}" y="${height - 5}" fill="#9ca3af" font-size="9" text-anchor="middle">${tradingHours} AEDT</text>
-      <path d="${predictedPath}" fill="none" stroke="#3b82f6" stroke-width="2" />
-      ${actualElements}
-      ${currentPriceLine}
+      
+      <!-- Grid -->
+      ${gridLines}
+      
+      <!-- Axes -->
+      ${yAxisLabels}
+      ${xAxisLabels}
+      
+      <!-- Predicted Line -->
+      ${predictedPath ? `<path d="${predictedPath}" fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>` : ''}
+      
+      <!-- Real Price Line (red) -->
+      ${realPricePath ? `<path d="${realPricePath}" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>` : ''}
+      
+      <!-- Trade Markers -->
       ${tradeMarkers}
-      ${legendItems.join('')}
+      
+      <!-- Current Price Dot (blinking yellow) -->
+      ${currentPriceDot}
+      
+      <!-- Legend -->
+      ${legendItems}
     </svg>
   `;
+  
+  // Start 30-second price updates for today's chart
+  if (isToday) {
+    startForecastDayPriceUpdates(dayIndex);
+  }
+}
+
+// 30-second current price update for forecast day chart
+function startForecastDayPriceUpdates(dayIndex) {
+  if (forecastDayPriceInterval) {
+    clearInterval(forecastDayPriceInterval);
+  }
+  
+  forecastDayPriceInterval = setInterval(async () => {
+    if (!forecastData.days || forecastData.days.length === 0) return;
+    const forecastTab = document.getElementById('forecastTab');
+    if (!forecastTab || forecastTab.classList.contains('hidden')) return;
+    
+    try {
+      const day = forecastData.days[dayIndex];
+      if (!day) return;
+      
+      const asset = forecastData.asset || 'XAGUSD';
+      const response = await fetch(`/api/yahoo-candles?symbol=${encodeURIComponent(asset)}&range=1d&interval=5m`);
+      if (!response.ok) return;
+      
+      const data = await response.json();
+      const candles = data.candles || data.data || [];
+      if (candles.length === 0) return;
+      
+      // Get latest price
+      const latestPrice = candles[candles.length - 1]?.close;
+      if (latestPrice && latestPrice !== day.currentPrice) {
+        day.currentPrice = latestPrice;
+        
+        // Update actual candles too (hourly aggregation from 5m data)
+        const hourlyCandles = [];
+        let hourGroup = [];
+        let currentHour = null;
+        
+        candles.forEach(c => {
+          const candleHour = new Date(c.time * 1000).getHours();
+          if (currentHour === null) currentHour = candleHour;
+          
+          if (candleHour !== currentHour && hourGroup.length > 0) {
+            hourlyCandles.push({
+              open: hourGroup[0].open,
+              high: Math.max(...hourGroup.map(h => h.high)),
+              low: Math.min(...hourGroup.map(h => h.low)),
+              close: hourGroup[hourGroup.length - 1].close,
+              time: hourGroup[0].time
+            });
+            hourGroup = [];
+            currentHour = candleHour;
+          }
+          hourGroup.push(c);
+        });
+        
+        // Add remaining hour group
+        if (hourGroup.length > 0) {
+          hourlyCandles.push({
+            open: hourGroup[0].open,
+            high: Math.max(...hourGroup.map(h => h.high)),
+            low: Math.min(...hourGroup.map(h => h.low)),
+            close: hourGroup[hourGroup.length - 1].close,
+            time: hourGroup[0].time
+          });
+        }
+        
+        if (hourlyCandles.length > 0) {
+          day.actualCandles = hourlyCandles;
+          day.actualPrices = hourlyCandles.map(c => c.close);
+        }
+        
+        // Re-render chart with updated data
+        renderDayChart(day, dayIndex);
+        
+        // Update current price display
+        const priceValueEl = document.getElementById('forecastCurrentPriceValue');
+        if (priceValueEl) {
+          priceValueEl.textContent = `$${latestPrice.toFixed(2)}`;
+        }
+        
+        console.log(`Forecast day chart updated: $${latestPrice.toFixed(2)}`);
+      }
+    } catch (e) {
+      console.warn('Forecast day price update failed:', e);
+    }
+  }, 30000); // 30 seconds
 }
 
 function checkAndRotateForecast() {
