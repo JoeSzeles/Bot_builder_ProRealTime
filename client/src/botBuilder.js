@@ -9222,13 +9222,16 @@ function generateFutureTrades({ prediction, currentHour, currentPrice, brainData
             entryPrice: point.price,
             entryTime: `${String(Math.floor(pointHour)).padStart(2, '0')}:00`,
             entryHour: pointHour,
+            entryIdx: point.idx,
             exitPrice: nextHigh.price,
             exitTime: `${String(Math.min(23, Math.floor(exitHour))).padStart(2, '0')}:00`,
             exitHour: exitHour,
+            exitIdx: nextHigh.idx,
             expectedPnL: pnlPercent.toFixed(2) + '%',
             confidence: Math.min(90, 60 + volatilityStats.avgRange * 10)
           });
           lastTradeType = 'entry';
+          i = swingPoints.indexOf(nextHigh); // Skip to after this trade
         }
       }
     } else if (point.type === 'high' && lastTradeType !== 'entry') {
@@ -9244,13 +9247,16 @@ function generateFutureTrades({ prediction, currentHour, currentPrice, brainData
             entryPrice: point.price,
             entryTime: `${String(Math.floor(pointHour)).padStart(2, '0')}:00`,
             entryHour: pointHour,
+            entryIdx: point.idx,
             exitPrice: nextLow.price,
             exitTime: `${String(Math.min(23, Math.floor(exitHour))).padStart(2, '0')}:00`,
             exitHour: exitHour,
+            exitIdx: nextLow.idx,
             expectedPnL: pnlPercent.toFixed(2) + '%',
             confidence: Math.min(90, 60 + volatilityStats.avgRange * 10)
           });
           lastTradeType = 'entry';
+          i = swingPoints.indexOf(nextLow); // Skip to after this trade
         }
       }
     }
@@ -10495,18 +10501,33 @@ function renderDayChart(day, dayIndex) {
     });
   }
   
-  // === SUGGESTED TRADE MARKERS (future trades from AI) ===
+  // === SUGGESTED TRADE MARKERS (future trades from AI, aligned with prediction line) ===
   const suggestedTrades = day.suggestedTrades || [];
   if (isToday && suggestedTrades.length > 0) {
     suggestedTrades.forEach((trade, idx) => {
-      // Use entryHour/exitHour for time-aligned positioning
-      const entryHour = trade.entryHour || parseInt(trade.entryTime?.split(':')[0]) || 0;
-      const exitHour = trade.exitHour || parseInt(trade.exitTime?.split(':')[0]) || 0;
+      // Use prediction index for X positioning to align with prediction line
+      let entryX, exitX, entryY, exitY;
       
-      const entryX = paddingLeft + (entryHour / 24) * chartWidth;
-      const exitX = paddingLeft + (exitHour / 24) * chartWidth;
-      const entryY = paddingTop + ((max - trade.entryPrice) / range) * chartHeight;
-      const exitY = paddingTop + ((max - trade.exitPrice) / range) * chartHeight;
+      if (trade.entryIdx != null && trade.exitIdx != null && predicted.length > 0) {
+        // Index-based positioning aligned with prediction line
+        const entryHourOffset = (trade.entryIdx / (predicted.length - 1 || 1)) * predictionSpan;
+        const exitHourOffset = (trade.exitIdx / (predicted.length - 1 || 1)) * predictionSpan;
+        entryX = paddingLeft + ((predictionStartHour + entryHourOffset) / 24) * chartWidth;
+        exitX = paddingLeft + ((predictionStartHour + exitHourOffset) / 24) * chartWidth;
+        // Use prediction values at those indices for Y (ensures alignment)
+        const entryPredPrice = predicted[trade.entryIdx] || trade.entryPrice;
+        const exitPredPrice = predicted[trade.exitIdx] || trade.exitPrice;
+        entryY = paddingTop + ((max - entryPredPrice) / range) * chartHeight;
+        exitY = paddingTop + ((max - exitPredPrice) / range) * chartHeight;
+      } else {
+        // Fallback to hour-based positioning
+        const entryHour = trade.entryHour || parseInt(trade.entryTime?.split(':')[0]) || 0;
+        const exitHour = trade.exitHour || parseInt(trade.exitTime?.split(':')[0]) || 0;
+        entryX = paddingLeft + (entryHour / 24) * chartWidth;
+        exitX = paddingLeft + (exitHour / 24) * chartWidth;
+        entryY = paddingTop + ((max - trade.entryPrice) / range) * chartHeight;
+        exitY = paddingTop + ((max - trade.exitPrice) / range) * chartHeight;
+      }
       
       const color = trade.direction === 'LONG' ? '#22c55e' : '#f97316';
       tradeMarkers += `
