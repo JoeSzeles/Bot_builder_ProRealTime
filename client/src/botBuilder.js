@@ -10906,6 +10906,39 @@ function setupNewscastHandlers() {
   document.getElementById('shareFacebookBtn')?.addEventListener('click', () => shareToSocial('facebook'));
   document.getElementById('shareLinkedInBtn')?.addEventListener('click', () => shareToSocial('linkedin'));
   document.getElementById('shareCopyBtn')?.addEventListener('click', copyNewscastToClipboard);
+  
+  document.getElementById('newscastSkipBack')?.addEventListener('click', () => {
+    if (newscastAudio) {
+      newscastAudio.currentTime = Math.max(0, newscastAudio.currentTime - 10);
+    }
+  });
+  
+  document.getElementById('newscastSkipForward')?.addEventListener('click', () => {
+    if (newscastAudio) {
+      newscastAudio.currentTime = Math.min(newscastAudio.duration, newscastAudio.currentTime + 10);
+    }
+  });
+  
+  document.getElementById('newscastDownload')?.addEventListener('click', () => {
+    if (newscastAudioUrl) {
+      const a = document.createElement('a');
+      a.href = newscastAudioUrl;
+      a.download = `market-radio-${new Date().toISOString().split('T')[0]}.mp3`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } else {
+      alert('Play the broadcast first to generate the audio file');
+    }
+  });
+  
+  document.getElementById('newscastProgressTrack')?.addEventListener('click', (e) => {
+    if (newscastAudio && newscastAudio.duration) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const percent = (e.clientX - rect.left) / rect.width;
+      newscastAudio.currentTime = percent * newscastAudio.duration;
+    }
+  });
 }
 
 function toggleSharePanel() {
