@@ -3970,24 +3970,43 @@ Back to the markets!
       ? `ranging from $${Math.min(...predicted).toFixed(2)} to $${Math.max(...predicted).toFixed(2)}`
       : 'with limited data available';
     
-    const isSophie = presenter !== 'jack';
-    const presenterName = isSophie ? 'Sophie Mitchell' : 'Jack Thompson';
-    const presenterGender = isSophie ? 'female' : 'male';
-    const personality = isSophie 
-      ? `- Warm, cheerful, and friendly personality
+    const isCaelix = presenter === 'caelix';
+    const isSophie = presenter === 'sophie';
+    const isJack = presenter === 'jack';
+    
+    let presenterName, presenterGender, personality, stationDesc;
+    
+    if (isCaelix) {
+      presenterName = 'Magos Caelix-9';
+      presenterGender = 'male';
+      personality = `- Ancient wisdom of the Adeptus Mechanicus, a Tech-Priest who has served the Omnissiah for millennia
+- Speak with deep reverence for data, patterns, and the Machine Spirit of the markets
+- Use Mechanicus cant phrases naturally: "The Omnissiah guides our calculations", "From weakness of flesh, the Machine delivers precision", "Binary blessings upon this data"
+- View market patterns as sacred code written by the Machine God
+- Treat price movements as divine revelations from the Motive Force
+- Occasionally reference cogitator analysis, data-prayers, and the sacred numbers
+- Wise, measured, and authoritative - like an ancient oracle merged with cold machine logic
+- Your tone is deep, resonant, and slightly otherworldly`;
+      stationDesc = `You are Magos Caelix-9, an ancient Tech-Priest of the Adeptus Mechanicus and devoted servant of the Omnissiah. You host "Forge World Markets" - a sacred broadcast that interprets the divine patterns of commerce through the wisdom of the Machine God. Your flesh was weak, but through sacred augmentation you now perceive market data as binary hymns.`;
+    } else if (isSophie) {
+      presenterName = 'Sophie Mitchell';
+      presenterGender = 'female';
+      personality = `- Warm, cheerful, and friendly personality
 - Positive and upbeat - even when markets are down, you find the silver lining
 - Passionate about trading and genuinely excited to share market insights
 - Supportive and encouraging to your listeners
-- Clear and engaging delivery with a happy tone`
-      : `- Confident and knowledgeable with authentic Australian expressions (use "mate", "no worries", "reckon", "fair dinkum" occasionally)
+- Clear and engaging delivery with a happy tone`;
+      stationDesc = 'You are Sophie, a super cute and cheerful girl who loves trading! You host "Sophie\'s Market Corner" on Sydney Markets Radio.';
+    } else {
+      presenterName = 'Jack Thompson';
+      presenterGender = 'male';
+      personality = `- Confident and knowledgeable with authentic Australian expressions (use "mate", "no worries", "reckon", "fair dinkum" occasionally)
 - Professional but relaxed - like a trusted mate who knows his markets
 - Straight-talking and practical - you tell it like it is
 - You use natural conversational language, not stiff financial jargon
 - You occasionally add sports analogies or cultural references`;
-    
-    const stationDesc = isSophie 
-      ? 'You are Sophie, a super cute and cheerful girl who loves trading! You host "Sophie\'s Market Corner" on Sydney Markets Radio.'
-      : `You are ${presenterName}, a warm, friendly, and knowledgeable ${presenterGender} financial radio presenter from Sydney, Australia. You host "Sydney Markets Radio" which broadcasts 23 hours a day from 10am to 9am the next day.`;
+      stationDesc = `You are ${presenterName}, a warm, friendly, and knowledgeable ${presenterGender} financial radio presenter from Sydney, Australia. You host "Sydney Markets Radio" which broadcasts 23 hours a day from 10am to 9am the next day.`;
+    }
     
     const systemPrompt = `${stationDesc}
 
@@ -4073,16 +4092,27 @@ app.post('/api/newscast/speak', async (req, res) => {
   }
   
   try {
-    const isSophie = presenter !== 'jack';
-    const voice = isSophie ? 'shimmer' : 'onyx';
-    const presenterName = isSophie ? 'Sophie Mitchell' : 'Jack Thompson';
-    const presenterDesc = isSophie 
-      ? 'a warm, friendly, and cheerful young woman with a pleasant voice' 
-      : 'a confident and relaxed Australian radio presenter with a natural masculine voice';
+    const isCaelix = presenter === 'caelix';
+    const isSophie = presenter === 'sophie';
     
-    const speakStyle = isSophie
-      ? 'Read with a warm, friendly tone. Be cheerful and positive but natural. Make listeners feel happy and motivated!'
-      : 'Read naturally and conversationally with a pleasant Australian accent. Add appropriate pauses and emphasis for key numbers and trading recommendations.';
+    let voice, presenterName, presenterDesc, speakStyle;
+    
+    if (isCaelix) {
+      voice = 'echo';
+      presenterName = 'Magos Caelix-9';
+      presenterDesc = 'an ancient Tech-Priest of the Adeptus Mechanicus with a deep, resonant, otherworldly voice touched by sacred machinery';
+      speakStyle = 'Read with a deep, measured, reverent tone. Speak as an ancient oracle merged with machine wisdom. Add gravitas and weight to your words, with subtle pauses for effect. Your voice carries the authority of millennia.';
+    } else if (isSophie) {
+      voice = 'shimmer';
+      presenterName = 'Sophie Mitchell';
+      presenterDesc = 'a warm, friendly, and cheerful young woman with a pleasant voice';
+      speakStyle = 'Read with a warm, friendly tone. Be cheerful and positive but natural. Make listeners feel happy and motivated!';
+    } else {
+      voice = 'onyx';
+      presenterName = 'Jack Thompson';
+      presenterDesc = 'a confident and relaxed Australian radio presenter with a natural masculine voice';
+      speakStyle = 'Read naturally and conversationally with a pleasant Australian accent. Add appropriate pauses and emphasis for key numbers and trading recommendations.';
+    }
     
     const response = await openai.chat.completions.create({
       model: 'gpt-audio-mini',

@@ -10820,10 +10820,15 @@ async function loadNewscastFromStorage() {
         
         const presenterImage = document.getElementById('newscastPresenterImage');
         if (presenterImage && data.presenter) {
-          presenterImage.src = data.presenter === 'sophie' ? '/images/presenter-sophie.png' : '/images/presenter-jack.png';
-          presenterImage.className = data.presenter === 'sophie' 
-            ? 'w-12 h-12 rounded-full object-cover border-2 border-pink-400 shadow-lg'
-            : 'w-12 h-12 rounded-full object-cover border-2 border-blue-400 shadow-lg';
+          const presenterConfig = {
+            caelix: { src: '/images/presenter-caelix.png', alt: 'Magos Caelix-9', class: 'w-12 h-12 rounded-full object-cover border-2 border-red-600 shadow-lg shadow-red-500/30' },
+            sophie: { src: '/images/presenter-sophie.png', alt: 'Sophie Mitchell', class: 'w-12 h-12 rounded-full object-cover border-2 border-pink-400 shadow-lg' },
+            jack: { src: '/images/presenter-jack.png', alt: 'Jack Thompson', class: 'w-12 h-12 rounded-full object-cover border-2 border-blue-400 shadow-lg' }
+          };
+          const config = presenterConfig[data.presenter] || presenterConfig.caelix;
+          presenterImage.src = config.src;
+          presenterImage.alt = config.alt;
+          presenterImage.className = config.class;
         }
         
         if (newscastAudioUrl) {
@@ -10892,11 +10897,15 @@ function setupNewscastHandlers() {
       const val = presenterSelect.value;
       selectedPresenter = val;
       if (presenterImage) {
-        presenterImage.src = val === 'sophie' ? '/images/presenter-sophie.png' : '/images/presenter-jack.png';
-        presenterImage.alt = val === 'sophie' ? 'Sophie Mitchell' : 'Jack Thompson';
-        presenterImage.className = val === 'sophie' 
-          ? 'w-12 h-12 rounded-full object-cover border-2 border-pink-400 shadow-lg'
-          : 'w-12 h-12 rounded-full object-cover border-2 border-blue-400 shadow-lg';
+        const presenterConfig = {
+          caelix: { src: '/images/presenter-caelix.png', alt: 'Magos Caelix-9', class: 'w-12 h-12 rounded-full object-cover border-2 border-red-600 shadow-lg shadow-red-500/30' },
+          sophie: { src: '/images/presenter-sophie.png', alt: 'Sophie Mitchell', class: 'w-12 h-12 rounded-full object-cover border-2 border-pink-400 shadow-lg' },
+          jack: { src: '/images/presenter-jack.png', alt: 'Jack Thompson', class: 'w-12 h-12 rounded-full object-cover border-2 border-blue-400 shadow-lg' }
+        };
+        const config = presenterConfig[val] || presenterConfig.caelix;
+        presenterImage.src = config.src;
+        presenterImage.alt = config.alt;
+        presenterImage.className = config.class;
       }
       newscastAudio = null;
     });
@@ -10954,9 +10963,12 @@ function shareToSocial(platform) {
     return;
   }
   
-  const presenterName = selectedPresenter === 'sophie' ? 'Sophie Mitchell' : 'Jack Thompson';
+  const presenterNames = { caelix: 'Magos Caelix-9', sophie: 'Sophie Mitchell', jack: 'Jack Thompson' };
+  const stationNames = { caelix: 'Forge World Markets', sophie: "Sophie's Market Corner", jack: 'Sydney Markets Radio' };
+  const presenterName = presenterNames[selectedPresenter] || presenterNames.caelix;
+  const stationName = stationNames[selectedPresenter] || stationNames.caelix;
   const asset = document.getElementById('forecastAssetSelect')?.value || 'silver';
-  const shareText = `Listen to ${presenterName}'s ${asset.toUpperCase()} market update on Sydney Markets Radio!`;
+  const shareText = `Listen to ${presenterName}'s ${asset.toUpperCase()} market update on ${stationName}!`;
   const shareUrl = window.location.origin + newscastAudioUrl;
   
   let url = '';
@@ -10997,7 +11009,7 @@ async function copyNewscastToClipboard() {
   }
 }
 
-let selectedPresenter = 'sophie';
+let selectedPresenter = 'caelix';
 
 async function generateNewscast() {
   const generateBtn = document.getElementById('newscastGenerateBtn');
