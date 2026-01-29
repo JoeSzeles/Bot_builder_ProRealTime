@@ -9337,9 +9337,9 @@ function generateMockForecast(asset, priceData, brainData) {
     // Get actual candles for today (first trading day) - full OHLC data for candlestick chart
     let actualPrices = [];
     let actualCandles = [];
-    if (isToday && recentPrices.length >= 24) {
-      // Get hourly candles for today
-      const todayCandles = recentPrices.slice(-Math.min(24, sessionDuration));
+    if (isToday && recentPrices.length > 0) {
+      // Get hourly candles for today - use whatever data we have
+      const todayCandles = recentPrices.slice(-Math.min(24, recentPrices.length));
       actualPrices = todayCandles.map(p => p.close);
       actualCandles = todayCandles.map(p => ({
         open: p.open,
@@ -9741,12 +9741,37 @@ function renderMiniCharts() {
 
 let currentDetailDayIndex = 0;
 
-function showDayDetails(dayIndex) {
+async function showDayDetails(dayIndex) {
   const day = forecastData.days[dayIndex];
   if (!day) return;
   
   currentDetailDayIndex = dayIndex;
   const isToday = dayIndex === 0;
+  
+  // Fetch fresh real price data for today
+  if (isToday) {
+    try {
+      const asset = forecastData.asset || 'XAGUSD';
+      const response = await fetch(`/api/yahoo-candles?symbol=${encodeURIComponent(asset)}&range=1d&interval=1h`);
+      if (response.ok) {
+        const data = await response.json();
+        const candles = data.candles || data.data || [];
+        if (candles.length > 0) {
+          day.actualCandles = candles.map(c => ({
+            open: c.open,
+            high: c.high,
+            low: c.low,
+            close: c.close,
+            time: c.time
+          }));
+          day.actualPrices = candles.map(c => c.close);
+          day.currentPrice = candles[candles.length - 1]?.close;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to fetch real price data:', e);
+    }
+  }
   
   const detailsEl = document.getElementById('forecastDayDetails');
   if (!detailsEl) return;
