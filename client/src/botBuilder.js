@@ -10466,14 +10466,24 @@ function renderDayChart(day, dayIndex) {
     `;
   }
   
-  // === TRADE MARKERS ===
+  // === TRADE MARKERS (time-aligned) ===
   let tradeMarkers = '';
   const bt = day.backtestResult;
   if (bt && bt.trades.length > 0) {
     bt.trades.forEach(trade => {
-      const entryX = paddingLeft + (trade.entryIdx / (predicted.length - 1 || 1)) * chartWidth;
+      // Use hour-based positioning if available, otherwise use index-based with prediction alignment
+      let entryX, exitX;
+      if (trade.entryHour != null && trade.exitHour != null) {
+        entryX = paddingLeft + (trade.entryHour / 24) * chartWidth;
+        exitX = paddingLeft + (trade.exitHour / 24) * chartWidth;
+      } else {
+        // Fallback: align with prediction line positioning
+        const entryHourOffset = (trade.entryIdx / (predicted.length - 1 || 1)) * predictionSpan;
+        const exitHourOffset = (trade.exitIdx / (predicted.length - 1 || 1)) * predictionSpan;
+        entryX = paddingLeft + ((predictionStartHour + entryHourOffset) / 24) * chartWidth;
+        exitX = paddingLeft + ((predictionStartHour + exitHourOffset) / 24) * chartWidth;
+      }
       const entryY = paddingTop + ((max - trade.entryPrice) / range) * chartHeight;
-      const exitX = paddingLeft + (trade.exitIdx / (predicted.length - 1 || 1)) * chartWidth;
       const exitY = paddingTop + ((max - trade.exitPrice) / range) * chartHeight;
       
       const color = trade.pnl >= 0 ? '#10b981' : '#ef4444';
@@ -10481,6 +10491,33 @@ function renderDayChart(day, dayIndex) {
         <line x1="${entryX}" y1="${entryY}" x2="${exitX}" y2="${exitY}" stroke="${color}" stroke-width="2" stroke-dasharray="4,3"/>
         <circle cx="${entryX}" cy="${entryY}" r="5" fill="#3b82f6" stroke="white" stroke-width="2"/>
         <circle cx="${exitX}" cy="${exitY}" r="5" fill="${color}" stroke="white" stroke-width="2"/>
+      `;
+    });
+  }
+  
+  // === SUGGESTED TRADE MARKERS (future trades from AI) ===
+  const suggestedTrades = day.suggestedTrades || [];
+  if (isToday && suggestedTrades.length > 0) {
+    suggestedTrades.forEach((trade, idx) => {
+      // Use entryHour/exitHour for time-aligned positioning
+      const entryHour = trade.entryHour || parseInt(trade.entryTime?.split(':')[0]) || 0;
+      const exitHour = trade.exitHour || parseInt(trade.exitTime?.split(':')[0]) || 0;
+      
+      const entryX = paddingLeft + (entryHour / 24) * chartWidth;
+      const exitX = paddingLeft + (exitHour / 24) * chartWidth;
+      const entryY = paddingTop + ((max - trade.entryPrice) / range) * chartHeight;
+      const exitY = paddingTop + ((max - trade.exitPrice) / range) * chartHeight;
+      
+      const color = trade.direction === 'LONG' ? '#22c55e' : '#f97316';
+      tradeMarkers += `
+        <line x1="${entryX}" y1="${entryY}" x2="${exitX}" y2="${exitY}" stroke="${color}" stroke-width="2" stroke-dasharray="6,3" opacity="0.8"/>
+        <circle cx="${entryX}" cy="${entryY}" r="6" fill="${color}" stroke="white" stroke-width="2" opacity="0.9">
+          <title>Trade ${idx + 1}: ${trade.direction} Entry @ ${trade.entryTime}</title>
+        </circle>
+        <circle cx="${exitX}" cy="${exitY}" r="6" fill="${color}" stroke="white" stroke-width="2" opacity="0.9">
+          <title>Trade ${idx + 1}: Exit @ ${trade.exitTime}</title>
+        </circle>
+        <text x="${entryX}" y="${entryY - 10}" fill="${color}" font-size="9" text-anchor="middle" font-weight="bold">${idx + 1}</text>
       `;
     });
   }
