@@ -10803,15 +10803,18 @@ function setupNewscastHandlers() {
     shareBtn.addEventListener('click', toggleSharePanel);
   }
   
+  const presenterImage = document.getElementById('newscastPresenterImage');
+  
   if (presenterSelect) {
     presenterSelect.addEventListener('change', () => {
       const val = presenterSelect.value;
       selectedPresenter = val;
-      if (presenterIcon) {
-        presenterIcon.textContent = val === 'sophie' ? 'S' : 'J';
-        presenterIcon.className = val === 'sophie' 
-          ? 'w-8 h-8 rounded-full bg-pink-200 dark:bg-pink-800 flex items-center justify-center text-pink-600 dark:text-pink-300 text-sm font-bold'
-          : 'w-8 h-8 rounded-full bg-blue-200 dark:bg-blue-800 flex items-center justify-center text-blue-600 dark:text-blue-300 text-sm font-bold';
+      if (presenterImage) {
+        presenterImage.src = val === 'sophie' ? '/images/presenter-sophie.png' : '/images/presenter-jack.png';
+        presenterImage.alt = val === 'sophie' ? 'Sophie Mitchell' : 'Jack Thompson';
+        presenterImage.className = val === 'sophie' 
+          ? 'w-12 h-12 rounded-full object-cover border-2 border-pink-400 shadow-lg'
+          : 'w-12 h-12 rounded-full object-cover border-2 border-blue-400 shadow-lg';
       }
       newscastAudio = null;
     });
