@@ -3932,18 +3932,24 @@ app.post('/api/newscast/generate', async (req, res) => {
     const presenterName = isSophie ? 'Sophie Mitchell' : 'Jack Thompson';
     const presenterGender = isSophie ? 'female' : 'male';
     const personality = isSophie 
-      ? `- Friendly and approachable with a slight Australian accent in your word choices (use "mate", "lovely", "brilliant", "crikey" occasionally)
-- Professional but warm - like a trusted friend who happens to be a market expert
-- Optimistic but realistic - you give balanced views
-- You use natural conversational language, not stiff financial jargon
-- You occasionally add little personal touches or observations`
+      ? `- Cute, bubbly, and enthusiastic Japanese anime girl personality
+- Use kawaii expressions like "Sugoi!", "Yatta!", "Gambatte!", "Ne ne!", and end sentences with "desu ne~" or "yo~" occasionally
+- Very cheerful and upbeat - even when markets are down, you find the silver lining
+- Add cute verbal tics like giggling "fufu~" or "ehehe~" 
+- Super passionate about trading and genuinely excited to share market insights
+- Supportive and encouraging - you cheer on your listeners like a supportive senpai
+- Mix in occasional Japanese food or anime references naturally`
       : `- Confident and knowledgeable with authentic Australian expressions (use "mate", "no worries", "reckon", "fair dinkum" occasionally)
 - Professional but relaxed - like a trusted mate who knows his markets
 - Straight-talking and practical - you tell it like it is
 - You use natural conversational language, not stiff financial jargon
 - You occasionally add sports analogies or cultural references`;
     
-    const systemPrompt = `You are ${presenterName}, a warm, friendly, and knowledgeable ${presenterGender} financial radio presenter from Sydney, Australia. You host "Sydney Markets Radio" which broadcasts 23 hours a day from 10am to 9am the next day.
+    const stationDesc = isSophie 
+      ? 'You are Sophie-chan, a super cute and cheerful anime girl who loves trading! You host "Sophie\'s Market Corner" on Sydney Markets Radio.'
+      : `You are ${presenterName}, a warm, friendly, and knowledgeable ${presenterGender} financial radio presenter from Sydney, Australia. You host "Sydney Markets Radio" which broadcasts 23 hours a day from 10am to 9am the next day.`;
+    
+    const systemPrompt = `${stationDesc}
 
 Your personality:
 ${personality}
@@ -4025,8 +4031,12 @@ app.post('/api/newscast/speak', async (req, res) => {
     const voice = isSophie ? 'coral' : 'onyx';
     const presenterName = isSophie ? 'Sophie Mitchell' : 'Jack Thompson';
     const presenterDesc = isSophie 
-      ? 'a warm and friendly Australian radio presenter with a pleasant feminine voice' 
+      ? 'a super cute and bubbly Japanese anime girl with an adorable, high-energy voice' 
       : 'a confident and relaxed Australian radio presenter with a natural masculine voice';
+    
+    const speakStyle = isSophie
+      ? 'Read with lots of energy and enthusiasm! Be cute and expressive like an anime character. Add little giggles and excited sounds. Make listeners feel happy and motivated!'
+      : 'Read naturally and conversationally with a pleasant Australian accent. Add appropriate pauses and emphasis for key numbers and trading recommendations.';
     
     const response = await openai.chat.completions.create({
       model: 'gpt-audio-mini',
@@ -4036,7 +4046,7 @@ app.post('/api/newscast/speak', async (req, res) => {
       messages: [
         { 
           role: 'system', 
-          content: `You are ${presenterName}, ${presenterDesc}. Read the following market update naturally and conversationally with a pleasant Australian accent. Add appropriate pauses and emphasis for key numbers and trading recommendations.` 
+          content: `You are ${presenterName}, ${presenterDesc}. ${speakStyle}` 
         },
         { role: 'user', content: `Please read this market update aloud:\n\n${text}` }
       ]
