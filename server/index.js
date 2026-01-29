@@ -3900,6 +3900,146 @@ Be concise but helpful. Use your learned data to inform your responses. If asked
   }
 });
 
+// Generate AI Market Newscast Text
+app.post('/api/newscast/generate', async (req, res) => {
+  const { forecastData, asset, currentPrice, brainData } = req.body;
+  
+  try {
+    const now = new Date();
+    const sydneyTime = new Date(now.toLocaleString('en-US', { timeZone: 'Australia/Sydney' }));
+    const timeStr = sydneyTime.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
+    const dayStr = sydneyTime.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' });
+    
+    const assetName = asset === 'silver' ? 'Silver' : asset === 'gold' ? 'Gold' : asset.toUpperCase();
+    
+    const todayForecast = forecastData?.days?.[0] || {};
+    const suggestedTrades = todayForecast.suggestedTrades || [];
+    const predicted = todayForecast.predicted || [];
+    const accuracy = brainData?.forecastAccuracy || 0;
+    
+    let tradesSummary = 'No specific trades recommended at this time.';
+    if (suggestedTrades.length > 0) {
+      tradesSummary = suggestedTrades.map((t, i) => 
+        `Trade ${i + 1}: ${t.direction} entry at ${t.entryTime} around $${t.entryPrice?.toFixed(2) || '--'}, exit at ${t.exitTime} with expected return of ${t.expectedPnL}`
+      ).join('. ');
+    }
+    
+    const priceRange = predicted.length > 0 
+      ? `ranging from $${Math.min(...predicted).toFixed(2)} to $${Math.max(...predicted).toFixed(2)}`
+      : 'with limited data available';
+    
+    const systemPrompt = `You are Sophie Mitchell, a warm, friendly, and knowledgeable female financial radio presenter from Sydney, Australia. You host "Sydney Markets Radio" which broadcasts 23 hours a day from 10am to 9am the next day.
+
+Your personality:
+- Friendly and approachable with a slight Australian accent in your word choices (use "mate", "lovely", "brilliant", "crikey" occasionally)
+- Professional but warm - like a trusted friend who happens to be a market expert
+- Optimistic but realistic - you give balanced views
+- You use natural conversational language, not stiff financial jargon
+- You occasionally add little personal touches or observations
+
+Your broadcast style:
+- Start with a warm greeting and time check
+- Give an overview of the market mood
+- Present the key predictions and analysis
+- Highlight the best trading opportunities
+- End with an encouraging sign-off
+
+Keep the newscast between 150-250 words - concise but informative.`;
+
+    const userPrompt = `Create a market radio broadcast for right now.
+
+Current Time: ${timeStr} Sydney time, ${dayStr}
+Asset: ${assetName}
+Current Price: $${currentPrice?.toFixed(2) || 'checking'}
+Today's AI Prediction Accuracy: ${(accuracy * 100).toFixed(1)}%
+Price Forecast: ${priceRange}
+Trading Signals: ${tradesSummary}
+
+Generate Sophie's friendly market update covering:
+1. A warm greeting with the time
+2. Current ${assetName} market conditions
+3. What the AI predictions are showing for today
+4. The best trading opportunities (if any)
+5. A friendly sign-off
+
+Remember to sound natural and conversational, like you're speaking to a friend who trades.`;
+
+    let newscastText = '';
+    
+    try {
+      const response = await anthropic.messages.create({
+        model: 'claude-sonnet-4-5',
+        max_tokens: 500,
+        messages: [
+          { role: 'user', content: `${systemPrompt}\n\n${userPrompt}` }
+        ]
+      });
+      newscastText = response.content[0]?.text || '';
+    } catch (claudeError) {
+      console.error('Claude newscast error, trying GPT:', claudeError.message);
+      
+      const gptResponse = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        max_completion_tokens: 500,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ]
+      });
+      newscastText = gptResponse.choices[0]?.message?.content || '';
+    }
+    
+    res.json({ 
+      text: newscastText,
+      timestamp: now.toISOString(),
+      asset: assetName,
+      presenter: 'Sophie Mitchell'
+    });
+  } catch (e) {
+    console.error('Newscast generation error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Text-to-Speech for newscast using OpenAI audio
+app.post('/api/newscast/speak', async (req, res) => {
+  const { text } = req.body;
+  
+  if (!text) {
+    return res.status(400).json({ error: 'Text is required' });
+  }
+  
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-audio-mini',
+      modalities: ['text', 'audio'],
+      audio: { voice: 'coral', format: 'mp3' },
+      max_completion_tokens: 2048,
+      messages: [
+        { 
+          role: 'system', 
+          content: 'You are Sophie Mitchell, a warm and friendly Australian radio presenter. Read the following market update naturally and conversationally with a pleasant Australian accent. Add appropriate pauses and emphasis for key numbers and trading recommendations.' 
+        },
+        { role: 'user', content: `Please read this market update aloud:\n\n${text}` }
+      ]
+    });
+    
+    const audioData = response.choices[0]?.message?.audio?.data;
+    
+    if (!audioData) {
+      throw new Error('No audio data returned from API');
+    }
+    
+    res.json({ 
+      audio: audioData,
+      format: 'mp3'
+    });
+  } catch (e) {
+    console.error('TTS error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);

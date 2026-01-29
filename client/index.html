@@ -622,6 +622,73 @@
                 <p class="text-xs text-gray-500 italic">No prediction history yet</p>
               </div>
             </div>
+
+            <!-- AI Market Newscast Section -->
+            <div class="mt-6 bg-gradient-to-br from-pink-50 to-purple-50 dark:from-pink-900/20 dark:to-purple-900/20 rounded-xl border border-pink-200 dark:border-pink-800 p-4">
+              <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2">
+                  <div class="w-10 h-10 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center shadow-lg">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <h4 class="text-lg font-bold text-gray-800 dark:text-white">Market Radio</h4>
+                    <p class="text-xs text-pink-600 dark:text-pink-400">Your 23-Hour Market Companion</p>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button id="newscastPlayBtn" class="w-12 h-12 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white flex items-center justify-center shadow-lg transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed" title="Play newscast">
+                    <svg id="newscastPlayIcon" class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z"/>
+                    </svg>
+                    <svg id="newscastPauseIcon" class="w-6 h-6 hidden" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                    </svg>
+                  </button>
+                  <button id="newscastGenerateBtn" class="px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-pink-300 dark:border-pink-700 rounded-lg hover:bg-pink-50 dark:hover:bg-pink-900/30 transition-colors flex items-center gap-1" title="Generate new newscast">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    Update
+                  </button>
+                </div>
+              </div>
+              
+              <!-- Presenter Info -->
+              <div class="flex items-center gap-3 mb-3 p-2 bg-white/50 dark:bg-gray-800/50 rounded-lg">
+                <div class="w-8 h-8 rounded-full bg-pink-200 dark:bg-pink-800 flex items-center justify-center text-pink-600 dark:text-pink-300 text-sm font-bold">S</div>
+                <div>
+                  <p class="text-sm font-medium text-gray-800 dark:text-white">Sophie Mitchell</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">Sydney Markets Radio | 10am - 9am Coverage</p>
+                </div>
+                <div class="ml-auto flex items-center gap-1">
+                  <span id="newscastStatus" class="text-xs text-gray-500">Ready</span>
+                  <div id="newscastLoadingIndicator" class="hidden">
+                    <svg class="w-4 h-4 animate-spin text-pink-500" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Newscast Transcript -->
+              <div id="newscastTranscript" class="bg-white dark:bg-gray-800 rounded-lg p-3 max-h-48 overflow-y-auto border border-pink-100 dark:border-gray-700">
+                <p class="text-sm text-gray-600 dark:text-gray-400 italic">Click "Update" to generate today's market briefing from Sophie...</p>
+              </div>
+              
+              <!-- Audio Progress -->
+              <div id="newscastAudioProgress" class="hidden mt-3">
+                <div class="flex items-center gap-2">
+                  <span id="newscastCurrentTime" class="text-xs text-gray-500 w-10">0:00</span>
+                  <div class="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                    <div id="newscastProgressBar" class="h-full bg-gradient-to-r from-pink-500 to-purple-500 rounded-full transition-all" style="width: 0%"></div>
+                  </div>
+                  <span id="newscastDuration" class="text-xs text-gray-500 w-10">0:00</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- Settings Tab Content -->

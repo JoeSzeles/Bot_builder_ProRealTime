@@ -8899,6 +8899,8 @@ function setupForecastHandlers() {
     updatePredictionBtn.addEventListener('click', () => updateCurrentDayPrediction());
   }
   
+  setupNewscastHandlers();
+  
   // Forecast day chart height slider
   const forecastHeightSlider = document.getElementById('forecastDayChartHeight');
   const forecastHeightLabel = document.getElementById('forecastDayChartHeightLabel');
@@ -10776,3 +10778,196 @@ function updateForecastHistory() {
     `;
   }).join('');
 }
+
+// ========== AI MARKET NEWSCAST FEATURE ==========
+let newscastAudio = null;
+let newscastText = '';
+let newscastIsPlaying = false;
+
+function setupNewscastHandlers() {
+  const generateBtn = document.getElementById('newscastGenerateBtn');
+  const playBtn = document.getElementById('newscastPlayBtn');
+  
+  if (generateBtn) {
+    generateBtn.addEventListener('click', generateNewscast);
+  }
+  
+  if (playBtn) {
+    playBtn.addEventListener('click', toggleNewscastPlayback);
+  }
+}
+
+async function generateNewscast() {
+  const generateBtn = document.getElementById('newscastGenerateBtn');
+  const statusEl = document.getElementById('newscastStatus');
+  const loadingEl = document.getElementById('newscastLoadingIndicator');
+  const transcriptEl = document.getElementById('newscastTranscript');
+  
+  if (!generateBtn) return;
+  
+  try {
+    generateBtn.disabled = true;
+    statusEl.textContent = 'Generating...';
+    loadingEl?.classList.remove('hidden');
+    
+    const asset = document.getElementById('forecastAssetSelect')?.value || 'silver';
+    const currentPrice = forecastData.days?.[0]?.actual?.[0] || 0;
+    
+    let brainData = {};
+    try {
+      const brainRes = await fetch('/api/ai/brain');
+      if (brainRes.ok) brainData = await brainRes.json();
+    } catch (e) {}
+    
+    const response = await fetch('/api/newscast/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        forecastData,
+        asset,
+        currentPrice,
+        brainData
+      })
+    });
+    
+    if (!response.ok) throw new Error('Failed to generate newscast');
+    
+    const data = await response.json();
+    newscastText = data.text;
+    
+    if (transcriptEl) {
+      transcriptEl.innerHTML = `<p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">${newscastText}</p>`;
+    }
+    
+    statusEl.textContent = 'Ready to play';
+    
+    newscastAudio = null;
+    
+  } catch (e) {
+    console.error('Newscast generation error:', e);
+    statusEl.textContent = 'Error generating';
+    if (transcriptEl) {
+      transcriptEl.innerHTML = `<p class="text-sm text-red-500">Sorry, couldn't generate the newscast. Please try again.</p>`;
+    }
+  } finally {
+    generateBtn.disabled = false;
+    loadingEl?.classList.add('hidden');
+  }
+}
+
+async function toggleNewscastPlayback() {
+  const playBtn = document.getElementById('newscastPlayBtn');
+  const playIcon = document.getElementById('newscastPlayIcon');
+  const pauseIcon = document.getElementById('newscastPauseIcon');
+  const statusEl = document.getElementById('newscastStatus');
+  const progressContainer = document.getElementById('newscastAudioProgress');
+  
+  if (!newscastText) {
+    statusEl.textContent = 'Generate first';
+    return;
+  }
+  
+  if (newscastIsPlaying && newscastAudio) {
+    newscastAudio.pause();
+    newscastIsPlaying = false;
+    playIcon?.classList.remove('hidden');
+    pauseIcon?.classList.add('hidden');
+    statusEl.textContent = 'Paused';
+    return;
+  }
+  
+  if (newscastAudio && !newscastIsPlaying) {
+    newscastAudio.play();
+    newscastIsPlaying = true;
+    playIcon?.classList.add('hidden');
+    pauseIcon?.classList.remove('hidden');
+    statusEl.textContent = 'Playing...';
+    return;
+  }
+  
+  try {
+    playBtn.disabled = true;
+    statusEl.textContent = 'Loading audio...';
+    
+    const response = await fetch('/api/newscast/speak', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: newscastText })
+    });
+    
+    if (!response.ok) throw new Error('Failed to generate audio');
+    
+    const data = await response.json();
+    
+    const audioData = atob(data.audio);
+    const audioArray = new Uint8Array(audioData.length);
+    for (let i = 0; i < audioData.length; i++) {
+      audioArray[i] = audioData.charCodeAt(i);
+    }
+    const audioBlob = new Blob([audioArray], { type: 'audio/mp3' });
+    const audioUrl = URL.createObjectURL(audioBlob);
+    
+    newscastAudio = new Audio(audioUrl);
+    
+    newscastAudio.addEventListener('loadedmetadata', () => {
+      progressContainer?.classList.remove('hidden');
+      updateNewscastDuration();
+    });
+    
+    newscastAudio.addEventListener('timeupdate', updateNewscastProgress);
+    
+    newscastAudio.addEventListener('ended', () => {
+      newscastIsPlaying = false;
+      playIcon?.classList.remove('hidden');
+      pauseIcon?.classList.add('hidden');
+      statusEl.textContent = 'Finished';
+    });
+    
+    newscastAudio.play();
+    newscastIsPlaying = true;
+    playIcon?.classList.add('hidden');
+    pauseIcon?.classList.remove('hidden');
+    statusEl.textContent = 'Playing...';
+    
+  } catch (e) {
+    console.error('Newscast audio error:', e);
+    statusEl.textContent = 'Audio error';
+  } finally {
+    playBtn.disabled = false;
+  }
+}
+
+function updateNewscastProgress() {
+  if (!newscastAudio) return;
+  
+  const currentTimeEl = document.getElementById('newscastCurrentTime');
+  const progressBar = document.getElementById('newscastProgressBar');
+  
+  const current = newscastAudio.currentTime;
+  const duration = newscastAudio.duration || 1;
+  const percent = (current / duration) * 100;
+  
+  if (currentTimeEl) {
+    const mins = Math.floor(current / 60);
+    const secs = Math.floor(current % 60);
+    currentTimeEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+  }
+  
+  if (progressBar) {
+    progressBar.style.width = `${percent}%`;
+  }
+}
+
+function updateNewscastDuration() {
+  if (!newscastAudio) return;
+  
+  const durationEl = document.getElementById('newscastDuration');
+  const duration = newscastAudio.duration || 0;
+  
+  if (durationEl) {
+    const mins = Math.floor(duration / 60);
+    const secs = Math.floor(duration % 60);
+    durationEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+  }
+}
+
