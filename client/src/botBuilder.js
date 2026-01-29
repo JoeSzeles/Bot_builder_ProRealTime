@@ -10798,7 +10798,7 @@ function saveNewscastToStorage() {
   }
 }
 
-function loadNewscastFromStorage() {
+async function loadNewscastFromStorage() {
   try {
     const saved = localStorage.getItem('newscastData');
     if (saved) {
@@ -10824,6 +10824,36 @@ function loadNewscastFromStorage() {
           presenterImage.className = data.presenter === 'sophie' 
             ? 'w-12 h-12 rounded-full object-cover border-2 border-pink-400 shadow-lg'
             : 'w-12 h-12 rounded-full object-cover border-2 border-blue-400 shadow-lg';
+        }
+        
+        if (newscastAudioUrl) {
+          try {
+            const audioResponse = await fetch(newscastAudioUrl, { method: 'HEAD' });
+            if (audioResponse.ok) {
+              newscastAudio = new Audio(newscastAudioUrl);
+              newscastAudio.addEventListener('loadedmetadata', () => {
+                const progressContainer = document.getElementById('newscastProgressContainer');
+                progressContainer?.classList.remove('hidden');
+                updateNewscastDuration();
+              });
+              newscastAudio.addEventListener('timeupdate', updateNewscastProgress);
+              newscastAudio.addEventListener('ended', () => {
+                newscastIsPlaying = false;
+                document.getElementById('newscastPlayIcon')?.classList.remove('hidden');
+                document.getElementById('newscastPauseIcon')?.classList.add('hidden');
+                document.getElementById('newscastStatus').textContent = 'Finished';
+              });
+              const statusEl = document.getElementById('newscastStatus');
+              if (statusEl) statusEl.textContent = 'Ready to play';
+              console.log('Loaded saved audio from server');
+            } else {
+              newscastAudioUrl = null;
+              console.log('Saved audio no longer available on server');
+            }
+          } catch (audioErr) {
+            newscastAudioUrl = null;
+            console.log('Could not load saved audio:', audioErr.message);
+          }
         }
         
         console.log('Loaded saved newscast from storage');
