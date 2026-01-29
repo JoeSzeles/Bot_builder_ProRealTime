@@ -752,8 +752,9 @@ document.addEventListener('DOMContentLoaded', () => {
     initBotBuilder();
     loadBotHistory();
     // Default to forecast tab within bot builder
-    const { switchBotTab } = await import('./botBuilder.js');
-    if (typeof switchBotTab === 'function') switchBotTab('forecast');
+    import('./botBuilder.js').then(({ switchBotTab }) => {
+      if (typeof switchBotTab === 'function') switchBotTab('forecast');
+    }).catch(e => console.error('Failed to switch bot tab:', e));
   }
 
   elements.tabText.addEventListener('click', () => switchTab('text'));
