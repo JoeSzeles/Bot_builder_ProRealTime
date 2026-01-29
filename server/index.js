@@ -3904,15 +3904,37 @@ Be concise but helpful. Use your learned data to inform your responses. If asked
 app.post('/api/newscast/generate', async (req, res) => {
   const { forecastData, asset, currentPrice, brainData, presenter, includeIntroAd, includeOutroAd, includeWorldNews, adTopic } = req.body;
   
-  const topic = adTopic || 'Bot Builder - AI-powered trading bot generator';
+  const adPromptTopic = adTopic || 'Bot Builder - AI-powered trading bot generator';
   
-  const introAd = `And now, a word from our sponsor! ${topic}. And now, back to the show!
-
-`;
+  // Generate character-appropriate ads based on presenter
+  let introAd = '';
+  let outroAd = '';
   
-  const outroAd = `
-
-And that's all for now! This broadcast was brought to you by ${topic}. Thanks for listening!`;
+  const adStyle = presenter === 'caelix' 
+    ? 'Speak as Magos Caelix-9, an ancient Tech-Priest. Use reverent Mechanicus language about the sacred product/service. Reference the Omnissiah, Machine Spirit, and sacred technology. Deep, wise tone.'
+    : presenter === 'sophie'
+    ? 'Speak as Sophie, a cheerful and friendly presenter. Be warm, positive, and enthusiastic about the product/service. Make it sound fun and exciting!'
+    : 'Speak as Jack Thompson, a relaxed Australian presenter. Use casual Australian expressions. Make it sound like a trusted mate recommending something good.';
+  
+  try {
+    if (includeIntroAd || includeOutroAd) {
+      const adResponse = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        max_completion_tokens: 300,
+        messages: [
+          { role: 'system', content: `You write short radio advertisements. ${adStyle} Output ONLY spoken text - no asterisks, stage directions, or formatting. Just the words to be spoken.` },
+          { role: 'user', content: `Write a brief 2-3 sentence radio ad for: ${adPromptTopic}. Make it sound natural and in-character.` }
+        ]
+      });
+      const generatedAd = adResponse.choices[0]?.message?.content?.trim() || adPromptTopic;
+      introAd = `${generatedAd}\n\n`;
+      outroAd = `\n\nThis broadcast was brought to you by ${adPromptTopic}. ${generatedAd.split('.')[0]}.`;
+    }
+  } catch (adErr) {
+    console.error('Ad generation error:', adErr.message);
+    introAd = `A message from our sponsors: ${adPromptTopic}.\n\n`;
+    outroAd = `\n\nThis broadcast was brought to you by ${adPromptTopic}.`;
+  }
   
   let worldNewsSection = '';
   if (includeWorldNews) {
@@ -4020,6 +4042,12 @@ Your broadcast style:
 - Highlight the best trading opportunities
 - End with an encouraging sign-off
 
+CRITICAL OUTPUT RULES:
+- Output ONLY spoken sentences that will be read aloud by text-to-speech
+- Do NOT include any stage directions, asterisks, actions, or descriptions like "*The hum of machinery echoes*" or "[pauses]"
+- Do NOT include any formatting, italics, or narrative descriptions
+- Write ONLY the exact words the presenter will speak - nothing else
+
 Keep the newscast between 150-250 words - concise but informative.`;
 
     const userPrompt = `Create a market radio broadcast for right now.
@@ -4098,10 +4126,10 @@ app.post('/api/newscast/speak', async (req, res) => {
     let voice, presenterName, presenterDesc, speakStyle;
     
     if (isCaelix) {
-      voice = 'echo';
+      voice = 'onyx';
       presenterName = 'Magos Caelix-9';
-      presenterDesc = 'an ancient Tech-Priest of the Adeptus Mechanicus with a deep, resonant, otherworldly voice touched by sacred machinery';
-      speakStyle = 'Read with a deep, measured, reverent tone. Speak as an ancient oracle merged with machine wisdom. Add gravitas and weight to your words, with subtle pauses for effect. Your voice carries the authority of millennia.';
+      presenterDesc = 'an extremely ancient Tech-Priest of the Adeptus Mechanicus, thousands of years old, with a very deep, slow, gravelly voice like grinding gears and ancient machinery';
+      speakStyle = 'Read very slowly and deliberately with an extremely deep, bass-heavy voice. You are ancient beyond measure - speak with the weight of millennia. Each word should feel heavy and significant. Pause between sentences. Your voice rumbles like sacred machinery awakening from dormancy.';
     } else if (isSophie) {
       voice = 'shimmer';
       presenterName = 'Sophie Mitchell';
