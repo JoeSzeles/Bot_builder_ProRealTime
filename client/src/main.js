@@ -4,7 +4,7 @@ let currentTranslation = null;
 let historyItems = [];
 let savedPrompts = [];
 let abortController = null;
-let currentTab = 'text';
+let currentTab = 'bot';
 
 const elements = {
   menuToggle: document.getElementById('menuToggle'),
@@ -738,6 +738,24 @@ document.addEventListener('DOMContentLoaded', () => {
   elements.cancelBtn.addEventListener('click', cancelGeneration);
   elements.copyBtn.addEventListener('click', copyTranslatedText);
   elements.downloadBtn.addEventListener('click', downloadPdf);
+  const isBot = currentTab === 'bot';
+  elements.textTabContent.classList.toggle('hidden', isBot);
+  elements.botTabContent.classList.toggle('hidden', !isBot);
+  
+  if (isBot) {
+    elements.tabBot.classList.add('bg-indigo-100', 'dark:bg-indigo-900', 'text-indigo-700', 'dark:text-indigo-300');
+    elements.tabText.classList.add('text-gray-600', 'dark:text-gray-400');
+    if (document.getElementById('translationHistorySidebar')) document.getElementById('translationHistorySidebar').classList.add('hidden');
+    if (document.getElementById('botHistorySidebar')) document.getElementById('botHistorySidebar').classList.remove('hidden');
+    if (document.getElementById('promptsSidebar')) document.getElementById('promptsSidebar').classList.add('hidden');
+    if (document.getElementById('aiStrategySidebar')) document.getElementById('aiStrategySidebar').classList.remove('hidden');
+    initBotBuilder();
+    loadBotHistory();
+    // Default to forecast tab within bot builder
+    const { switchBotTab } = await import('./botBuilder.js');
+    if (typeof switchBotTab === 'function') switchBotTab('forecast');
+  }
+
   elements.tabText.addEventListener('click', () => switchTab('text'));
   elements.tabBot.addEventListener('click', () => switchTab('bot'));
   
