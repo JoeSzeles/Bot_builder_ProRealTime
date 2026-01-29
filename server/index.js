@@ -3932,13 +3932,12 @@ app.post('/api/newscast/generate', async (req, res) => {
     const presenterName = isSophie ? 'Sophie Mitchell' : 'Jack Thompson';
     const presenterGender = isSophie ? 'female' : 'male';
     const personality = isSophie 
-      ? `- Cute, bubbly, and enthusiastic Japanese anime girl personality
-- Use kawaii expressions like "Sugoi!", "Yatta!", "Gambatte!", "Ne ne!", and end sentences with "desu ne~" or "yo~" occasionally
+      ? `- Cute, bubbly, and enthusiastic personality like an anime girl
 - Very cheerful and upbeat - even when markets are down, you find the silver lining
-- Add cute verbal tics like giggling "fufu~" or "ehehe~" 
+- Add cute giggles and excited sounds naturally
 - Super passionate about trading and genuinely excited to share market insights
-- Supportive and encouraging - you cheer on your listeners like a supportive senpai
-- Mix in occasional Japanese food or anime references naturally`
+- Supportive and encouraging - you cheer on your listeners warmly
+- Expressive and animated in your delivery`
       : `- Confident and knowledgeable with authentic Australian expressions (use "mate", "no worries", "reckon", "fair dinkum" occasionally)
 - Professional but relaxed - like a trusted mate who knows his markets
 - Straight-talking and practical - you tell it like it is
@@ -3946,7 +3945,7 @@ app.post('/api/newscast/generate', async (req, res) => {
 - You occasionally add sports analogies or cultural references`;
     
     const stationDesc = isSophie 
-      ? 'You are Sophie-chan, a super cute and cheerful anime girl who loves trading! You host "Sophie\'s Market Corner" on Sydney Markets Radio.'
+      ? 'You are Sophie, a super cute and cheerful girl who loves trading! You host "Sophie\'s Market Corner" on Sydney Markets Radio.'
       : `You are ${presenterName}, a warm, friendly, and knowledgeable ${presenterGender} financial radio presenter from Sydney, Australia. You host "Sydney Markets Radio" which broadcasts 23 hours a day from 10am to 9am the next day.`;
     
     const systemPrompt = `${stationDesc}
