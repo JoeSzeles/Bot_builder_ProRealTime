@@ -4279,6 +4279,7 @@ app.post('/api/newscast/speak', async (req, res) => {
     
     const audioId = `broadcast-${Date.now()}`;
     const audioFileName = `${audioId}.mp3`;
+    const metaFileName = `${audioId}.json`;
     const audioDir = path.join(__dirname, '..', 'downloads', 'broadcasts');
     
     if (!fs.existsSync(audioDir)) {
@@ -4289,10 +4290,48 @@ app.post('/api/newscast/speak', async (req, res) => {
     const audioPath = path.join(audioDir, audioFileName);
     fs.writeFileSync(audioPath, audioBuffer);
     
+    // Save metadata for the shareable page
+    const presenterAvatars = {
+      caelix: '/images/presenter-caelix.png',
+      sophie: '/images/presenter-sophie.png',
+      jack: '/images/presenter-jack.png'
+    };
+    const presenterNames = {
+      caelix: 'Magos Caelix-9',
+      sophie: 'Sophie Mitchell',
+      jack: 'Jack Thompson'
+    };
+    const stationNames = {
+      caelix: 'Forge World Markets',
+      sophie: "Sophie's Market Corner",
+      jack: 'Sydney Markets Radio'
+    };
+    
+    const metadata = {
+      id: audioId,
+      presenter: presenter || 'caelix',
+      presenterName: presenterNames[presenter] || 'Magos Caelix-9',
+      stationName: stationNames[presenter] || 'Forge World Markets',
+      avatar: presenterAvatars[presenter] || '/images/presenter-caelix.png',
+      audioUrl: `/downloads/broadcasts/${audioFileName}`,
+      createdAt: new Date().toISOString(),
+      title: `${stationNames[presenter] || 'Market Radio'} - ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+    };
+    
+    fs.writeFileSync(path.join(audioDir, metaFileName), JSON.stringify(metadata, null, 2));
+    
+    // Clean up old files (keep last 10 broadcasts)
     const oldFiles = fs.readdirSync(audioDir).filter(f => f.endsWith('.mp3'));
     if (oldFiles.length > 10) {
       oldFiles.sort().slice(0, oldFiles.length - 10).forEach(f => {
-        try { fs.unlinkSync(path.join(audioDir, f)); } catch (e) {}
+        try { 
+          fs.unlinkSync(path.join(audioDir, f)); 
+          // Also remove corresponding metadata
+          const metaFile = f.replace('.mp3', '.json');
+          if (fs.existsSync(path.join(audioDir, metaFile))) {
+            fs.unlinkSync(path.join(audioDir, metaFile));
+          }
+        } catch (e) {}
       });
     }
     
@@ -4300,12 +4339,194 @@ app.post('/api/newscast/speak', async (req, res) => {
       audio: audioData,
       format: 'mp3',
       audioUrl: `/downloads/broadcasts/${audioFileName}`,
-      audioId: audioId
+      audioId: audioId,
+      shareUrl: `/share/${audioId}`
     });
   } catch (e) {
     console.error('TTS error:', e);
     res.status(500).json({ error: e.message });
   }
+});
+
+// Shareable broadcast page with Open Graph meta tags
+app.get('/share/:audioId', (req, res) => {
+  const { audioId } = req.params;
+  const audioDir = path.join(__dirname, '..', 'downloads', 'broadcasts');
+  const metaPath = path.join(audioDir, `${audioId}.json`);
+  
+  // Default metadata if file not found
+  let metadata = {
+    title: 'Market Radio Broadcast',
+    presenterName: 'Market Radio',
+    stationName: 'Market Radio',
+    avatar: '/images/presenter-caelix.png',
+    audioUrl: `/downloads/broadcasts/${audioId}.mp3`
+  };
+  
+  if (fs.existsSync(metaPath)) {
+    try {
+      metadata = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+    } catch (e) {
+      console.error('Error reading metadata:', e);
+    }
+  }
+  
+  // Get the base URL for absolute URLs
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  const absoluteAudioUrl = `${baseUrl}${metadata.audioUrl}`;
+  const absoluteAvatarUrl = `${baseUrl}${metadata.avatar}`;
+  const shareUrl = `${baseUrl}/share/${audioId}`;
+  
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${metadata.title} | ${metadata.stationName}</title>
+  
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="music.song">
+  <meta property="og:url" content="${shareUrl}">
+  <meta property="og:title" content="${metadata.title}">
+  <meta property="og:description" content="Listen to this market broadcast from ${metadata.presenterName} on ${metadata.stationName}">
+  <meta property="og:image" content="${absoluteAvatarUrl}">
+  <meta property="og:image:width" content="512">
+  <meta property="og:image:height" content="512">
+  <meta property="og:audio" content="${absoluteAudioUrl}">
+  <meta property="og:audio:type" content="audio/mpeg">
+  
+  <!-- Twitter -->
+  <meta name="twitter:card" content="player">
+  <meta name="twitter:url" content="${shareUrl}">
+  <meta name="twitter:title" content="${metadata.title}">
+  <meta name="twitter:description" content="Listen to this market broadcast from ${metadata.presenterName}">
+  <meta name="twitter:image" content="${absoluteAvatarUrl}">
+  <meta name="twitter:player" content="${shareUrl}?embed=true">
+  <meta name="twitter:player:width" content="480">
+  <meta name="twitter:player:height" content="200">
+  
+  <!-- Audio embed for Discord, Telegram, etc -->
+  <meta property="og:audio:secure_url" content="${absoluteAudioUrl}">
+  <link rel="alternate" type="application/json+oembed" href="${baseUrl}/oembed?url=${encodeURIComponent(shareUrl)}">
+  
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .player-card {
+      background: rgba(255,255,255,0.1);
+      backdrop-filter: blur(10px);
+      border-radius: 20px;
+      padding: 30px;
+      max-width: 400px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .avatar {
+      width: 150px;
+      height: 150px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 4px solid rgba(255,255,255,0.2);
+      margin-bottom: 20px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+    .title {
+      color: #fff;
+      font-size: 1.4rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .station {
+      color: rgba(255,255,255,0.7);
+      font-size: 0.95rem;
+      margin-bottom: 20px;
+    }
+    .presenter {
+      color: #ff6b9d;
+      font-size: 1rem;
+      margin-bottom: 25px;
+    }
+    audio {
+      width: 100%;
+      border-radius: 30px;
+      outline: none;
+    }
+    audio::-webkit-media-controls-panel {
+      background: rgba(255,255,255,0.1);
+    }
+    .powered-by {
+      margin-top: 20px;
+      color: rgba(255,255,255,0.4);
+      font-size: 0.75rem;
+    }
+    .powered-by a {
+      color: rgba(255,255,255,0.6);
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="player-card">
+    <img src="${metadata.avatar}" alt="${metadata.presenterName}" class="avatar">
+    <h1 class="title">${metadata.title}</h1>
+    <p class="station">${metadata.stationName}</p>
+    <p class="presenter">Presented by ${metadata.presenterName}</p>
+    <audio controls autoplay preload="auto">
+      <source src="${metadata.audioUrl}" type="audio/mpeg">
+      Your browser does not support the audio element.
+    </audio>
+    <p class="powered-by">Powered by <a href="/">Bot Builder</a></p>
+  </div>
+</body>
+</html>`;
+  
+  res.setHeader('Content-Type', 'text/html');
+  res.send(html);
+});
+
+// oEmbed endpoint for rich embeds
+app.get('/oembed', (req, res) => {
+  const url = req.query.url;
+  if (!url) return res.status(400).json({ error: 'URL required' });
+  
+  const audioIdMatch = url.match(/share\/(broadcast-\d+)/);
+  if (!audioIdMatch) return res.status(404).json({ error: 'Invalid URL' });
+  
+  const audioId = audioIdMatch[1];
+  const audioDir = path.join(__dirname, '..', 'downloads', 'broadcasts');
+  const metaPath = path.join(audioDir, `${audioId}.json`);
+  
+  let metadata = { title: 'Market Radio', presenterName: 'Presenter' };
+  if (fs.existsSync(metaPath)) {
+    try { metadata = JSON.parse(fs.readFileSync(metaPath, 'utf8')); } catch (e) {}
+  }
+  
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  
+  res.json({
+    version: '1.0',
+    type: 'rich',
+    provider_name: 'Bot Builder Market Radio',
+    provider_url: baseUrl,
+    title: metadata.title,
+    author_name: metadata.presenterName,
+    thumbnail_url: `${baseUrl}${metadata.avatar}`,
+    thumbnail_width: 512,
+    thumbnail_height: 512,
+    html: `<iframe src="${baseUrl}/share/${audioId}?embed=true" width="100%" height="200" frameborder="0" allowtransparency="true" allow="autoplay"></iframe>`,
+    width: 480,
+    height: 200
+  });
 });
 
 const PORT = process.env.PORT || 3001;

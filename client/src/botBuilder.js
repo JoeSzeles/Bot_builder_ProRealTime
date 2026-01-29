@@ -10784,6 +10784,7 @@ let newscastAudio = null;
 let newscastText = '';
 let newscastIsPlaying = false;
 let newscastAudioUrl = null;
+let newscastShareUrl = null;
 
 function saveNewscastToStorage() {
   try {
@@ -10958,7 +10959,7 @@ function toggleSharePanel() {
 }
 
 function shareToSocial(platform) {
-  if (!newscastAudioUrl) {
+  if (!newscastShareUrl && !newscastAudioUrl) {
     alert('Play the broadcast first to generate a shareable audio link!');
     return;
   }
@@ -10969,7 +10970,8 @@ function shareToSocial(platform) {
   const stationName = stationNames[selectedPresenter] || stationNames.caelix;
   const asset = document.getElementById('forecastAssetSelect')?.value || 'silver';
   const shareText = `Listen to ${presenterName}'s ${asset.toUpperCase()} market update on ${stationName}!`;
-  const shareUrl = window.location.origin + newscastAudioUrl;
+  // Use the share page URL for better social media previews
+  const shareUrl = newscastShareUrl ? window.location.origin + newscastShareUrl : window.location.origin + newscastAudioUrl;
   
   let url = '';
   switch (platform) {
@@ -10990,13 +10992,14 @@ function shareToSocial(platform) {
 }
 
 async function copyNewscastToClipboard() {
-  if (!newscastAudioUrl) {
+  if (!newscastShareUrl && !newscastAudioUrl) {
     alert('Play the broadcast first to generate a shareable audio link!');
     return;
   }
   
   try {
-    const fullUrl = window.location.origin + newscastAudioUrl;
+    // Use the share page URL for better previews
+    const fullUrl = newscastShareUrl ? window.location.origin + newscastShareUrl : window.location.origin + newscastAudioUrl;
     await navigator.clipboard.writeText(fullUrl);
     const btn = document.getElementById('shareCopyBtn');
     if (btn) {
@@ -11149,6 +11152,7 @@ async function toggleNewscastPlayback() {
     const data = await response.json();
     
     newscastAudioUrl = data.audioUrl;
+    newscastShareUrl = data.shareUrl || null;
     saveNewscastToStorage();
     
     const audioData = atob(data.audio);
