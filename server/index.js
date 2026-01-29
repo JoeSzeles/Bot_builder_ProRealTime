@@ -4018,7 +4018,11 @@ ${newsOutro}
     const todayForecast = forecastData?.days?.[0] || {};
     const suggestedTrades = todayForecast.suggestedTrades || [];
     const predicted = todayForecast.predicted || [];
-    const accuracy = brainData?.forecastAccuracy || 0;
+    
+    // Get Day 1 direction and confidence from forecast data (same source as 7-day)
+    const dayDirection = todayForecast.direction || 'neutral';
+    const dayConfidence = todayForecast.confidence || 50;
+    const daySummary = todayForecast.summary || '';
     
     let tradesSummary = 'No specific trades recommended at this time.';
     if (suggestedTrades.length > 0) {
@@ -4027,9 +4031,15 @@ ${newsOutro}
       ).join('. ');
     }
     
-    const priceRange = predicted.length > 0 
-      ? `ranging from $${Math.min(...predicted).toFixed(2)} to $${Math.max(...predicted).toFixed(2)}`
-      : 'with limited data available';
+    // Build price range from predicted values, or use direction/confidence as fallback
+    let priceRange = '';
+    if (predicted.length > 0) {
+      priceRange = `Expected to range from $${Math.min(...predicted).toFixed(2)} to $${Math.max(...predicted).toFixed(2)}`;
+    } else if (dayDirection && dayConfidence) {
+      priceRange = `${dayDirection.toUpperCase()} outlook with ${dayConfidence}% confidence`;
+    } else {
+      priceRange = 'awaiting further data'
+    }
     
     const isCaelix = presenter === 'caelix';
     const isSophie = presenter === 'sophie';
@@ -4094,18 +4104,19 @@ Keep the newscast between 150-250 words - concise but informative.`;
 Current Time: ${timeStr} Sydney time, ${dayStr}
 Asset: ${assetName}
 Current Price: $${currentPrice?.toFixed(2) || 'checking'}
-Today's AI Prediction Accuracy: ${(accuracy * 100).toFixed(1)}%
+Today's Outlook: ${dayDirection.toUpperCase()} with ${dayConfidence}% confidence
 Price Forecast: ${priceRange}
+${daySummary ? `Analysis: ${daySummary}` : ''}
 Trading Signals: ${tradesSummary}
 
-Generate ${presenterName}'s friendly market update covering:
+Generate ${presenterName}'s market update covering:
 1. A warm greeting with the time
-2. Current ${assetName} market conditions
-3. What the AI predictions are showing for today
+2. Current ${assetName} price and market conditions
+3. Today's forecast direction (${dayDirection}) and confidence level (${dayConfidence}%)
 4. The best trading opportunities (if any)
 5. A friendly sign-off
 
-Remember to sound natural and conversational, like you're speaking to a friend who trades.`;
+IMPORTANT: Present the forecast confidently based on the data provided. Do not mention prediction accuracy, lack of data, or make excuses. Focus on the direction and confidence level given.`;
 
     let newscastText = '';
     
