@@ -8697,15 +8697,15 @@ async function updateCurrentDayActualCandles() {
   const today = forecastData.days[0];
   if (!today) return;
   
-  const asset = forecastData.asset || 'XAGUSD';
+  const asset = forecastData.asset || 'silver';
   
   try {
     // Fetch latest price data
-    const response = await fetch(`/api/yahoo-candles?symbol=${encodeURIComponent(asset)}&range=1d&interval=1h`);
+    const response = await fetch(`/api/market-data/${asset}/1h`);
     if (!response.ok) return;
     
     const data = await response.json();
-    const candles = data.candles || data.data || [];
+    const candles = data.candles || [];
     
     if (candles.length === 0) return;
     
@@ -9751,11 +9751,11 @@ async function showDayDetails(dayIndex) {
   // Fetch fresh real price data for today
   if (isToday) {
     try {
-      const asset = forecastData.asset || 'XAGUSD';
-      const response = await fetch(`/api/yahoo-candles?symbol=${encodeURIComponent(asset)}&range=1d&interval=1h`);
+      const asset = forecastData.asset || 'silver';
+      const response = await fetch(`/api/market-data/${asset}/1h`);
       if (response.ok) {
         const data = await response.json();
-        const candles = data.candles || data.data || [];
+        const candles = data.candles || [];
         if (candles.length > 0) {
           day.actualCandles = candles.map(c => ({
             open: c.open,
@@ -9766,6 +9766,7 @@ async function showDayDetails(dayIndex) {
           }));
           day.actualPrices = candles.map(c => c.close);
           day.currentPrice = candles[candles.length - 1]?.close;
+          console.log('Fetched real price data:', candles.length, 'candles');
         }
       }
     } catch (e) {
@@ -10217,12 +10218,12 @@ function startForecastDayPriceUpdates(dayIndex) {
       const day = forecastData.days[dayIndex];
       if (!day) return;
       
-      const asset = forecastData.asset || 'XAGUSD';
-      const response = await fetch(`/api/yahoo-candles?symbol=${encodeURIComponent(asset)}&range=1d&interval=5m`);
+      const asset = forecastData.asset || 'silver';
+      const response = await fetch(`/api/market-data/${asset}/1h`);
       if (!response.ok) return;
       
       const data = await response.json();
-      const candles = data.candles || data.data || [];
+      const candles = data.candles || [];
       if (candles.length === 0) return;
       
       // Get latest price
@@ -10230,44 +10231,15 @@ function startForecastDayPriceUpdates(dayIndex) {
       if (latestPrice && latestPrice !== day.currentPrice) {
         day.currentPrice = latestPrice;
         
-        // Update actual candles too (hourly aggregation from 5m data)
-        const hourlyCandles = [];
-        let hourGroup = [];
-        let currentHour = null;
-        
-        candles.forEach(c => {
-          const candleHour = new Date(c.time * 1000).getHours();
-          if (currentHour === null) currentHour = candleHour;
-          
-          if (candleHour !== currentHour && hourGroup.length > 0) {
-            hourlyCandles.push({
-              open: hourGroup[0].open,
-              high: Math.max(...hourGroup.map(h => h.high)),
-              low: Math.min(...hourGroup.map(h => h.low)),
-              close: hourGroup[hourGroup.length - 1].close,
-              time: hourGroup[0].time
-            });
-            hourGroup = [];
-            currentHour = candleHour;
-          }
-          hourGroup.push(c);
-        });
-        
-        // Add remaining hour group
-        if (hourGroup.length > 0) {
-          hourlyCandles.push({
-            open: hourGroup[0].open,
-            high: Math.max(...hourGroup.map(h => h.high)),
-            low: Math.min(...hourGroup.map(h => h.low)),
-            close: hourGroup[hourGroup.length - 1].close,
-            time: hourGroup[0].time
-          });
-        }
-        
-        if (hourlyCandles.length > 0) {
-          day.actualCandles = hourlyCandles;
-          day.actualPrices = hourlyCandles.map(c => c.close);
-        }
+        // Use hourly candles directly
+        day.actualCandles = candles.map(c => ({
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+          time: c.time
+        }));
+        day.actualPrices = candles.map(c => c.close);
         
         // Re-render chart with updated data
         renderDayChart(day, dayIndex);
