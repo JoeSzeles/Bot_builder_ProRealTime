@@ -4379,36 +4379,42 @@ app.get('/share/:audioId', (req, res) => {
   const shareUrl = `${baseUrl}/share/${audioId}`;
   
   const html = `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" prefix="og: http://ogp.me/ns#">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${metadata.title} | ${metadata.stationName}</title>
   
-  <!-- Open Graph / Facebook -->
-  <meta property="og:type" content="music.song">
+  <!-- Primary Meta Tags - Discord reads these first -->
+  <title>${metadata.title}</title>
+  <meta name="title" content="${metadata.title}">
+  <meta name="description" content="Listen to this market broadcast from ${metadata.presenterName} on ${metadata.stationName}">
+  <meta name="theme-color" content="#ff6b9d">
+  
+  <!-- Open Graph / Facebook / Discord - Image MUST come first for Discord -->
+  <meta property="og:image" content="${absoluteAvatarUrl}">
+  <meta property="og:image:url" content="${absoluteAvatarUrl}">
+  <meta property="og:image:secure_url" content="${absoluteAvatarUrl}">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="512">
+  <meta property="og:image:height" content="512">
+  <meta property="og:type" content="website">
   <meta property="og:url" content="${shareUrl}">
   <meta property="og:title" content="${metadata.title}">
   <meta property="og:description" content="Listen to this market broadcast from ${metadata.presenterName} on ${metadata.stationName}">
-  <meta property="og:image" content="${absoluteAvatarUrl}">
-  <meta property="og:image:width" content="512">
-  <meta property="og:image:height" content="512">
+  <meta property="og:site_name" content="Bot Builder Market Radio">
   <meta property="og:audio" content="${absoluteAudioUrl}">
+  <meta property="og:audio:secure_url" content="${absoluteAudioUrl}">
   <meta property="og:audio:type" content="audio/mpeg">
   
   <!-- Twitter -->
-  <meta name="twitter:card" content="player">
+  <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:url" content="${shareUrl}">
   <meta name="twitter:title" content="${metadata.title}">
   <meta name="twitter:description" content="Listen to this market broadcast from ${metadata.presenterName}">
   <meta name="twitter:image" content="${absoluteAvatarUrl}">
-  <meta name="twitter:player" content="${shareUrl}?embed=true">
-  <meta name="twitter:player:width" content="480">
-  <meta name="twitter:player:height" content="200">
   
-  <!-- Audio embed for Discord, Telegram, etc -->
-  <meta property="og:audio:secure_url" content="${absoluteAudioUrl}">
-  <link rel="alternate" type="application/json+oembed" href="${baseUrl}/oembed?url=${encodeURIComponent(shareUrl)}">
+  <!-- oEmbed for rich embeds -->
+  <link rel="alternate" type="application/json+oembed" href="${baseUrl}/oembed?url=${encodeURIComponent(shareUrl)}" title="${metadata.title}">
   
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -4417,58 +4423,60 @@ app.get('/share/:audioId', (req, res) => {
       background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
       min-height: 100vh;
       display: flex;
+      flex-direction: column;
       align-items: center;
-      justify-content: center;
       padding: 20px;
+    }
+    .hero-image {
+      width: 100%;
+      max-width: 500px;
+      margin-bottom: 20px;
+    }
+    .hero-image img {
+      width: 100%;
+      height: auto;
+      border-radius: 16px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+      border: 3px solid rgba(255,107,157,0.3);
     }
     .player-card {
       background: rgba(255,255,255,0.1);
       backdrop-filter: blur(10px);
       border-radius: 20px;
-      padding: 30px;
-      max-width: 400px;
+      padding: 25px 30px;
+      max-width: 500px;
       width: 100%;
       text-align: center;
       box-shadow: 0 8px 32px rgba(0,0,0,0.3);
       border: 1px solid rgba(255,255,255,0.1);
     }
-    .avatar {
-      width: 150px;
-      height: 150px;
-      border-radius: 50%;
-      object-fit: cover;
-      border: 4px solid rgba(255,255,255,0.2);
-      margin-bottom: 20px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-    }
     .title {
       color: #fff;
-      font-size: 1.4rem;
-      font-weight: 600;
+      font-size: 1.5rem;
+      font-weight: 700;
       margin-bottom: 8px;
     }
     .station {
       color: rgba(255,255,255,0.7);
-      font-size: 0.95rem;
-      margin-bottom: 20px;
+      font-size: 1rem;
+      margin-bottom: 8px;
     }
     .presenter {
       color: #ff6b9d;
-      font-size: 1rem;
-      margin-bottom: 25px;
+      font-size: 1.1rem;
+      font-weight: 500;
+      margin-bottom: 20px;
     }
     audio {
       width: 100%;
       border-radius: 30px;
       outline: none;
-    }
-    audio::-webkit-media-controls-panel {
-      background: rgba(255,255,255,0.1);
+      height: 50px;
     }
     .powered-by {
-      margin-top: 20px;
+      margin-top: 15px;
       color: rgba(255,255,255,0.4);
-      font-size: 0.75rem;
+      font-size: 0.8rem;
     }
     .powered-by a {
       color: rgba(255,255,255,0.6);
@@ -4477,8 +4485,10 @@ app.get('/share/:audioId', (req, res) => {
   </style>
 </head>
 <body>
+  <div class="hero-image">
+    <img src="${metadata.avatar}" alt="${metadata.presenterName}">
+  </div>
   <div class="player-card">
-    <img src="${metadata.avatar}" alt="${metadata.presenterName}" class="avatar">
     <h1 class="title">${metadata.title}</h1>
     <p class="station">${metadata.stationName}</p>
     <p class="presenter">Presented by ${metadata.presenterName}</p>
