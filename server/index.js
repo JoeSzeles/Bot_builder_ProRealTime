@@ -4174,8 +4174,8 @@ app.post('/api/newscast/speak', async (req, res) => {
     if (isCaelix) {
       voice = 'onyx';
       presenterName = 'Magos Caelix-9';
-      presenterDesc = 'an extremely ancient Tech-Priest of the Adeptus Mechanicus, thousands of years old, with a very deep, slow, gravelly voice like grinding gears and ancient machinery';
-      speakStyle = 'Read very slowly and deliberately with an extremely deep, bass-heavy voice. You are ancient beyond measure - speak with the weight of millennia. Each word should feel heavy and significant. Pause between sentences. Your voice rumbles like sacred machinery awakening from dormancy.';
+      presenterDesc = 'an ancient Tech-Priest of the Adeptus Mechanicus with a deep, gravelly voice like grinding gears and sacred machinery';
+      speakStyle = 'Read with a deep, authoritative voice at a measured but steady pace. You are a Tech-Priest delivering important data. Speak clearly and with conviction, like a commanding officer. Your voice is deep and resonant but not sluggish.';
     } else if (isSophie) {
       voice = 'shimmer';
       presenterName = 'Sophie Mitchell';
