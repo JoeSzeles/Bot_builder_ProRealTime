@@ -31,6 +31,7 @@ if (!fs.existsSync(DOWNLOADS_DIR)) {
 }
 
 app.use('/downloads', express.static(DOWNLOADS_DIR));
+app.use('/images', express.static(path.join(__dirname, '..', 'client', 'public', 'images')));
 
 const anthropic = new Anthropic({
   apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
