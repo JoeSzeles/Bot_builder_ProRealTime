@@ -10388,9 +10388,19 @@ function renderDayChart(day, dayIndex) {
   
   // === PREDICTED LINE (blue) ===
   let predictedPath = '';
+  const now = new Date();
+  const currentHourDecimal = now.getHours() + now.getMinutes() / 60;
+  
+  // For today: prediction starts from current time to 24:00
+  // For past/future days: prediction spans full 00:00 to 24:00
+  const predictionStartHour = isToday ? currentHourDecimal : 0;
+  const predictionEndHour = 24;
+  const predictionSpan = predictionEndHour - predictionStartHour;
+  
   predicted.forEach((p, j) => {
-    // Predicted prices are evenly distributed across the session
-    const x = paddingLeft + (j / (predicted.length - 1 || 1)) * chartWidth;
+    const hourOffset = (j / (predicted.length - 1 || 1)) * predictionSpan;
+    const predictedHour = predictionStartHour + hourOffset;
+    const x = paddingLeft + (predictedHour / 24) * chartWidth;
     const y = paddingTop + ((max - p) / range) * chartHeight;
     predictedPath += j === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`;
   });
