@@ -3940,12 +3940,11 @@ And that's all for now! This broadcast was brought to you by Bot Builder - where
     const presenterName = isSophie ? 'Sophie Mitchell' : 'Jack Thompson';
     const presenterGender = isSophie ? 'female' : 'male';
     const personality = isSophie 
-      ? `- Cute, bubbly, and enthusiastic personality like an anime girl
-- Very cheerful and upbeat - even when markets are down, you find the silver lining
-- Add cute giggles and excited sounds naturally
-- Super passionate about trading and genuinely excited to share market insights
-- Supportive and encouraging - you cheer on your listeners warmly
-- Expressive and animated in your delivery`
+      ? `- Warm, cheerful, and friendly personality
+- Positive and upbeat - even when markets are down, you find the silver lining
+- Passionate about trading and genuinely excited to share market insights
+- Supportive and encouraging to your listeners
+- Clear and engaging delivery with a happy tone`
       : `- Confident and knowledgeable with authentic Australian expressions (use "mate", "no worries", "reckon", "fair dinkum" occasionally)
 - Professional but relaxed - like a trusted mate who knows his markets
 - Straight-talking and practical - you tell it like it is
@@ -4043,11 +4042,11 @@ app.post('/api/newscast/speak', async (req, res) => {
     const voice = isSophie ? 'shimmer' : 'onyx';
     const presenterName = isSophie ? 'Sophie Mitchell' : 'Jack Thompson';
     const presenterDesc = isSophie 
-      ? 'a super cute and bubbly girl with an adorable, youthful, high-energy voice' 
+      ? 'a warm, friendly, and cheerful young woman with a pleasant voice' 
       : 'a confident and relaxed Australian radio presenter with a natural masculine voice';
     
     const speakStyle = isSophie
-      ? 'Read with lots of energy and enthusiasm! Be cute and expressive like an anime character. Add little giggles and excited sounds. Make listeners feel happy and motivated!'
+      ? 'Read with a warm, friendly tone. Be cheerful and positive but natural. Make listeners feel happy and motivated!'
       : 'Read naturally and conversationally with a pleasant Australian accent. Add appropriate pauses and emphasis for key numbers and trading recommendations.';
     
     const response = await openai.chat.completions.create({
