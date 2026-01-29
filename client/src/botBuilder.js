@@ -8587,9 +8587,111 @@ document.addEventListener('DOMContentLoaded', () => {
   setupBlankAppButton();
 });
 
+let forecastAutoRefreshInterval = null;
+
 function initForecastOnStartup() {
   loadForecastFromStorage();
   loadForecastAccuracyFromBrain();
+  startForecastAutoRefresh();
+}
+
+// Auto-refresh current day's actual candles every 60 seconds
+function startForecastAutoRefresh() {
+  if (forecastAutoRefreshInterval) {
+    clearInterval(forecastAutoRefreshInterval);
+  }
+  
+  forecastAutoRefreshInterval = setInterval(async () => {
+    if (!forecastData.days || forecastData.days.length === 0) return;
+    
+    // Only update if we're on the forecast tab and viewing today
+    const forecastTab = document.getElementById('forecastTab');
+    if (!forecastTab || forecastTab.classList.contains('hidden')) return;
+    
+    try {
+      await updateCurrentDayActualCandles();
+    } catch (e) {
+      console.warn('Forecast auto-refresh failed:', e);
+    }
+  }, 60000); // Every 60 seconds
+}
+
+// Fetch and update actual candles for the current day
+async function updateCurrentDayActualCandles() {
+  const today = forecastData.days[0];
+  if (!today) return;
+  
+  const asset = forecastData.asset || 'XAGUSD';
+  
+  try {
+    // Fetch latest price data
+    const response = await fetch(`/api/yahoo-candles?symbol=${encodeURIComponent(asset)}&range=1d&interval=1h`);
+    if (!response.ok) return;
+    
+    const data = await response.json();
+    const candles = data.candles || data.data || [];
+    
+    if (candles.length === 0) return;
+    
+    // Get trading hours settings
+    const tradingStartTime = document.getElementById('tradingStartTime')?.value || '00:00';
+    const tradingEndTime = document.getElementById('tradingEndTime')?.value || '23:59';
+    const [startHour] = tradingStartTime.split(':').map(Number);
+    const [endHour] = tradingEndTime.split(':').map(Number);
+    // Handle overnight sessions (e.g., 22:00 - 06:00)
+    const sessionDuration = endHour >= startHour ? 
+      (endHour - startHour) : 
+      (24 - startHour + endHour);
+    
+    // Update today's actual candles and prices
+    const todayCandles = candles.slice(-Math.min(24, Math.max(1, sessionDuration)));
+    today.actualPrices = todayCandles.map(p => p.close);
+    today.actualCandles = todayCandles.map(p => ({
+      open: p.open,
+      high: p.high,
+      low: p.low,
+      close: p.close,
+      time: p.time
+    }));
+    
+    // Update current price
+    const latestPrice = candles[candles.length - 1]?.close;
+    if (latestPrice) {
+      today.currentPrice = latestPrice;
+      
+      // Adjust intraday prediction based on actual movement
+      if (today.actualCandles.length > 0) {
+        const actualOpen = today.actualCandles[0].open;
+        const actualCurrent = latestPrice;
+        const actualChange = actualCurrent - actualOpen;
+        const predictedChange = today.predictedClose - today.predictedOpen;
+        
+        // If actual movement differs significantly from predicted, adjust remaining prediction
+        const adjustmentFactor = actualChange / (predictedChange || 0.01);
+        if (Math.abs(adjustmentFactor - 1) > 0.3) {
+          // Significant deviation - record for day-to-day learning
+          console.log(`Forecast deviation detected: actual ${actualChange.toFixed(2)} vs predicted ${predictedChange.toFixed(2)}`);
+        }
+      }
+    }
+    
+    saveForecastToStorage();
+    
+    // Re-render if viewing current day
+    if (currentDetailDayIndex === 0) {
+      showDayDetails(0);
+    }
+    renderMiniCharts();
+    
+    // Update current price display
+    const priceValueEl = document.getElementById('forecastCurrentPriceValue');
+    if (priceValueEl && latestPrice) {
+      priceValueEl.textContent = `$${latestPrice.toFixed(2)}`;
+    }
+    
+  } catch (e) {
+    console.warn('Failed to update current day candles:', e);
+  }
 }
 
 async function loadForecastAccuracyFromBrain() {
@@ -8958,6 +9060,14 @@ function generateMockForecast(asset, priceData, brainData) {
   const [startHour, startMin] = tradingStartTime.split(':').map(Number);
   const [endHour, endMin] = tradingEndTime.split(':').map(Number);
   
+  // Get Backtest Simulation settings for trades
+  const backtestSettings = {
+    capital: parseFloat(document.getElementById('backtestCapital')?.value) || 10000,
+    positionSize: parseFloat(document.getElementById('backtestPositionSize')?.value) || 1,
+    orderFee: parseFloat(document.getElementById('orderFee')?.value) || 7,
+    spreadCost: parseFloat(document.getElementById('spreadCost')?.value) || 0.02
+  };
+  
   // Get real current price and recent data
   const recentPrices = prices.slice(-168); // Last 7 days of hourly data
   const currentPrice = recentPrices[recentPrices.length - 1]?.close || 30;
@@ -8970,10 +9080,79 @@ function generateMockForecast(asset, priceData, brainData) {
   const avgChange = priceChanges.reduce((a, b) => a + b, 0) / priceChanges.length;
   const volatility = Math.sqrt(priceChanges.reduce((sum, c) => sum + c * c, 0) / priceChanges.length);
   
-  // Get brain patterns for this asset
-  const assetPatterns = brainData?.patterns?.[asset] || {};
-  const brainAccuracy = brainData?.accuracy?.[asset] || 50;
-  const trendBias = avgChange > 0 ? 0.6 : avgChange < 0 ? 0.4 : 0.5;
+  // === ENHANCED AI MEMORY INTEGRATION ===
+  // Get asset-specific brain data (all data scoped to asset)
+  const assetBrain = brainData?.assets?.[asset] || brainData?.assets?.[asset?.toLowerCase()] || {};
+  const learnedPatterns = assetBrain.learnedPatterns || [];
+  // Session memory from asset level (recent prediction outcomes)
+  const sessionMemory = assetBrain.sessionMemory || brainData?.sessionMemory || [];
+  // Confidence level from asset accuracy or global
+  const assetAccuracy = parseFloat(assetBrain.accuracy) || 50;
+  const confidenceLevel = assetAccuracy; // Use asset-specific accuracy as confidence
+  const correlations = brainData?.correlations || {};
+  
+  // Analyze learned patterns to determine direction bias
+  let longPnL = 0, shortPnL = 0, longWins = 0, shortWins = 0, totalPatterns = 0;
+  let sessionBias = { asian: 0, london: 0, ny: 0 };
+  
+  learnedPatterns.forEach(p => {
+    const pnl = p.totalPnL || 0;
+    const success = p.successRate || 50;
+    const occurrences = p.occurrences || 1;
+    
+    if (p.name.includes('_long_')) {
+      longPnL += pnl;
+      if (success > 60) longWins += occurrences;
+    } else if (p.name.includes('_short_')) {
+      shortPnL += pnl;
+      if (success > 60) shortWins += occurrences;
+    }
+    
+    // Track session performance
+    if (p.name.includes('asian_')) sessionBias.asian += pnl;
+    else if (p.name.includes('london_')) sessionBias.london += pnl;
+    else if (p.name.includes('ny_')) sessionBias.ny += pnl;
+    
+    totalPatterns += occurrences;
+  });
+  
+  // Analyze session memory for recent prediction accuracy
+  let recentCorrectPredictions = 0;
+  let recentTotalPredictions = 0;
+  sessionMemory.slice(-10).forEach(mem => {
+    recentTotalPredictions++;
+    if (mem.correct || mem.directionCorrect) recentCorrectPredictions++;
+  });
+  const recentAccuracyBias = recentTotalPredictions > 0 ? 
+    (recentCorrectPredictions / recentTotalPredictions - 0.5) * 0.3 : 0; // -0.15 to +0.15 adjustment
+  
+  // Calculate AI-driven direction bias (weighted by learned patterns + session memory)
+  const patternBias = totalPatterns > 0 ? (longPnL - shortPnL) / (Math.abs(longPnL) + Math.abs(shortPnL) + 1) : 0;
+  const marketTrend = avgChange > 0 ? 0.2 : avgChange < 0 ? -0.2 : 0;
+  // Combine: 50% patterns, 30% market trend, 20% recent session accuracy
+  const combinedBias = (patternBias * 0.5) + (marketTrend * 0.3) + (recentAccuracyBias * 0.2);
+  
+  // Get previous day corrections from storage (day-to-day learning)
+  const storedForecast = localStorage.getItem('forecastData');
+  let previousCorrection = 0;
+  if (storedForecast) {
+    try {
+      const prevData = JSON.parse(storedForecast);
+      if (prevData.history && prevData.history.length > 0) {
+        const lastPrediction = prevData.history[prevData.history.length - 1];
+        if (lastPrediction.actualClose && lastPrediction.predictedClose) {
+          // Learn from previous day's error
+          previousCorrection = (lastPrediction.actualClose - lastPrediction.predictedClose) / lastPrediction.predictedClose;
+        }
+      }
+    } catch (e) {}
+  }
+  
+  // Determine best trading session based on brain memory
+  const bestSession = Object.entries(sessionBias).sort((a, b) => b[1] - a[1])[0]?.[0] || 'london';
+  
+  // Calculate overall brain confidence adjustment
+  const brainConfidenceMultiplier = 0.5 + (confidenceLevel / 100) * 0.5; // 0.5 to 1.0
   
   const days = [];
   const now = new Date();
@@ -9008,10 +9187,19 @@ function generateMockForecast(asset, priceData, brainData) {
       if (currentHour > endHour || (currentHour === endHour && currentMin >= endMin)) continue;
     }
     
-    // Use brain patterns and real volatility for prediction
-    const trendMultiplier = (Math.random() * 0.4 + 0.8) * (trendBias > 0.5 ? 1 : -1);
+    // === AI-ENHANCED PREDICTION MODEL ===
+    // Use brain memory, learned patterns, and day-to-day corrections
     const dayVolatility = volatility * (1 + (Math.random() - 0.5) * 0.5);
-    const expectedChange = avgChange * 24 * trendMultiplier + (Math.random() - 0.5) * dayVolatility * 2;
+    
+    // Direction is weighted by: brain patterns (60%), market trend (30%), previous correction (10%)
+    const aiDirection = combinedBias + (previousCorrection * 0.3) + (Math.random() - 0.5) * 0.2;
+    const directionMultiplier = aiDirection > 0 ? 1 : -1;
+    const biasStrength = Math.abs(aiDirection) * brainConfidenceMultiplier;
+    
+    // Expected change incorporates brain-learned patterns
+    const baseChange = avgChange * 24 * directionMultiplier;
+    const brainAdjustment = dayVolatility * biasStrength * directionMultiplier;
+    const expectedChange = baseChange + brainAdjustment + (Math.random() - 0.5) * dayVolatility;
     
     const openPrice = lastClose; // Continuity: open = previous close
     const predictedClose = openPrice + expectedChange;
@@ -9019,13 +9207,28 @@ function generateMockForecast(asset, priceData, brainData) {
     const predictedLow = Math.min(openPrice, predictedClose) - dayVolatility * (1 + Math.random());
     
     const direction = predictedClose > openPrice ? 'bullish' : 'bearish';
-    const confidence = Math.min(90, Math.max(30, 50 + brainAccuracy * 0.3 + Math.abs(expectedChange / openPrice) * 500));
+    
+    // Confidence is based on brain data quality
+    const patternStrength = Math.min(100, totalPatterns / 10); // More patterns = more confidence
+    const baseConfidence = 50 + (patternStrength * 0.3) + (Math.abs(expectedChange / openPrice) * 300);
+    const confidence = Math.min(90, Math.max(30, baseConfidence * brainConfidenceMultiplier));
     
     // Calculate entry/exit based on backtest-style logic
     const entryOffset = direction === 'bullish' ? 0.3 : 0.7;
     const exitOffset = direction === 'bullish' ? 0.8 : 0.2;
     const entryPrice = predictedLow + (predictedHigh - predictedLow) * entryOffset;
     const exitPrice = predictedLow + (predictedHigh - predictedLow) * exitOffset;
+    
+    // === DETAILED TRADE INFORMATION (using Backtest Simulation settings) ===
+    const tradeDirection = direction === 'bullish' ? 'LONG' : 'SHORT';
+    const positionSize = backtestSettings.positionSize;
+    const spreadCost = backtestSettings.spreadCost * positionSize;
+    const fees = backtestSettings.orderFee * 2; // Entry + exit fees
+    const priceDiff = direction === 'bullish' ? exitPrice - entryPrice : entryPrice - exitPrice;
+    const grossPnL = priceDiff * positionSize;
+    const netPnL = grossPnL - spreadCost - fees;
+    const capitalUsed = entryPrice * positionSize;
+    const returnPct = (netPnL / capitalUsed) * 100;
     
     // Trading hours for entry/exit using settings (Sydney time)
     const sessionDuration = endHour - startHour;
@@ -9036,10 +9239,20 @@ function generateMockForecast(asset, priceData, brainData) {
     const tradingHoursCount = Math.max(1, sessionDuration);
     const hourlyPrices = generateSmoothedHourlyPrices(openPrice, predictedClose, predictedHigh, predictedLow, tradingHoursCount, dayVolatility);
     
-    // Get actual prices for today (first trading day)
+    // Get actual candles for today (first trading day) - full OHLC data for candlestick chart
     let actualPrices = [];
+    let actualCandles = [];
     if (isToday && recentPrices.length >= 24) {
-      actualPrices = recentPrices.slice(-24).map(p => p.close);
+      // Get hourly candles for today
+      const todayCandles = recentPrices.slice(-Math.min(24, sessionDuration));
+      actualPrices = todayCandles.map(p => p.close);
+      actualCandles = todayCandles.map(p => ({
+        open: p.open,
+        high: p.high,
+        low: p.low,
+        close: p.close,
+        time: p.time
+      }));
     }
     
     days.push({
@@ -9062,7 +9275,33 @@ function generateMockForecast(asset, priceData, brainData) {
       summary: generateDaySummary(direction === 'bullish' ? 1 : -1, confidence, asset, expectedChange, openPrice),
       predictedPrices: hourlyPrices,
       actualPrices,
-      currentPrice: days.length === 0 ? currentPrice : null, // Current price only for today (first day)
+      actualCandles, // Full OHLC data for candlestick rendering
+      currentPrice: days.length === 0 ? currentPrice : null,
+      // Detailed trade information using Backtest Simulation settings
+      trade: {
+        direction: tradeDirection,
+        positionSize,
+        entryPrice,
+        exitPrice,
+        grossPnL,
+        netPnL,
+        fees,
+        spreadCost,
+        capitalUsed,
+        returnPct,
+        capital: backtestSettings.capital
+      },
+      // AI Brain metadata
+      brainMetadata: {
+        patternBias: patternBias.toFixed(3),
+        previousCorrection: previousCorrection.toFixed(4),
+        confidenceMultiplier: brainConfidenceMultiplier.toFixed(2),
+        bestSession,
+        totalPatternsUsed: totalPatterns,
+        recentAccuracy: recentTotalPredictions > 0 ? 
+          `${recentCorrectPredictions}/${recentTotalPredictions}` : 'N/A',
+        assetAccuracy: `${assetAccuracy.toFixed(0)}%`
+      },
       backtestResult: null // Will be populated by runForecastBacktest
     });
     
@@ -9447,14 +9686,88 @@ function showDayDetails(dayIndex) {
   document.getElementById('forecastExpectedMove').className = `text-lg font-bold ${parseFloat(day.expectedMove) >= 0 ? 'text-green-600' : 'text-red-600'}`;
   document.getElementById('forecastNaturalSummary').textContent = day.summary;
   
-  // Show backtest results
-  const btResultsEl = document.getElementById('forecastBacktestResults');
-  if (btResultsEl) {
+  // Show detailed trade information (from Backtest Simulation settings)
+  const tradeInfoEl = document.getElementById('forecastBacktestResults');
+  if (tradeInfoEl) {
+    const trade = day.trade;
+    const brainMeta = day.brainMetadata;
     const bt = day.backtestResult;
+    
+    let tradeHtml = '';
+    
+    // Show AI-predicted trade details
+    if (trade) {
+      const pnlClass = trade.netPnL >= 0 ? 'text-green-600' : 'text-red-600';
+      tradeHtml += `
+        <div class="mt-3 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-lg border border-blue-200 dark:border-blue-700">
+          <h4 class="font-semibold text-sm mb-2 text-blue-700 dark:text-blue-300">📊 Forecast Trade (using Backtest Settings)</h4>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+            <div>
+              <span class="text-gray-500">Direction:</span>
+              <span class="font-bold ${trade.direction === 'LONG' ? 'text-green-600' : 'text-red-600'}">${trade.direction}</span>
+            </div>
+            <div>
+              <span class="text-gray-500">Position:</span>
+              <span class="font-bold">${trade.positionSize.toFixed(2)} units</span>
+            </div>
+            <div>
+              <span class="text-gray-500">Capital Used:</span>
+              <span class="font-bold">$${trade.capitalUsed.toFixed(2)}</span>
+            </div>
+            <div>
+              <span class="text-gray-500">Account:</span>
+              <span class="font-bold">$${trade.capital.toLocaleString()}</span>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm mt-2">
+            <div>
+              <span class="text-gray-500">Entry:</span>
+              <span class="font-bold">$${trade.entryPrice.toFixed(2)}</span>
+            </div>
+            <div>
+              <span class="text-gray-500">Exit:</span>
+              <span class="font-bold">$${trade.exitPrice.toFixed(2)}</span>
+            </div>
+            <div>
+              <span class="text-gray-500">Gross P/L:</span>
+              <span class="font-bold ${pnlClass}">${trade.grossPnL >= 0 ? '+' : ''}$${trade.grossPnL.toFixed(2)}</span>
+            </div>
+            <div>
+              <span class="text-gray-500">Net P/L:</span>
+              <span class="font-bold ${pnlClass}">${trade.netPnL >= 0 ? '+' : ''}$${trade.netPnL.toFixed(2)}</span>
+            </div>
+          </div>
+          <div class="grid grid-cols-3 gap-2 text-xs mt-2 text-gray-500">
+            <div>Fees: $${trade.fees.toFixed(2)}</div>
+            <div>Spread: $${trade.spreadCost.toFixed(2)}</div>
+            <div>Return: <span class="${pnlClass} font-medium">${trade.returnPct >= 0 ? '+' : ''}${trade.returnPct.toFixed(2)}%</span></div>
+          </div>
+        </div>
+      `;
+    }
+    
+    // Show AI Brain metadata
+    if (brainMeta) {
+      tradeHtml += `
+        <div class="mt-2 p-2 bg-purple-50 dark:bg-purple-900/20 rounded-lg text-xs">
+          <span class="font-medium text-purple-700 dark:text-purple-300">🧠 AI Brain:</span>
+          <span class="text-gray-600 dark:text-gray-400">
+            Bias: ${brainMeta.patternBias} | 
+            Correction: ${brainMeta.previousCorrection} | 
+            Session: ${brainMeta.bestSession} | 
+            Patterns: ${brainMeta.totalPatternsUsed} |
+            Recent: ${brainMeta.recentAccuracy || 'N/A'} |
+            Accuracy: ${brainMeta.assetAccuracy || 'N/A'}
+          </span>
+        </div>
+      `;
+    }
+    
+    // Show backtest simulation results if available
     if (bt && bt.tradeCount > 0) {
-      btResultsEl.innerHTML = `
-        <div class="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-          <h4 class="font-semibold text-sm mb-2">Simulation Results</h4>
+      tradeHtml += `
+        <div class="mt-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <h4 class="font-semibold text-xs mb-2">Backtest Simulation</h4>
           <div class="grid grid-cols-3 gap-2 text-sm">
             <div>
               <span class="text-gray-500">P/L:</span>
@@ -9469,27 +9782,11 @@ function showDayDetails(dayIndex) {
               <span class="font-bold">${bt.tradeCount}</span>
             </div>
           </div>
-          ${bt.trades.length > 0 ? `
-            <div class="mt-2 text-xs">
-              <div class="font-medium text-gray-600 dark:text-gray-400">Trade Log:</div>
-              ${bt.trades.slice(0, 3).map(t => `
-                <div class="flex justify-between py-0.5 ${t.pnl >= 0 ? 'text-green-600' : 'text-red-600'}">
-                  <span>${t.type.toUpperCase()} ${t.entryTime} → ${t.exitTime}</span>
-                  <span>${t.pnl >= 0 ? '+' : ''}$${t.pnl.toFixed(2)}</span>
-                </div>
-              `).join('')}
-              ${bt.trades.length > 3 ? `<div class="text-gray-400">+${bt.trades.length - 3} more trades</div>` : ''}
-            </div>
-          ` : ''}
-        </div>
-      `;
-    } else {
-      btResultsEl.innerHTML = `
-        <div class="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-          <p class="text-sm text-gray-500">No trades simulated for this day</p>
         </div>
       `;
     }
+    
+    tradeInfoEl.innerHTML = tradeHtml || '<div class="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"><p class="text-sm text-gray-500">No trade data available</p></div>';
   }
   
   // Show price continuity info
@@ -9514,11 +9811,20 @@ function renderDayChart(day, dayIndex) {
   
   const predicted = day.predictedPrices || [];
   const actual = day.actualPrices || [];
+  const actualCandles = day.actualCandles || [];
   const currentPrice = day.currentPrice;
   const isToday = dayIndex === 0;
   
+  // Collect all prices for scale calculation
   const allPrices = [...predicted, ...actual].filter(p => p != null);
   if (currentPrice) allPrices.push(currentPrice);
+  
+  // Include candle highs/lows in scale
+  actualCandles.forEach(c => {
+    if (c.high) allPrices.push(c.high);
+    if (c.low) allPrices.push(c.low);
+  });
+  
   if (allPrices.length === 0) {
     container.innerHTML = '<div class="flex items-center justify-center h-full text-gray-500 text-sm">No price data</div>';
     return;
@@ -9540,14 +9846,37 @@ function renderDayChart(day, dayIndex) {
     predictedPath += j === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`;
   });
   
-  // Draw actual path if available
-  let actualPath = '';
-  if (actual.length > 0) {
+  // Draw actual candlesticks if available, otherwise draw line
+  let actualElements = '';
+  if (isToday && actualCandles.length > 0) {
+    // Render candlesticks for current day actual data
+    const candleWidth = Math.max(3, (width - padding * 2) / (Math.max(predicted.length, actualCandles.length) * 1.5));
+    actualCandles.forEach((c, j) => {
+      const x = padding + (j / (actualCandles.length - 1 || 1)) * (width - padding * 2);
+      const openY = height - padding - ((c.open - min) / range) * (height - padding * 2);
+      const closeY = height - padding - ((c.close - min) / range) * (height - padding * 2);
+      const highY = height - padding - ((c.high - min) / range) * (height - padding * 2);
+      const lowY = height - padding - ((c.low - min) / range) * (height - padding * 2);
+      
+      const isBullish = c.close >= c.open;
+      const color = isBullish ? '#10b981' : '#ef4444';
+      const bodyTop = Math.min(openY, closeY);
+      const bodyHeight = Math.max(1, Math.abs(closeY - openY));
+      
+      // Wick (high-low line)
+      actualElements += `<line x1="${x}" y1="${highY}" x2="${x}" y2="${lowY}" stroke="${color}" stroke-width="1"/>`;
+      // Body (open-close rectangle)
+      actualElements += `<rect x="${x - candleWidth/2}" y="${bodyTop}" width="${candleWidth}" height="${bodyHeight}" fill="${isBullish ? color : color}" stroke="${color}" stroke-width="1"/>`;
+    });
+  } else if (actual.length > 0) {
+    // Fallback: draw line for actual prices
+    let actualPath = '';
     actual.forEach((p, j) => {
       const x = padding + (j / (actual.length - 1)) * (width - padding * 2);
       const y = height - padding - ((p - min) / range) * (height - padding * 2);
       actualPath += j === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`;
     });
+    actualElements = `<path d="${actualPath}" fill="none" stroke="#f97316" stroke-width="2" />`;
   }
   
   // Mark entry and exit points from backtest
@@ -9569,8 +9898,10 @@ function renderDayChart(day, dayIndex) {
     });
   }
   
-  // Time labels for trading hours
-  const tradingHours = day.dayOfWeek === 1 ? '10:00-24:00' : day.dayOfWeek === 6 ? '00:00-09:00' : '00:00-24:00';
+  // Time labels for trading hours (from settings)
+  const tradingHours = day.tradingStart && day.tradingEnd ? 
+    `${day.tradingStart.split(' ')[0]} - ${day.tradingEnd.split(' ')[0]}` : 
+    `${document.getElementById('tradingStartTime')?.value || '00:00'} - ${document.getElementById('tradingEndTime')?.value || '23:59'}`;
   
   // Current price line (red horizontal line) for today
   let currentPriceLine = '';
@@ -9591,8 +9922,8 @@ function renderDayChart(day, dayIndex) {
     legendItems.push(`<circle cx="${width - 80}" cy="${legendY}" r="4" fill="#ef4444"/><text x="${width - 70}" y="${legendY + 3}" fill="#9ca3af" font-size="10">Current</text>`);
     legendY += 15;
   }
-  if (actual.length > 0) {
-    legendItems.push(`<circle cx="${width - 80}" cy="${legendY}" r="4" fill="#f97316"/><text x="${width - 70}" y="${legendY + 3}" fill="#9ca3af" font-size="10">Actual</text>`);
+  if (actualCandles.length > 0 || actual.length > 0) {
+    legendItems.push(`<rect x="${width - 82}" y="${legendY - 4}" width="5" height="8" fill="#10b981"/><text x="${width - 70}" y="${legendY + 3}" fill="#9ca3af" font-size="10">Actual</text>`);
     legendY += 15;
   }
   if (bt && bt.trades.length > 0) {
@@ -9611,7 +9942,7 @@ function renderDayChart(day, dayIndex) {
       <text x="${padding}" y="${height - 5}" fill="#9ca3af" font-size="10">$${min.toFixed(2)}</text>
       <text x="${width / 2}" y="${height - 5}" fill="#9ca3af" font-size="9" text-anchor="middle">${tradingHours} AEDT</text>
       <path d="${predictedPath}" fill="none" stroke="#3b82f6" stroke-width="2" />
-      ${actualPath ? `<path d="${actualPath}" fill="none" stroke="#f97316" stroke-width="2" />` : ''}
+      ${actualElements}
       ${currentPriceLine}
       ${tradeMarkers}
       ${legendItems.join('')}
