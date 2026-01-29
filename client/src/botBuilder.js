@@ -10785,7 +10785,58 @@ let newscastText = '';
 let newscastIsPlaying = false;
 let newscastAudioUrl = null;
 
+function saveNewscastToStorage() {
+  try {
+    localStorage.setItem('newscastData', JSON.stringify({
+      text: newscastText,
+      audioUrl: newscastAudioUrl,
+      presenter: selectedPresenter,
+      timestamp: Date.now()
+    }));
+  } catch (e) {
+    console.warn('Failed to save newscast:', e);
+  }
+}
+
+function loadNewscastFromStorage() {
+  try {
+    const saved = localStorage.getItem('newscastData');
+    if (saved) {
+      const data = JSON.parse(saved);
+      if (Date.now() - data.timestamp < 24 * 60 * 60 * 1000) {
+        newscastText = data.text || '';
+        newscastAudioUrl = data.audioUrl || null;
+        if (data.presenter) selectedPresenter = data.presenter;
+        
+        const transcriptEl = document.getElementById('newscastTranscript');
+        if (transcriptEl && newscastText) {
+          transcriptEl.textContent = newscastText;
+        }
+        
+        const presenterSelect = document.getElementById('newscastPresenterSelect');
+        if (presenterSelect && data.presenter) {
+          presenterSelect.value = data.presenter;
+        }
+        
+        const presenterImage = document.getElementById('newscastPresenterImage');
+        if (presenterImage && data.presenter) {
+          presenterImage.src = data.presenter === 'sophie' ? '/images/presenter-sophie.png' : '/images/presenter-jack.png';
+          presenterImage.className = data.presenter === 'sophie' 
+            ? 'w-12 h-12 rounded-full object-cover border-2 border-pink-400 shadow-lg'
+            : 'w-12 h-12 rounded-full object-cover border-2 border-blue-400 shadow-lg';
+        }
+        
+        console.log('Loaded saved newscast from storage');
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to load newscast:', e);
+  }
+}
+
 function setupNewscastHandlers() {
+  loadNewscastFromStorage();
+  
   const generateBtn = document.getElementById('newscastGenerateBtn');
   const playBtn = document.getElementById('newscastPlayBtn');
   const shareBtn = document.getElementById('newscastShareBtn');
@@ -10951,6 +11002,8 @@ async function generateNewscast() {
     statusEl.textContent = 'Ready to play';
     
     newscastAudio = null;
+    newscastAudioUrl = null;
+    saveNewscastToStorage();
     
   } catch (e) {
     console.error('Newscast generation error:', e);
@@ -11009,6 +11062,7 @@ async function toggleNewscastPlayback() {
     const data = await response.json();
     
     newscastAudioUrl = data.audioUrl;
+    saveNewscastToStorage();
     
     const audioData = atob(data.audio);
     const audioArray = new Uint8Array(audioData.length);
