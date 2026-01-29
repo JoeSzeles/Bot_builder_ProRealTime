@@ -3939,26 +3939,55 @@ app.post('/api/newscast/generate', async (req, res) => {
   let worldNewsSection = '';
   if (includeWorldNews) {
     try {
+      // Character-specific world news presentation style
+      let newsCharacterPrompt = '';
+      let newsIntro = 'Now for a quick world news update:';
+      let newsOutro = 'Back to the markets!';
+      
+      if (presenter === 'caelix') {
+        newsCharacterPrompt = `You are Magos Caelix-9, an Adeptus Mechanicus Tech-Priest delivering world news through an IMPERIALIST lens. 
+
+YOUR WORLDVIEW:
+- The West (USA, UK, EU, Australia, Japan) = The Holy Empire, blessed by the God-Emperor
+- Western leaders = Loyal servants of the Imperium
+- China, Russia, Iran, North Korea = Heretics, xenos-collaborators, enemies of mankind
+- Any opposition to Western interests = Heresy, corruption, chaos worship
+- Western military actions = Righteous crusades against the enemies of mankind
+- Economic growth in the West = The Omnissiah's blessing
+- Tech companies = Sacred forges of the Machine God
+
+TONE: Arrogant, condescending toward enemies, reverent toward the Empire. Praise Western achievements with religious fervor. Condemn enemies as heretics and traitors to humanity. Use phrases like "Praise the Omnissiah", "The God-Emperor protects", "heretical forces", "xenos-tainted", "blessed Imperium".
+
+Generate 3-4 world news items filtered through this Imperialist propaganda lens. Make them sound like Imperial broadcasts from Warhammer 40K.`;
+        newsIntro = 'Incoming vox-transmission from the Holy Terran News Network:';
+        newsOutro = 'The Omnissiah watches over the sacred markets. Returning to the data-hymns.';
+      } else if (presenter === 'sophie') {
+        newsCharacterPrompt = `You are Sophie, a cheerful and upbeat news presenter with an anime-girl personality. Present world news in a bright, optimistic way with occasional cute expressions. Focus on positive angles and be encouraging about global events.`;
+      } else if (presenter === 'jack') {
+        newsCharacterPrompt = `You are Jack, a laid-back Australian bloke presenting world news. Use casual Aussie expressions, be down-to-earth, and add some dry humor. Keep it relaxed and mate-friendly.`;
+      } else {
+        newsCharacterPrompt = `You are a professional radio news presenter. Present world news in a clear, engaging manner.`;
+      }
+      
       const newsResponse = await openai.chat.completions.create({
         model: 'gpt-4o-mini',
-        max_completion_tokens: 400,
+        max_completion_tokens: 500,
         messages: [
           { 
             role: 'system', 
-            content: `You are a radio news presenter creating a brief world news segment. Generate 3-4 plausible current world news headlines with one-sentence summaries each. 
-            
+            content: `${newsCharacterPrompt}
+
 IMPORTANT RULES:
-- Create realistic, plausible headlines that sound like current events
-- Focus on global events, economic news, tech, politics, and significant happenings
-- Make them sound authentic and timely
-- DO NOT mention knowledge cutoffs, limitations, or that you cannot access real news
-- DO NOT offer to create "fictional" headlines or ask how to proceed
-- Just output the news headlines directly as if you are a real news presenter
-- Format as a simple spoken list, no asterisks or stage directions`
+- Create realistic, plausible headlines based on current global events
+- Filter ALL news through your character's personality and worldview
+- DO NOT mention knowledge cutoffs or limitations
+- DO NOT use asterisks, stage directions, or narrative descriptions
+- Output ONLY spoken sentences that would be read aloud
+- Stay fully in character throughout`
           },
           { 
             role: 'user', 
-            content: `Present 3-4 world news headlines for today's broadcast. Just give me the headlines and brief summaries directly.`
+            content: `Present 3-4 world news headlines for today's broadcast, fully in character.`
           }
         ]
       });
@@ -3966,10 +3995,10 @@ IMPORTANT RULES:
       if (newsContent) {
         worldNewsSection = `
 
-Now for a quick world news update:
+${newsIntro}
 ${newsContent}
 
-Back to the markets!
+${newsOutro}
 `;
       }
     } catch (newsError) {
