@@ -4048,9 +4048,30 @@ app.post('/api/newscast/speak', async (req, res) => {
       throw new Error('No audio data returned from API');
     }
     
+    const audioId = `broadcast-${Date.now()}`;
+    const audioFileName = `${audioId}.mp3`;
+    const audioDir = path.join(__dirname, '..', 'downloads', 'broadcasts');
+    
+    if (!fs.existsSync(audioDir)) {
+      fs.mkdirSync(audioDir, { recursive: true });
+    }
+    
+    const audioBuffer = Buffer.from(audioData, 'base64');
+    const audioPath = path.join(audioDir, audioFileName);
+    fs.writeFileSync(audioPath, audioBuffer);
+    
+    const oldFiles = fs.readdirSync(audioDir).filter(f => f.endsWith('.mp3'));
+    if (oldFiles.length > 10) {
+      oldFiles.sort().slice(0, oldFiles.length - 10).forEach(f => {
+        try { fs.unlinkSync(path.join(audioDir, f)); } catch (e) {}
+      });
+    }
+    
     res.json({ 
       audio: audioData,
-      format: 'mp3'
+      format: 'mp3',
+      audioUrl: `/downloads/broadcasts/${audioFileName}`,
+      audioId: audioId
     });
   } catch (e) {
     console.error('TTS error:', e);

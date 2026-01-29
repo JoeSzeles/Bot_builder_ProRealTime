@@ -10783,6 +10783,7 @@ function updateForecastHistory() {
 let newscastAudio = null;
 let newscastText = '';
 let newscastIsPlaying = false;
+let newscastAudioUrl = null;
 
 function setupNewscastHandlers() {
   const generateBtn = document.getElementById('newscastGenerateBtn');
@@ -10834,15 +10835,15 @@ function toggleSharePanel() {
 }
 
 function shareToSocial(platform) {
-  if (!newscastText) {
-    alert('Generate a broadcast first!');
+  if (!newscastAudioUrl) {
+    alert('Play the broadcast first to generate a shareable audio link!');
     return;
   }
   
   const presenterName = selectedPresenter === 'sophie' ? 'Sophie Mitchell' : 'Jack Thompson';
   const asset = document.getElementById('forecastAssetSelect')?.value || 'silver';
-  const shareText = `Market update from ${presenterName} on Sydney Markets Radio - ${asset.toUpperCase()} analysis`;
-  const shareUrl = window.location.href;
+  const shareText = `Listen to ${presenterName}'s ${asset.toUpperCase()} market update on Sydney Markets Radio!`;
+  const shareUrl = window.location.origin + newscastAudioUrl;
   
   let url = '';
   switch (platform) {
@@ -10863,13 +10864,14 @@ function shareToSocial(platform) {
 }
 
 async function copyNewscastToClipboard() {
-  if (!newscastText) {
-    alert('Generate a broadcast first!');
+  if (!newscastAudioUrl) {
+    alert('Play the broadcast first to generate a shareable audio link!');
     return;
   }
   
   try {
-    await navigator.clipboard.writeText(newscastText);
+    const fullUrl = window.location.origin + newscastAudioUrl;
+    await navigator.clipboard.writeText(fullUrl);
     const btn = document.getElementById('shareCopyBtn');
     if (btn) {
       const originalHTML = btn.innerHTML;
@@ -10998,6 +11000,8 @@ async function toggleNewscastPlayback() {
     if (!response.ok) throw new Error('Failed to generate audio');
     
     const data = await response.json();
+    
+    newscastAudioUrl = data.audioUrl;
     
     const audioData = atob(data.audio);
     const audioArray = new Uint8Array(audioData.length);
