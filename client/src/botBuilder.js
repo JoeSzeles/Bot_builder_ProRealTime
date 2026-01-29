@@ -10787,6 +10787,9 @@ let newscastIsPlaying = false;
 function setupNewscastHandlers() {
   const generateBtn = document.getElementById('newscastGenerateBtn');
   const playBtn = document.getElementById('newscastPlayBtn');
+  const shareBtn = document.getElementById('newscastShareBtn');
+  const presenterSelect = document.getElementById('newscastPresenterSelect');
+  const presenterIcon = document.getElementById('newscastPresenterIcon');
   
   if (generateBtn) {
     generateBtn.addEventListener('click', generateNewscast);
@@ -10795,7 +10798,87 @@ function setupNewscastHandlers() {
   if (playBtn) {
     playBtn.addEventListener('click', toggleNewscastPlayback);
   }
+  
+  if (shareBtn) {
+    shareBtn.addEventListener('click', toggleSharePanel);
+  }
+  
+  if (presenterSelect) {
+    presenterSelect.addEventListener('change', () => {
+      const val = presenterSelect.value;
+      selectedPresenter = val;
+      if (presenterIcon) {
+        presenterIcon.textContent = val === 'sophie' ? 'S' : 'J';
+        presenterIcon.className = val === 'sophie' 
+          ? 'w-8 h-8 rounded-full bg-pink-200 dark:bg-pink-800 flex items-center justify-center text-pink-600 dark:text-pink-300 text-sm font-bold'
+          : 'w-8 h-8 rounded-full bg-blue-200 dark:bg-blue-800 flex items-center justify-center text-blue-600 dark:text-blue-300 text-sm font-bold';
+      }
+      newscastAudio = null;
+    });
+  }
+  
+  document.getElementById('shareTwitterBtn')?.addEventListener('click', () => shareToSocial('twitter'));
+  document.getElementById('shareFacebookBtn')?.addEventListener('click', () => shareToSocial('facebook'));
+  document.getElementById('shareLinkedInBtn')?.addEventListener('click', () => shareToSocial('linkedin'));
+  document.getElementById('shareCopyBtn')?.addEventListener('click', copyNewscastToClipboard);
 }
+
+function toggleSharePanel() {
+  const panel = document.getElementById('newscastSharePanel');
+  if (panel) {
+    panel.classList.toggle('hidden');
+  }
+}
+
+function shareToSocial(platform) {
+  if (!newscastText) {
+    alert('Generate a broadcast first!');
+    return;
+  }
+  
+  const presenterName = selectedPresenter === 'sophie' ? 'Sophie Mitchell' : 'Jack Thompson';
+  const asset = document.getElementById('forecastAssetSelect')?.value || 'silver';
+  const shareText = `Market update from ${presenterName} on Sydney Markets Radio - ${asset.toUpperCase()} analysis`;
+  const shareUrl = window.location.href;
+  
+  let url = '';
+  switch (platform) {
+    case 'twitter':
+      url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
+      break;
+    case 'facebook':
+      url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(shareText)}`;
+      break;
+    case 'linkedin':
+      url = `https://www.linkedin.com/shareArticle?mini=true&url=${encodeURIComponent(shareUrl)}&title=${encodeURIComponent(shareText)}`;
+      break;
+  }
+  
+  if (url) {
+    window.open(url, '_blank', 'width=600,height=400');
+  }
+}
+
+async function copyNewscastToClipboard() {
+  if (!newscastText) {
+    alert('Generate a broadcast first!');
+    return;
+  }
+  
+  try {
+    await navigator.clipboard.writeText(newscastText);
+    const btn = document.getElementById('shareCopyBtn');
+    if (btn) {
+      const originalHTML = btn.innerHTML;
+      btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg><span class="text-xs">Copied!</span>';
+      setTimeout(() => { btn.innerHTML = originalHTML; }, 2000);
+    }
+  } catch (e) {
+    alert('Failed to copy to clipboard');
+  }
+}
+
+let selectedPresenter = 'sophie';
 
 async function generateNewscast() {
   const generateBtn = document.getElementById('newscastGenerateBtn');
@@ -10811,7 +10894,20 @@ async function generateNewscast() {
     loadingEl?.classList.remove('hidden');
     
     const asset = document.getElementById('forecastAssetSelect')?.value || 'silver';
-    const currentPrice = forecastData.days?.[0]?.actual?.[0] || 0;
+    selectedPresenter = document.getElementById('newscastPresenterSelect')?.value || 'sophie';
+    
+    let currentPrice = forecastData.days?.[0]?.actual?.[0] || 0;
+    if (!currentPrice || currentPrice === 0) {
+      try {
+        const priceRes = await fetch(`/api/market-data/${asset}/1m`);
+        if (priceRes.ok) {
+          const priceData = await priceRes.json();
+          if (priceData.candles && priceData.candles.length > 0) {
+            currentPrice = priceData.candles[priceData.candles.length - 1].close;
+          }
+        }
+      } catch (e) { console.warn('Could not fetch current price:', e); }
+    }
     
     let brainData = {};
     try {
@@ -10826,7 +10922,8 @@ async function generateNewscast() {
         forecastData,
         asset,
         currentPrice,
-        brainData
+        brainData,
+        presenter: selectedPresenter
       })
     });
     
@@ -10892,7 +10989,7 @@ async function toggleNewscastPlayback() {
     const response = await fetch('/api/newscast/speak', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: newscastText })
+      body: JSON.stringify({ text: newscastText, presenter: selectedPresenter })
     });
     
     if (!response.ok) throw new Error('Failed to generate audio');

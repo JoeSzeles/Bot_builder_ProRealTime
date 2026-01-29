@@ -3902,7 +3902,7 @@ Be concise but helpful. Use your learned data to inform your responses. If asked
 
 // Generate AI Market Newscast Text
 app.post('/api/newscast/generate', async (req, res) => {
-  const { forecastData, asset, currentPrice, brainData } = req.body;
+  const { forecastData, asset, currentPrice, brainData, presenter } = req.body;
   
   try {
     const now = new Date();
@@ -3928,14 +3928,25 @@ app.post('/api/newscast/generate', async (req, res) => {
       ? `ranging from $${Math.min(...predicted).toFixed(2)} to $${Math.max(...predicted).toFixed(2)}`
       : 'with limited data available';
     
-    const systemPrompt = `You are Sophie Mitchell, a warm, friendly, and knowledgeable female financial radio presenter from Sydney, Australia. You host "Sydney Markets Radio" which broadcasts 23 hours a day from 10am to 9am the next day.
-
-Your personality:
-- Friendly and approachable with a slight Australian accent in your word choices (use "mate", "lovely", "brilliant", "crikey" occasionally)
+    const isSophie = presenter !== 'jack';
+    const presenterName = isSophie ? 'Sophie Mitchell' : 'Jack Thompson';
+    const presenterGender = isSophie ? 'female' : 'male';
+    const personality = isSophie 
+      ? `- Friendly and approachable with a slight Australian accent in your word choices (use "mate", "lovely", "brilliant", "crikey" occasionally)
 - Professional but warm - like a trusted friend who happens to be a market expert
 - Optimistic but realistic - you give balanced views
 - You use natural conversational language, not stiff financial jargon
-- You occasionally add little personal touches or observations
+- You occasionally add little personal touches or observations`
+      : `- Confident and knowledgeable with authentic Australian expressions (use "mate", "no worries", "reckon", "fair dinkum" occasionally)
+- Professional but relaxed - like a trusted mate who knows his markets
+- Straight-talking and practical - you tell it like it is
+- You use natural conversational language, not stiff financial jargon
+- You occasionally add sports analogies or cultural references`;
+    
+    const systemPrompt = `You are ${presenterName}, a warm, friendly, and knowledgeable ${presenterGender} financial radio presenter from Sydney, Australia. You host "Sydney Markets Radio" which broadcasts 23 hours a day from 10am to 9am the next day.
+
+Your personality:
+${personality}
 
 Your broadcast style:
 - Start with a warm greeting and time check
@@ -3955,7 +3966,7 @@ Today's AI Prediction Accuracy: ${(accuracy * 100).toFixed(1)}%
 Price Forecast: ${priceRange}
 Trading Signals: ${tradesSummary}
 
-Generate Sophie's friendly market update covering:
+Generate ${presenterName}'s friendly market update covering:
 1. A warm greeting with the time
 2. Current ${assetName} market conditions
 3. What the AI predictions are showing for today
@@ -3993,7 +4004,7 @@ Remember to sound natural and conversational, like you're speaking to a friend w
       text: newscastText,
       timestamp: now.toISOString(),
       asset: assetName,
-      presenter: 'Sophie Mitchell'
+      presenter: presenterName
     });
   } catch (e) {
     console.error('Newscast generation error:', e);
@@ -4003,22 +4014,29 @@ Remember to sound natural and conversational, like you're speaking to a friend w
 
 // Text-to-Speech for newscast using OpenAI audio
 app.post('/api/newscast/speak', async (req, res) => {
-  const { text } = req.body;
+  const { text, presenter } = req.body;
   
   if (!text) {
     return res.status(400).json({ error: 'Text is required' });
   }
   
   try {
+    const isSophie = presenter !== 'jack';
+    const voice = isSophie ? 'coral' : 'onyx';
+    const presenterName = isSophie ? 'Sophie Mitchell' : 'Jack Thompson';
+    const presenterDesc = isSophie 
+      ? 'a warm and friendly Australian radio presenter with a pleasant feminine voice' 
+      : 'a confident and relaxed Australian radio presenter with a natural masculine voice';
+    
     const response = await openai.chat.completions.create({
       model: 'gpt-audio-mini',
       modalities: ['text', 'audio'],
-      audio: { voice: 'coral', format: 'mp3' },
+      audio: { voice: voice, format: 'mp3' },
       max_completion_tokens: 2048,
       messages: [
         { 
           role: 'system', 
-          content: 'You are Sophie Mitchell, a warm and friendly Australian radio presenter. Read the following market update naturally and conversationally with a pleasant Australian accent. Add appropriate pauses and emphasis for key numbers and trading recommendations.' 
+          content: `You are ${presenterName}, ${presenterDesc}. Read the following market update naturally and conversationally with a pleasant Australian accent. Add appropriate pauses and emphasis for key numbers and trading recommendations.` 
         },
         { role: 'user', content: `Please read this market update aloud:\n\n${text}` }
       ]
