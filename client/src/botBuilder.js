@@ -2139,6 +2139,24 @@ function setupAiTradingSubTabs() {
   // AI Results timeframe buttons
   setupAiResultsTimeframes();
   
+  // AI Projection chart height slider
+  const aiChartHeightSlider = document.getElementById('aiProjectionChartHeight');
+  const aiChartHeightLabel = document.getElementById('aiProjectionChartHeightLabel');
+  if (aiChartHeightSlider) {
+    aiChartHeightSlider.addEventListener('input', () => {
+      const height = aiChartHeightSlider.value;
+      if (aiChartHeightLabel) aiChartHeightLabel.textContent = height;
+      const container = document.getElementById('aiProjectionChart');
+      if (container && aiProjectionChart) {
+        container.style.height = `${height}px`;
+        aiProjectionChart.resize(container.clientWidth, parseInt(height));
+      }
+    });
+  }
+  
+  // Restore cached AI results from localStorage
+  restoreCachedAiResults();
+  
   // AI Projection candles selector - just stores value, refresh button triggers update
   // (No auto-update on change - user clicks Refresh to apply)
   
@@ -2221,6 +2239,37 @@ function setupAiResultsTimeframes() {
       }
     });
   });
+}
+
+// Cache AI results to localStorage for persistence across tab switches
+function cacheAiResults(result) {
+  try {
+    const cacheData = {
+      result,
+      timestamp: Date.now(),
+      timeframe: aiResultsTimeframe
+    };
+    localStorage.setItem('cachedAiResults', JSON.stringify(cacheData));
+  } catch (e) {
+    console.log('Failed to cache AI results:', e);
+  }
+}
+
+// Restore cached AI results from localStorage
+function restoreCachedAiResults() {
+  try {
+    const cached = localStorage.getItem('cachedAiResults');
+    if (cached) {
+      const { result, timestamp } = JSON.parse(cached);
+      // Only use cache if less than 1 hour old
+      if (Date.now() - timestamp < 3600000 && result) {
+        window.lastAiResult = result;
+        console.log('Restored cached AI results from', new Date(timestamp).toLocaleTimeString());
+      }
+    }
+  } catch (e) {
+    console.log('Failed to restore cached AI results:', e);
+  }
 }
 
 function updateAiResultsForTimeframe(tf, result) {
@@ -3035,10 +3084,12 @@ async function updateAiProjectionChart(result) {
   if (interval <= 30) barSpacing = Math.max(0.3, barSpacing * 0.5);
   else if (interval >= 3600) barSpacing = Math.min(10, barSpacing * 1.5);
   
-  // Get actual dimensions from bounding rect
+  // Get actual dimensions from bounding rect, use height slider value
   const chartRect = container.getBoundingClientRect();
   const chartWidth = Math.max(chartRect.width, 400);
-  const chartHeight = Math.max(chartRect.height, 200);
+  const sliderHeight = parseInt(document.getElementById('aiProjectionChartHeight')?.value) || 400;
+  container.style.height = `${sliderHeight}px`;
+  const chartHeight = sliderHeight;
   
   console.log('Creating chart with dimensions:', { chartWidth, chartHeight });
   
@@ -3483,9 +3534,13 @@ function renderBacktestChart(historicalCandles, actualCandles, startPrice, aiDir
   const container = document.getElementById('aiProjectionChart');
   if (!container) return;
   
+  // Use height slider value
+  const sliderHeight = parseInt(document.getElementById('aiProjectionChartHeight')?.value) || 400;
+  container.style.height = `${sliderHeight}px`;
+  
   // Wait for container to have dimensions
   const rect = container.getBoundingClientRect();
-  if (rect.width === 0 || rect.height === 0) {
+  if (rect.width === 0) {
     console.log('Backtest chart container not visible, deferring render');
     setTimeout(() => renderBacktestChart(historicalCandles, actualCandles, startPrice, aiDirection, intervalSeconds), 100);
     return;
@@ -3499,10 +3554,10 @@ function renderBacktestChart(historicalCandles, actualCandles, startPrice, aiDir
   
   const forecastCandles = parseInt(document.getElementById('aiProjectionCandles')?.value || '100');
   
-  // Create chart
+  // Create chart with slider height
   aiProjectionChart = createChart(container, {
     width: rect.width,
-    height: rect.height,
+    height: sliderHeight,
     layout: {
       background: { type: ColorType.Solid, color: '#111827' },
       textColor: '#9ca3af',
@@ -3896,8 +3951,9 @@ window.loadAiStrategyFromHistory = function(index) {
     result.predictions = generateMultiTimeframePredictions(result);
   }
   
-  // Store globally
+  // Store globally and cache to localStorage
   window.lastAiResult = result;
+  cacheAiResults(result);
   
   // Re-display the stored result
   updateAiStrategyUI(result);
@@ -8845,6 +8901,21 @@ function setupForecastHandlers() {
   if (updatePredictionBtn) {
     updatePredictionBtn.addEventListener('click', () => updateCurrentDayPrediction());
   }
+  
+  // Forecast day chart height slider
+  const forecastHeightSlider = document.getElementById('forecastDayChartHeight');
+  const forecastHeightLabel = document.getElementById('forecastDayChartHeightLabel');
+  if (forecastHeightSlider) {
+    forecastHeightSlider.addEventListener('input', () => {
+      const height = forecastHeightSlider.value;
+      if (forecastHeightLabel) forecastHeightLabel.textContent = height;
+      // Redraw the chart with new height
+      if (forecastData.days && forecastData.days.length > 0) {
+        const selectedIdx = parseInt(document.querySelector('.forecast-day-btn.ring-2')?.dataset.day || '0');
+        renderDayChart(forecastData.days[selectedIdx], selectedIdx);
+      }
+    });
+  }
 }
 
 async function updateCurrentDayPrediction() {
@@ -9872,7 +9943,8 @@ function renderDayChart(day, dayIndex) {
   const range = max - min || 1;
   
   const width = container.clientWidth || 400;
-  const height = 180;
+  const height = parseInt(document.getElementById('forecastDayChartHeight')?.value) || 320;
+  container.style.height = `${height}px`;
   const padding = 40;
   
   // Draw predicted path
