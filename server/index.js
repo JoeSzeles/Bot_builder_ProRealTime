@@ -3902,15 +3902,17 @@ Be concise but helpful. Use your learned data to inform your responses. If asked
 
 // Generate AI Market Newscast Text
 app.post('/api/newscast/generate', async (req, res) => {
-  const { forecastData, asset, currentPrice, brainData, presenter, includeIntroAd, includeOutroAd } = req.body;
+  const { forecastData, asset, currentPrice, brainData, presenter, includeIntroAd, includeOutroAd, adTopic } = req.body;
   
-  const introAd = `And now, a word from our sponsor! Hey future trading legends! Ever look at your portfolio and think "I need to return some videotapes"? Bot Builder is here - the AI-powered bot generator that makes you feel like you have that superior brain. Craft ProRealTime bots with the precision of a business card in Silian Rail. Your algorithms will be so clean, so tastefully thick. Bot Builder - because your strategy should be killer. And now, back to the show!
+  const topic = adTopic || 'Bot Builder - AI-powered trading bot generator';
+  
+  const introAd = `And now, a word from our sponsor! ${topic}. And now, back to the show!
 
 `;
   
   const outroAd = `
 
-And that's all for now! This broadcast was brought to you by Bot Builder - where AI meets trading excellence. Build smarter bots, execute better trades, and never miss another market opportunity. Bot Builder: Feed me a stray cat? No thanks, we'd rather feed you profits! Visit Bot Builder today.`;
+And that's all for now! This broadcast was brought to you by ${topic}. Thanks for listening!`;
   
   try {
     const now = new Date();

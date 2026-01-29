@@ -10973,8 +10973,10 @@ async function generateNewscast() {
     
     const introAdCheckbox = document.getElementById('newscastIntroAdCheck');
     const outroAdCheckbox = document.getElementById('newscastOutroAdCheck');
+    const adTopicInput = document.getElementById('newscastAdTopic');
     const includeIntroAd = introAdCheckbox ? introAdCheckbox.checked : false;
     const includeOutroAd = outroAdCheckbox ? outroAdCheckbox.checked : false;
+    const adTopic = adTopicInput ? adTopicInput.value.trim() : '';
     
     const response = await fetch('/api/newscast/generate', {
       method: 'POST',
@@ -10986,7 +10988,8 @@ async function generateNewscast() {
         brainData,
         presenter: selectedPresenter,
         includeIntroAd,
-        includeOutroAd
+        includeOutroAd,
+        adTopic
       })
     });
     
