@@ -3902,7 +3902,7 @@ Be concise but helpful. Use your learned data to inform your responses. If asked
 
 // Generate AI Market Newscast Text
 app.post('/api/newscast/generate', async (req, res) => {
-  const { forecastData, asset, currentPrice, brainData, presenter, includeIntroAd, includeOutroAd, includeWorldNews, adTopic } = req.body;
+  const { forecastData, asset, currentPrice, brainData, presenter, includeMarketForecast = true, includeIntroAd, includeOutroAd, includeWorldNews, adTopic } = req.body;
   
   const adPromptTopic = adTopic || 'Bot Builder - AI-powered trading bot generator';
   
@@ -3945,11 +3945,20 @@ app.post('/api/newscast/generate', async (req, res) => {
         messages: [
           { 
             role: 'system', 
-            content: 'You are a news researcher. Provide 3-4 brief world news headlines with one-sentence summaries each. Focus on major global events, economic news, tech announcements, and significant happenings. Be concise and factual. Format as a simple list.'
+            content: `You are a radio news presenter creating a brief world news segment. Generate 3-4 plausible current world news headlines with one-sentence summaries each. 
+            
+IMPORTANT RULES:
+- Create realistic, plausible headlines that sound like current events
+- Focus on global events, economic news, tech, politics, and significant happenings
+- Make them sound authentic and timely
+- DO NOT mention knowledge cutoffs, limitations, or that you cannot access real news
+- DO NOT offer to create "fictional" headlines or ask how to proceed
+- Just output the news headlines directly as if you are a real news presenter
+- Format as a simple spoken list, no asterisks or stage directions`
           },
           { 
             role: 'user', 
-            content: `What are the top world news headlines right now? Today is ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}. Give me 3-4 major headlines with brief summaries.`
+            content: `Present 3-4 world news headlines for today's broadcast. Just give me the headlines and brief summaries directly.`
           }
         ]
       });
@@ -4070,34 +4079,42 @@ Remember to sound natural and conversational, like you're speaking to a friend w
 
     let newscastText = '';
     
-    try {
-      const response = await anthropic.messages.create({
-        model: 'claude-sonnet-4-5',
-        max_tokens: 500,
-        messages: [
-          { role: 'user', content: `${systemPrompt}\n\n${userPrompt}` }
-        ]
-      });
-      newscastText = response.content[0]?.text || '';
-    } catch (claudeError) {
-      console.error('Claude newscast error, trying GPT:', claudeError.message);
-      
-      const gptResponse = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        max_completion_tokens: 500,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ]
-      });
-      newscastText = gptResponse.choices[0]?.message?.content || '';
+    // Only generate market forecast if checkbox is enabled
+    if (includeMarketForecast) {
+      try {
+        const response = await anthropic.messages.create({
+          model: 'claude-sonnet-4-5',
+          max_tokens: 500,
+          messages: [
+            { role: 'user', content: `${systemPrompt}\n\n${userPrompt}` }
+          ]
+        });
+        newscastText = response.content[0]?.text || '';
+      } catch (claudeError) {
+        console.error('Claude newscast error, trying GPT:', claudeError.message);
+        
+        const gptResponse = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          max_completion_tokens: 500,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ]
+        });
+        newscastText = gptResponse.choices[0]?.message?.content || '';
+      }
     }
     
     let finalText = '';
     if (includeIntroAd) finalText += introAd;
-    finalText += newscastText;
+    if (newscastText) finalText += newscastText;
     if (worldNewsSection) finalText += worldNewsSection;
     if (includeOutroAd) finalText += outroAd;
+    
+    // If nothing was generated, provide a fallback
+    if (!finalText.trim()) {
+      finalText = 'Welcome to the broadcast. Stay tuned for updates.';
+    }
     
     res.json({ 
       text: finalText,

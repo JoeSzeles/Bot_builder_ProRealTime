@@ -11046,10 +11046,12 @@ async function generateNewscast() {
       if (brainRes.ok) brainData = await brainRes.json();
     } catch (e) {}
     
+    const marketForecastCheckbox = document.getElementById('newscastMarketForecastCheck');
     const introAdCheckbox = document.getElementById('newscastIntroAdCheck');
     const outroAdCheckbox = document.getElementById('newscastOutroAdCheck');
     const worldNewsCheckbox = document.getElementById('newscastWorldNewsCheck');
     const adTopicInput = document.getElementById('newscastAdTopic');
+    const includeMarketForecast = marketForecastCheckbox ? marketForecastCheckbox.checked : true;
     const includeIntroAd = introAdCheckbox ? introAdCheckbox.checked : false;
     const includeOutroAd = outroAdCheckbox ? outroAdCheckbox.checked : false;
     const includeWorldNews = worldNewsCheckbox ? worldNewsCheckbox.checked : false;
@@ -11064,6 +11066,7 @@ async function generateNewscast() {
         currentPrice,
         brainData,
         presenter: selectedPresenter,
+        includeMarketForecast,
         includeIntroAd,
         includeOutroAd,
         includeWorldNews,
