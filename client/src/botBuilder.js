@@ -10973,9 +10973,11 @@ async function generateNewscast() {
     
     const introAdCheckbox = document.getElementById('newscastIntroAdCheck');
     const outroAdCheckbox = document.getElementById('newscastOutroAdCheck');
+    const worldNewsCheckbox = document.getElementById('newscastWorldNewsCheck');
     const adTopicInput = document.getElementById('newscastAdTopic');
     const includeIntroAd = introAdCheckbox ? introAdCheckbox.checked : false;
     const includeOutroAd = outroAdCheckbox ? outroAdCheckbox.checked : false;
+    const includeWorldNews = worldNewsCheckbox ? worldNewsCheckbox.checked : false;
     const adTopic = adTopicInput ? adTopicInput.value.trim() : '';
     
     const response = await fetch('/api/newscast/generate', {
@@ -10989,6 +10991,7 @@ async function generateNewscast() {
         presenter: selectedPresenter,
         includeIntroAd,
         includeOutroAd,
+        includeWorldNews,
         adTopic
       })
     });

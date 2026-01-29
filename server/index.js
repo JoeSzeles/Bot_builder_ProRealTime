@@ -3902,7 +3902,7 @@ Be concise but helpful. Use your learned data to inform your responses. If asked
 
 // Generate AI Market Newscast Text
 app.post('/api/newscast/generate', async (req, res) => {
-  const { forecastData, asset, currentPrice, brainData, presenter, includeIntroAd, includeOutroAd, adTopic } = req.body;
+  const { forecastData, asset, currentPrice, brainData, presenter, includeIntroAd, includeOutroAd, includeWorldNews, adTopic } = req.body;
   
   const topic = adTopic || 'Bot Builder - AI-powered trading bot generator';
   
@@ -3913,6 +3913,38 @@ app.post('/api/newscast/generate', async (req, res) => {
   const outroAd = `
 
 And that's all for now! This broadcast was brought to you by ${topic}. Thanks for listening!`;
+  
+  let worldNewsSection = '';
+  if (includeWorldNews) {
+    try {
+      const newsResponse = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        max_completion_tokens: 400,
+        messages: [
+          { 
+            role: 'system', 
+            content: 'You are a news researcher. Provide 3-4 brief world news headlines with one-sentence summaries each. Focus on major global events, economic news, tech announcements, and significant happenings. Be concise and factual. Format as a simple list.'
+          },
+          { 
+            role: 'user', 
+            content: `What are the top world news headlines right now? Today is ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}. Give me 3-4 major headlines with brief summaries.`
+          }
+        ]
+      });
+      const newsContent = newsResponse.choices[0]?.message?.content || '';
+      if (newsContent) {
+        worldNewsSection = `
+
+Now for a quick world news update:
+${newsContent}
+
+Back to the markets!
+`;
+      }
+    } catch (newsError) {
+      console.error('Failed to fetch world news:', newsError.message);
+    }
+  }
   
   try {
     const now = new Date();
@@ -4017,6 +4049,7 @@ Remember to sound natural and conversational, like you're speaking to a friend w
     let finalText = '';
     if (includeIntroAd) finalText += introAd;
     finalText += newscastText;
+    if (worldNewsSection) finalText += worldNewsSection;
     if (includeOutroAd) finalText += outroAd;
     
     res.json({ 
