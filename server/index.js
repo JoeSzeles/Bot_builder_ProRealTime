@@ -3902,7 +3902,7 @@ Be concise but helpful. Use your learned data to inform your responses. If asked
 
 // Generate AI Market Newscast Text
 app.post('/api/newscast/generate', async (req, res) => {
-  const { forecastData, asset, currentPrice, brainData, presenter, includeMarketForecast = true, includeIntroAd, includeOutroAd, includeWorldNews, adTopic } = req.body;
+  const { forecastData, asset, currentPrice, brainData, presenter, includeMarketForecast = true, include7DayForecast = false, includeIntroAd, includeOutroAd, includeWorldNews, adTopic } = req.body;
   
   const adPromptTopic = adTopic || 'Bot Builder - AI-powered trading bot generator';
   
@@ -4134,9 +4134,78 @@ Remember to sound natural and conversational, like you're speaking to a friend w
       }
     }
     
+    // Generate 7-day forecast section if enabled
+    let sevenDaySection = '';
+    if (include7DayForecast && forecastData?.days && forecastData.days.length > 1) {
+      try {
+        const daysData = forecastData.days.map((day, i) => ({
+          day: i + 1,
+          date: day.date,
+          direction: day.direction,
+          confidence: day.confidence,
+          predictedHigh: day.predicted?.[1],
+          predictedLow: day.predicted?.[2],
+          summary: day.summary
+        }));
+        
+        let forecastCharacterPrompt = '';
+        if (presenter === 'caelix') {
+          forecastCharacterPrompt = `You are Magos Caelix-9, an Adeptus Mechanicus Tech-Priest. Present the 7-day market forecast as sacred data-prophecy from the Machine God. Use Mechanicus terminology: "data-augury", "probability matrices", "the Omnissiah reveals", "sacred calculations". Be reverent about the numbers as if they are holy scripture.`;
+        } else if (presenter === 'sophie') {
+          forecastCharacterPrompt = `You are Sophie, a cheerful and upbeat presenter. Present the 7-day forecast in an encouraging, positive way. Make the predictions sound exciting and helpful!`;
+        } else if (presenter === 'jack') {
+          forecastCharacterPrompt = `You are Jack, a laid-back Australian bloke. Present the 7-day forecast casually, like you're chatting with a mate about the week ahead. Use Aussie expressions.`;
+        } else {
+          forecastCharacterPrompt = `You are a professional market analyst presenting the weekly outlook.`;
+        }
+        
+        const forecastResponse = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          max_completion_tokens: 600,
+          messages: [
+            { 
+              role: 'system', 
+              content: `${forecastCharacterPrompt}
+
+RULES:
+- Present each day's forecast briefly (1-2 sentences per day)
+- Include direction (bullish/bearish), confidence level, and key price targets
+- Stay fully in character
+- NO asterisks, stage directions, or narrative descriptions
+- Output ONLY spoken sentences`
+            },
+            { 
+              role: 'user', 
+              content: `Present this 7-day forecast for ${asset?.toUpperCase() || 'the asset'}:\n${JSON.stringify(daysData, null, 2)}`
+            }
+          ]
+        });
+        
+        const forecastContent = forecastResponse.choices[0]?.message?.content || '';
+        if (forecastContent) {
+          const forecastIntro = presenter === 'caelix' 
+            ? 'Now, the sacred seven-day data-augury from the Machine God:'
+            : presenter === 'sophie'
+            ? 'And here is your seven-day outlook!'
+            : presenter === 'jack'
+            ? 'Alright, here is the week ahead mate:'
+            : 'Here is the seven-day market forecast:';
+          
+          sevenDaySection = `
+
+${forecastIntro}
+${forecastContent}
+`;
+        }
+      } catch (forecastError) {
+        console.error('Failed to generate 7-day forecast section:', forecastError.message);
+      }
+    }
+    
     let finalText = '';
     if (includeIntroAd) finalText += introAd;
     if (newscastText) finalText += newscastText;
+    if (sevenDaySection) finalText += sevenDaySection;
     if (worldNewsSection) finalText += worldNewsSection;
     if (includeOutroAd) finalText += outroAd;
     

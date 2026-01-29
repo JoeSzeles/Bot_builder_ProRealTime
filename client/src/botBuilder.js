@@ -11047,11 +11047,13 @@ async function generateNewscast() {
     } catch (e) {}
     
     const marketForecastCheckbox = document.getElementById('newscastMarketForecastCheck');
+    const sevenDayForecastCheckbox = document.getElementById('newscast7DayForecastCheck');
     const introAdCheckbox = document.getElementById('newscastIntroAdCheck');
     const outroAdCheckbox = document.getElementById('newscastOutroAdCheck');
     const worldNewsCheckbox = document.getElementById('newscastWorldNewsCheck');
     const adTopicInput = document.getElementById('newscastAdTopic');
     const includeMarketForecast = marketForecastCheckbox ? marketForecastCheckbox.checked : true;
+    const include7DayForecast = sevenDayForecastCheckbox ? sevenDayForecastCheckbox.checked : false;
     const includeIntroAd = introAdCheckbox ? introAdCheckbox.checked : false;
     const includeOutroAd = outroAdCheckbox ? outroAdCheckbox.checked : false;
     const includeWorldNews = worldNewsCheckbox ? worldNewsCheckbox.checked : false;
@@ -11067,6 +11069,7 @@ async function generateNewscast() {
         brainData,
         presenter: selectedPresenter,
         includeMarketForecast,
+        include7DayForecast,
         includeIntroAd,
         includeOutroAd,
         includeWorldNews,
