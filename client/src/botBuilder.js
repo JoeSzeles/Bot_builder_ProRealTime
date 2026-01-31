@@ -10925,7 +10925,7 @@ function renderNewscastHistory() {
           <p class="text-xs text-gray-600 dark:text-gray-400 truncate mt-0.5">${(item.text || '').substring(0, 60)}...</p>
         </div>
         <div class="flex items-center gap-1 flex-shrink-0">
-          ${item.audioUrl ? `<button onclick="playHistoryItem(${idx})" class="p-2 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400" title="Play"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>` : ''}
+          ${(item.audioUrl || item.videoUrl) ? `<button onclick="playHistoryItem(${idx})" class="p-2 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400" title="Play"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>` : ''}
           ${item.audioUrl ? `<a href="${item.audioUrl}" download class="p-2 text-gray-500 hover:text-green-600 dark:hover:text-green-400" title="Download MP3"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg></a>` : ''}
           ${item.videoUrl ? `<a href="${item.videoUrl}" download class="p-2 text-gray-500 hover:text-purple-600 dark:hover:text-purple-400" title="Download MP4"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg></a>` : ''}
           ${!item.videoUrl && item.audioUrl ? `<button onclick="generateVideoForHistoryItem(${idx})" class="p-2 text-gray-500 hover:text-purple-600 dark:hover:text-purple-400" title="Generate Video"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button>` : ''}
@@ -10940,7 +10940,7 @@ function renderNewscastHistory() {
 // Global functions for history actions
 window.playHistoryItem = function(idx) {
   const item = newscastHistory[idx];
-  if (!item?.audioUrl) return;
+  if (!item?.audioUrl && !item?.videoUrl) return;
   
   // Stop current audio if playing
   if (newscastAudio && newscastIsPlaying) {
@@ -10948,7 +10948,7 @@ window.playHistoryItem = function(idx) {
     newscastIsPlaying = false;
   }
   
-  // Open video player popup
+  // Open video player popup - prioritizes video if available
   openVideoPlayerPopup(item);
 };
 
