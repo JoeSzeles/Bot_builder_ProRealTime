@@ -11418,6 +11418,20 @@ function setupNewscastHandlers() {
   
   document.getElementById('newscastGenerateVideo')?.addEventListener('click', generateNewscastVideo);
   
+  // Quick video button (next to play button)
+  document.getElementById('newscastQuickVideoBtn')?.addEventListener('click', generateNewscastVideo);
+  
+  // Copy script to editor button
+  document.getElementById('copyScriptToEditorBtn')?.addEventListener('click', () => {
+    const editor = document.getElementById('newscastScriptEditor');
+    if (editor && newscastText) {
+      editor.value = newscastText;
+    }
+  });
+  
+  // Generate audio from custom text
+  document.getElementById('generateAudioFromTextBtn')?.addEventListener('click', generateAudioFromText);
+  
   document.getElementById('newscastProgressTrack')?.addEventListener('click', (e) => {
     if (newscastAudio && newscastAudio.duration) {
       const rect = e.currentTarget.getBoundingClientRect();
@@ -11425,6 +11439,90 @@ function setupNewscastHandlers() {
       newscastAudio.currentTime = percent * newscastAudio.duration;
     }
   });
+}
+
+// Generate audio from custom text
+async function generateAudioFromText() {
+  const editor = document.getElementById('newscastScriptEditor');
+  const statusEl = document.getElementById('audioFromTextStatus');
+  const btn = document.getElementById('generateAudioFromTextBtn');
+  const presenterSelect = document.getElementById('newscastPresenterSelect');
+  const transcriptEl = document.getElementById('newscastTranscript');
+  
+  const text = editor?.value?.trim();
+  if (!text) {
+    alert('Please enter or paste some text in the script editor');
+    return;
+  }
+  
+  const presenter = presenterSelect?.value || 'caelix';
+  
+  if (btn) btn.disabled = true;
+  if (statusEl) {
+    statusEl.textContent = 'Generating audio...';
+    statusEl.classList.remove('hidden');
+  }
+  
+  try {
+    const response = await fetch('/api/newscast/tts-from-text', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, presenter })
+    });
+    
+    if (!response.ok) throw new Error('Failed to generate audio');
+    
+    const data = await response.json();
+    
+    // Update the newscast state
+    newscastText = data.text;
+    newscastAudioUrl = data.audioUrl;
+    newscastIsPodcast = false;
+    newscastPodcastSegments = null;
+    
+    // Update transcript display
+    if (transcriptEl) {
+      transcriptEl.innerHTML = `<p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">${newscastText}</p>`;
+    }
+    
+    // Reset audio player
+    newscastAudio = null;
+    
+    // Update status
+    document.getElementById('newscastStatus').textContent = 'Audio ready';
+    if (statusEl) statusEl.textContent = 'Audio generated!';
+    
+    // Save to storage
+    saveNewscastToStorage();
+    
+    // Add to history
+    const historyItem = {
+      id: `custom-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      presenter: presenter,
+      text: newscastText,
+      audioUrl: newscastAudioUrl,
+      isPodcast: false,
+      isCustomText: true
+    };
+    newscastHistory.unshift(historyItem);
+    if (newscastHistory.length > 50) newscastHistory.pop();
+    saveNewscastHistory();
+    renderNewscastHistory();
+    
+    setTimeout(() => {
+      if (statusEl) statusEl.classList.add('hidden');
+    }, 3000);
+    
+  } catch (error) {
+    console.error('Generate audio from text error:', error);
+    if (statusEl) {
+      statusEl.textContent = 'Error generating audio';
+      statusEl.classList.remove('hidden');
+    }
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 // Generate video from current podcast/broadcast

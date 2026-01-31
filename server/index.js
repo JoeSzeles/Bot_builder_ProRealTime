@@ -5179,6 +5179,98 @@ function isValidMediaUrl(url) {
   }
 }
 
+// Generate audio from custom text (TTS only)
+app.post('/api/newscast/tts-from-text', async (req, res) => {
+  const { text, presenter = 'caelix' } = req.body;
+  
+  if (!text || text.trim().length === 0) {
+    return res.status(400).json({ error: 'Text is required' });
+  }
+  
+  try {
+    // Voice mapping
+    const voiceMap = {
+      caelix: 'onyx',
+      sophie: 'shimmer',
+      jack: 'echo',
+      bateman: 'fable',
+      mcafee: 'echo'
+    };
+    const voice = voiceMap[presenter] || 'onyx';
+    
+    // Generate TTS
+    const ttsResponse = await openai.audio.speech.create({
+      model: 'tts-1',
+      voice: voice,
+      input: text.trim(),
+      response_format: 'mp3'
+    });
+    
+    const audioData = Buffer.from(await ttsResponse.arrayBuffer()).toString('base64');
+    
+    // Save audio file
+    const audioId = `custom-${Date.now()}`;
+    const audioFileName = `${audioId}.mp3`;
+    const audioDir = path.join(__dirname, '..', 'downloads', 'broadcasts');
+    
+    if (!fs.existsSync(audioDir)) {
+      fs.mkdirSync(audioDir, { recursive: true });
+    }
+    
+    const audioBuffer = Buffer.from(audioData, 'base64');
+    const audioPath = path.join(audioDir, audioFileName);
+    fs.writeFileSync(audioPath, audioBuffer);
+    
+    // Save metadata
+    const presenterAvatars = {
+      caelix: '/images/presenter-caelix.png',
+      sophie: '/images/presenter-sophie.png',
+      jack: '/images/presenter-jack.png',
+      bateman: '/downloads/media/avatar/patrick-bateman.png',
+      mcafee: '/downloads/media/avatar/john-mcafee.png'
+    };
+    const presenterNames = {
+      caelix: 'Magos Caelix-9',
+      sophie: 'Sophie Mitchell',
+      jack: 'Jack Thompson',
+      bateman: 'Patrick Bateman',
+      mcafee: 'John McAfee'
+    };
+    const stationNames = {
+      caelix: 'Forge World Markets',
+      sophie: "Sophie's Market Corner",
+      jack: 'Sydney Markets Radio',
+      bateman: 'Morning Markets with Bateman',
+      mcafee: 'Crypto Jungle Radio'
+    };
+    
+    const metaFileName = `${audioId}.json`;
+    const metadata = {
+      id: audioId,
+      text: text.trim(),
+      presenter: presenter,
+      presenterName: presenterNames[presenter] || 'Unknown',
+      presenterImage: presenterAvatars[presenter] || '/images/presenter-caelix.png',
+      stationName: stationNames[presenter] || 'Market Radio',
+      timestamp: new Date().toISOString(),
+      isCustomText: true
+    };
+    fs.writeFileSync(path.join(audioDir, metaFileName), JSON.stringify(metadata, null, 2));
+    
+    res.json({
+      success: true,
+      audioUrl: `/downloads/broadcasts/${audioFileName}`,
+      text: text.trim(),
+      presenter: presenter,
+      presenterName: presenterNames[presenter] || 'Unknown'
+    });
+    
+  } catch (error) {
+    console.error('TTS from text error:', error);
+    res.status(500).json({ error: 'Failed to generate audio from text' });
+  }
+});
+
 app.post('/api/newscast/generate-video', async (req, res) => {
   const { audioUrl, podcastSegments, presenter, customAvatarUrl, customBgVideoUrl, customBgMusicUrl, bgMusicVolume = 0.15, speakerVideos = {}, showTitle = 'MARKET RADIO' } = req.body;
   const musicVol = Math.max(0, Math.min(0.5, parseFloat(bgMusicVolume) || 0.15));
