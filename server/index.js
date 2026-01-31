@@ -4272,7 +4272,7 @@ Be concise but helpful. Use your learned data to inform your responses. If asked
 
 // Generate AI Market Newscast Text
 app.post('/api/newscast/generate', async (req, res) => {
-  const { forecastData, asset, currentPrice, brainData, presenter, includeMarketForecast = true, include7DayForecast = false, includeIntroAd, includeOutroAd, includeWorldNews, isDailyPodcast = false, includeGuest = false, adTopic } = req.body;
+  const { forecastData, asset, currentPrice, brainData, presenter, includeMarketForecast = true, include7DayForecast = false, includeIntroAd, includeOutroAd, includeWorldNews, isDailyPodcast = false, includeGuest = false, adTopic, podcastTopic = '' } = req.body;
   
   const adPromptTopic = adTopic || 'Bot Builder - AI-powered trading bot generator';
   
@@ -4663,7 +4663,32 @@ ${forecastContent}
         // Build market context for the discussion
         let marketSummaryForPodcast = realMarketSummary || `${assetName} is currently trading.`;
         
-        const podcastPrompt = `Create a podcast script where ${mainHost.name} (main host) discusses the market with ${guest.name} (guest).
+        // Determine if using custom topic or market discussion
+        const hasCustomTopic = podcastTopic && podcastTopic.length > 10;
+        
+        const podcastPrompt = hasCustomTopic 
+          ? `Create a podcast script where ${mainHost.name} (main host) has a discussion with ${guest.name} (co-host).
+
+DISCUSSION TOPIC/SCENARIO:
+${podcastTopic}
+
+FORMAT RULES:
+- Use EXACTLY this format for each line: [SPEAKER_KEY]: dialogue text
+- ${presenter.toUpperCase()}: for ${mainHost.name}
+- ${guestKey.toUpperCase()}: for ${guest.name}
+- 8-12 exchanges total (heated back and forth, they can disagree!)
+- Create natural conflict, disagreements, and debates if the topic calls for it
+- Characters stay true to their personalities but engage in real discussion
+- NO asterisks, stage directions, or descriptions
+- Output ONLY the dialogue lines
+
+CHARACTERS:
+${presenter === 'caelix' ? '- CAELIX: Magos Caelix-9, Tech-Priest of the Omnissiah. Uses Mechanicus terminology, treats data as sacred, reverent about the Machine God. Very logical and anti-emotional.' : presenter === 'sophie' ? '- SOPHIE: Sophie Mitchell, cheerful but can be passionate about social issues. Optimistic but will argue her point firmly.' : '- JACK: Jack Thompson, laid-back Australian bloke, casual expressions, straight-talking. Can get heated when pushed.'}
+${guestKey === 'caelix' ? '- CAELIX: Magos Caelix-9, Tech-Priest of the Omnissiah. Uses Mechanicus terminology, logical to a fault, dismissive of emotional arguments.' : guestKey === 'sophie' ? '- SOPHIE: Sophie Mitchell, cheerful but opinionated. Will push back on things she disagrees with.' : '- JACK: Jack Thompson, laid-back Australian, casual expressions, can be blunt.'}
+
+START WITH: A brief greeting then dive into the topic.
+END WITH: They may or may not agree - end naturally based on the discussion.`
+          : `Create a podcast script where ${mainHost.name} (main host) discusses the market with ${guest.name} (guest).
 
 MARKET DATA:
 ${marketSummaryForPodcast}

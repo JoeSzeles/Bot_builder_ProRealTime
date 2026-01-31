@@ -11152,10 +11152,11 @@ function setupNewscastHandlers() {
     });
   }
   
-  // Daily Podcast checkbox - enable/disable guest participation
+  // Daily Podcast checkbox - enable/disable guest participation and topic input
   const dailyPodcastCheck = document.getElementById('newscastDailyPodcastCheck');
   const guestCheck = document.getElementById('newscastGuestCheck');
   const guestLabel = document.getElementById('guestParticipationLabel');
+  const podcastTopicContainer = document.getElementById('podcastTopicContainer');
   
   if (dailyPodcastCheck && guestCheck && guestLabel) {
     dailyPodcastCheck.addEventListener('change', () => {
@@ -11163,10 +11164,12 @@ function setupNewscastHandlers() {
         guestCheck.disabled = false;
         guestCheck.checked = true;
         guestLabel.classList.remove('opacity-50');
+        if (podcastTopicContainer) podcastTopicContainer.classList.remove('hidden');
       } else {
         guestCheck.disabled = true;
         guestCheck.checked = false;
         guestLabel.classList.add('opacity-50');
+        if (podcastTopicContainer) podcastTopicContainer.classList.add('hidden');
       }
     });
   }
@@ -11710,6 +11713,7 @@ async function generateNewscast() {
     const dailyPodcastCheckbox = document.getElementById('newscastDailyPodcastCheck');
     const guestParticipationCheckbox = document.getElementById('newscastGuestCheck');
     const adTopicInput = document.getElementById('newscastAdTopic');
+    const podcastTopicInput = document.getElementById('podcastTopicInput');
     const includeMarketForecast = marketForecastCheckbox ? marketForecastCheckbox.checked : true;
     const include7DayForecast = sevenDayForecastCheckbox ? sevenDayForecastCheckbox.checked : false;
     const includeIntroAd = introAdCheckbox ? introAdCheckbox.checked : false;
@@ -11718,6 +11722,7 @@ async function generateNewscast() {
     const isDailyPodcast = dailyPodcastCheckbox ? dailyPodcastCheckbox.checked : false;
     const includeGuest = guestParticipationCheckbox ? guestParticipationCheckbox.checked : false;
     const adTopic = adTopicInput ? adTopicInput.value.trim() : '';
+    const podcastTopic = podcastTopicInput ? podcastTopicInput.value.trim() : '';
     
     const response = await fetch('/api/newscast/generate', {
       method: 'POST',
@@ -11735,7 +11740,8 @@ async function generateNewscast() {
         includeWorldNews,
         isDailyPodcast,
         includeGuest,
-        adTopic
+        adTopic,
+        podcastTopic
       })
     });
     
