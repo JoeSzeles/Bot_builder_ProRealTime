@@ -8692,9 +8692,12 @@ function startForecastAutoRefresh() {
   }, 60000); // Every 60 seconds
 }
 
-// Fetch and update actual candles for the current day
+// Fetch and update actual candles for the current day (day index 1 in 8-day forecast)
 async function updateCurrentDayActualCandles() {
-  const today = forecastData.days[0];
+  // Find today's entry (has isToday flag)
+  const todayIndex = forecastData.days.findIndex(d => d.isToday);
+  if (todayIndex < 0) return;
+  const today = forecastData.days[todayIndex];
   if (!today) return;
   
   const asset = forecastData.asset || 'silver';
@@ -9860,7 +9863,7 @@ async function updateForecastUI() {
   const accuracyScore = document.getElementById('forecastAccuracyScore');
   
   if (!forecastData.days || forecastData.days.length === 0) {
-    if (container) container.innerHTML = '<div class="col-span-7 text-center py-8 text-gray-500">No forecast data available. Click Refresh to generate.</div>';
+    if (container) container.innerHTML = '<div class="col-span-8 text-center py-8 text-gray-500">No forecast data available. Click Refresh to generate.</div>';
     return;
   }
   
@@ -9906,40 +9909,73 @@ async function updateForecastUI() {
     
     container.innerHTML = forecastData.days.map((day, i) => {
       const date = new Date(day.date);
-      const isToday = i === 0;
-      const directionIcon = day.direction === 'bullish' ? '📈' : '📉';
-      const bgColor = day.direction === 'bullish' 
-        ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' 
-        : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800';
+      const isYesterday = day.isHistorical;
+      const isToday = day.isToday;
+      const isFuture = day.isFuture;
+      
+      // Direction icon based on actual data
+      let directionIcon = day.direction === 'bullish' ? '📈' : day.direction === 'bearish' ? '📉' : '➖';
+      
+      // Different color schemes for different day types
+      let bgColor;
+      if (isYesterday) {
+        // Yesterday - muted colors (historical)
+        bgColor = day.direction === 'bullish' 
+          ? 'bg-green-50/50 dark:bg-green-900/10 border-green-200/50 dark:border-green-800/50' 
+          : 'bg-red-50/50 dark:bg-red-900/10 border-red-200/50 dark:border-red-800/50';
+      } else if (isToday) {
+        // Today - bright with ring
+        bgColor = day.direction === 'bullish' 
+          ? 'bg-green-100 dark:bg-green-900/30 border-green-300 dark:border-green-700' 
+          : 'bg-red-100 dark:bg-red-900/30 border-red-300 dark:border-red-700';
+      } else {
+        // Future - standard
+        bgColor = day.direction === 'bullish' 
+          ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' 
+          : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800';
+      }
       
       const bt = day.backtestResult;
       const btPnL = bt?.totalPnL || 0;
-      const btWinRate = bt?.winRate || 0;
       const btTrades = bt?.tradeCount || 0;
       
-      // Show trading status for today
+      // Status badge
       let statusBadge = '';
-      if (isToday) {
+      if (isYesterday) {
+        statusBadge = '<span class="inline-block mt-1 px-1.5 py-0.5 text-xs bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded">HISTORICAL</span>';
+      } else if (isToday) {
         if (isMarketOpen) {
           statusBadge = '<span class="inline-block mt-1 px-1.5 py-0.5 text-xs bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300 rounded animate-pulse">LIVE</span>';
         } else {
-          statusBadge = '<span class="inline-block mt-1 px-1.5 py-0.5 text-xs bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-300 rounded">CLOSED</span>';
+          statusBadge = '<span class="inline-block mt-1 px-1.5 py-0.5 text-xs bg-yellow-100 dark:bg-yellow-900 text-yellow-600 dark:text-yellow-300 rounded">TODAY</span>';
         }
+      } else if (isFuture) {
+        statusBadge = '<span class="inline-block mt-1 px-1.5 py-0.5 text-xs bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 rounded">FORECAST</span>';
       }
+      
+      // Format the percentage
+      const expectedMove = parseFloat(day.expectedMove) || 0;
+      const moveStr = expectedMove >= 0 ? `+${expectedMove.toFixed(2)}%` : `${expectedMove.toFixed(2)}%`;
+      const moveColor = expectedMove >= 0 ? 'text-green-600' : 'text-red-600';
+      
+      // Label for the day
+      let dayLabel = day.dayName;
+      if (isYesterday) dayLabel = 'Yesterday';
+      else if (isToday) dayLabel = 'Today';
       
       return `
         <div class="forecast-day-card cursor-pointer p-3 rounded-lg border ${bgColor} ${isToday ? 'ring-2 ring-blue-500' : ''} hover:shadow-lg transition-all" data-day-index="${i}">
           <div class="text-center">
-            <p class="text-xs font-medium text-gray-500 dark:text-gray-400">${day.dayName}</p>
+            <p class="text-xs font-medium ${isToday ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'}">${dayLabel}</p>
             <p class="text-xs text-gray-400">${toSydneyTime(date).getDate()}/${toSydneyTime(date).getMonth() + 1}</p>
             <div class="text-2xl my-1">${directionIcon}</div>
             <div class="h-12 mb-1" id="miniChart${i}"></div>
-            <p class="text-xs font-semibold ${day.direction === 'bullish' ? 'text-green-600' : 'text-red-600'}">${parseFloat(day.expectedMove) > 0 ? '+' : ''}${day.expectedMove}%</p>
-            <p class="text-xs text-gray-500">${day.confidence.toFixed(0)}% conf</p>
-            ${btTrades > 0 ? `<p class="text-xs mt-1 ${btPnL >= 0 ? 'text-green-600' : 'text-red-600'}">${btPnL >= 0 ? '+' : ''}$${btPnL.toFixed(0)} (${btTrades} trades)</p>` : ''}
+            <p class="text-sm font-bold ${moveColor}">${moveStr}</p>
+            ${!isYesterday && !isToday ? `<p class="text-xs text-gray-500">${(day.confidence || 0).toFixed(0)}% conf</p>` : ''}
+            ${btTrades > 0 && !isYesterday ? `<p class="text-xs mt-1 ${btPnL >= 0 ? 'text-green-600' : 'text-red-600'}">${btPnL >= 0 ? '+' : ''}$${btPnL.toFixed(0)} (${btTrades} trades)</p>` : ''}
             ${statusBadge}
           </div>
-          <p class="text-xs text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">${day.summary}</p>
+          <p class="text-xs text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">${day.summary || ''}</p>
         </div>
       `;
     }).join('');

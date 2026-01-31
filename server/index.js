@@ -3757,25 +3757,77 @@ app.post('/api/ai/forecast', async (req, res) => {
       ? recentPrices[recentPrices.length - 1].close 
       : 30;
     
+    // Get real historical data for yesterday and today
+    const yahooSymbol = YAHOO_SYMBOLS[asset] || YAHOO_SYMBOLS['silver'];
+    let historicalData = null;
+    try {
+      historicalData = await fetchYahooFinanceData(yahooSymbol, '1h', '5d');
+    } catch (e) {
+      console.warn('Failed to fetch historical data:', e.message);
+    }
+    
+    // Parse candles into days (yesterday and today with real data)
+    const now = new Date();
+    const todayMidnight = new Date(now);
+    todayMidnight.setHours(0, 0, 0, 0);
+    const yesterdayMidnight = new Date(todayMidnight);
+    yesterdayMidnight.setDate(yesterdayMidnight.getDate() - 1);
+    
+    let yesterdayCandles = [];
+    let todayCandles = [];
+    
+    if (historicalData?.candles) {
+      const candles = historicalData.candles;
+      const todayTs = Math.floor(todayMidnight.getTime() / 1000);
+      const yesterdayTs = Math.floor(yesterdayMidnight.getTime() / 1000);
+      
+      yesterdayCandles = candles.filter(c => c.time >= yesterdayTs && c.time < todayTs);
+      todayCandles = candles.filter(c => c.time >= todayTs);
+    }
+    
+    // Calculate yesterday's real OHLC and change
+    let yesterdayOHLC = null;
+    if (yesterdayCandles.length > 0) {
+      const open = yesterdayCandles[0].open;
+      const close = yesterdayCandles[yesterdayCandles.length - 1].close;
+      const high = Math.max(...yesterdayCandles.map(c => c.high));
+      const low = Math.min(...yesterdayCandles.map(c => c.low));
+      const change = ((close - open) / open * 100).toFixed(2);
+      yesterdayOHLC = { open, high, low, close, change: parseFloat(change), candles: yesterdayCandles };
+    }
+    
+    // Calculate today's real OHLC so far
+    let todayOHLC = null;
+    if (todayCandles.length > 0) {
+      const open = todayCandles[0].open;
+      const close = todayCandles[todayCandles.length - 1].close;
+      const high = Math.max(...todayCandles.map(c => c.high));
+      const low = Math.min(...todayCandles.map(c => c.low));
+      const change = ((close - open) / open * 100).toFixed(2);
+      todayOHLC = { open, high, low, close, change: parseFloat(change), candles: todayCandles };
+    }
+    
     const patterns = brain?.patterns || [];
     const avgWinRate = patterns.length > 0 
       ? patterns.reduce((sum, p) => sum + (p.successRate || 50), 0) / patterns.length 
       : 55;
     
-    const prompt = `You are an expert market analyst. Based on the following data, generate a 7-day price forecast for ${asset.toUpperCase()}.
+    // AI generates 6 future days (not including today or yesterday which use real data)
+    const prompt = `You are an expert market analyst. Based on the following data, generate a 6-day FUTURE price forecast for ${asset.toUpperCase()}.
 
 CURRENT MARKET DATA:
 - Current Price: $${currentPrice.toFixed(2)}
-- Recent Price Trend: ${recentPrices ? (recentPrices[recentPrices.length - 1]?.close > recentPrices[0]?.close ? 'Upward' : 'Downward') : 'Unknown'}
+- Yesterday's Move: ${yesterdayOHLC ? `${yesterdayOHLC.change}% (Open: $${yesterdayOHLC.open.toFixed(2)}, Close: $${yesterdayOHLC.close.toFixed(2)})` : 'Unknown'}
+- Today So Far: ${todayOHLC ? `${todayOHLC.change}% (Open: $${todayOHLC.open.toFixed(2)}, Now: $${todayOHLC.close.toFixed(2)})` : 'Unknown'}
+- Recent Trend: ${recentPrices ? (recentPrices[recentPrices.length - 1]?.close > recentPrices[0]?.close ? 'Upward' : 'Downward') : 'Unknown'}
 - Historical Pattern Win Rate: ${avgWinRate.toFixed(1)}%
-- Number of Known Patterns: ${patterns.length}
 
 TRADING SETTINGS:
 - Initial Capital: $${settings?.initialCapital || 2000}
 - Stop Loss: ${settings?.stopLoss || 2}%
 - Take Profit: ${settings?.takeProfit || 5}%
 
-Generate a JSON response with exactly 7 days of forecast data. Each day should include:
+Generate a JSON response with exactly 6 days of FUTURE forecast data (starting from tomorrow). Each day should include:
 - direction: "bullish" or "bearish"
 - confidence: number 40-90
 - expectedMove: percentage change from open (-5 to +5)
@@ -3831,16 +3883,98 @@ Respond ONLY with valid JSON in this format:
       }
     }
     
-    if (result && result.days && result.days.length >= 7) {
-      const today = new Date();
-      result.days = result.days.slice(0, 7).map((day, i) => {
-        const date = new Date(today);
-        date.setDate(date.getDate() + i);
+    // Build the 8-day forecast: yesterday (real), today (real+live), 6 future days (AI)
+    const allDays = [];
+    
+    // Day 0: Yesterday (historical - real data only)
+    const yesterday = new Date(yesterdayMidnight);
+    if (yesterdayOHLC) {
+      allDays.push({
+        date: yesterday.toISOString(),
+        dayName: yesterday.toLocaleDateString('en-US', { weekday: 'short' }),
+        direction: yesterdayOHLC.change >= 0 ? 'bullish' : 'bearish',
+        confidence: 100, // Real data = 100% confidence
+        predictedOpen: yesterdayOHLC.open,
+        predictedHigh: yesterdayOHLC.high,
+        predictedLow: yesterdayOHLC.low,
+        predictedClose: yesterdayOHLC.close,
+        expectedMove: yesterdayOHLC.change,
+        entryPrice: yesterdayOHLC.open,
+        exitPrice: yesterdayOHLC.close,
+        entryTime: '00:00',
+        exitTime: '23:59',
+        summary: `Historical data: ${yesterdayOHLC.change >= 0 ? 'Gained' : 'Lost'} ${Math.abs(yesterdayOHLC.change).toFixed(2)}% from $${yesterdayOHLC.open.toFixed(2)} to $${yesterdayOHLC.close.toFixed(2)}`,
+        predictedPrices: yesterdayOHLC.candles.map(c => c.close),
+        actualPrices: yesterdayOHLC.candles.map(c => c.close),
+        isHistorical: true
+      });
+    } else {
+      // Fallback if no yesterday data
+      allDays.push({
+        date: yesterday.toISOString(),
+        dayName: yesterday.toLocaleDateString('en-US', { weekday: 'short' }),
+        direction: 'neutral',
+        confidence: 0,
+        expectedMove: 0,
+        summary: 'Historical data unavailable',
+        predictedPrices: [],
+        actualPrices: [],
+        isHistorical: true
+      });
+    }
+    
+    // Day 1: Today (real data + updating)
+    const todayDate = new Date(todayMidnight);
+    if (todayOHLC) {
+      allDays.push({
+        date: todayDate.toISOString(),
+        dayName: todayDate.toLocaleDateString('en-US', { weekday: 'short' }),
+        direction: todayOHLC.change >= 0 ? 'bullish' : 'bearish',
+        confidence: 100, // Real data
+        predictedOpen: todayOHLC.open,
+        predictedHigh: todayOHLC.high,
+        predictedLow: todayOHLC.low,
+        predictedClose: todayOHLC.close,
+        expectedMove: todayOHLC.change,
+        entryPrice: todayOHLC.open,
+        exitPrice: todayOHLC.close,
+        entryTime: '00:00',
+        exitTime: 'LIVE',
+        summary: `Live data: ${todayOHLC.change >= 0 ? 'Up' : 'Down'} ${Math.abs(todayOHLC.change).toFixed(2)}% so far today`,
+        predictedPrices: [],
+        actualPrices: todayOHLC.candles.map(c => c.close),
+        isToday: true
+      });
+    } else {
+      // Fallback if no today data yet
+      allDays.push({
+        date: todayDate.toISOString(),
+        dayName: todayDate.toLocaleDateString('en-US', { weekday: 'short' }),
+        direction: 'neutral',
+        confidence: 0,
+        expectedMove: 0,
+        summary: 'Awaiting market data...',
+        predictedPrices: [],
+        actualPrices: [],
+        isToday: true
+      });
+    }
+    
+    // Days 2-7: Future days (AI predicted)
+    if (result && result.days && result.days.length >= 6) {
+      let lastClose = currentPrice; // Track the last close for chaining
+      
+      const futureDays = result.days.slice(0, 6).map((day, i) => {
+        const date = new Date(todayMidnight);
+        date.setDate(date.getDate() + i + 1); // Start from tomorrow
         
-        const predictedOpen = i === 0 ? currentPrice : result.days[i - 1].predictedClose || currentPrice;
+        const predictedOpen = lastClose; // Use chained close price
         const move = (day.expectedMove || 0) / 100;
         const predictedClose = predictedOpen * (1 + move);
         const volatility = Math.abs(move) * 0.5;
+        
+        // Update lastClose for next iteration
+        lastClose = predictedClose;
         
         return {
           date: date.toISOString(),
@@ -3862,14 +3996,35 @@ Respond ONLY with valid JSON in this format:
           exitTime: day.exitTime || '16:00',
           summary: day.summary || 'Forecast based on historical patterns.',
           predictedPrices: generateHourlyPrices(predictedOpen, predictedClose, 24),
-          actualPrices: []
+          actualPrices: [],
+          isFuture: true
         };
       });
-      
-      res.json(result);
-    } else {
-      res.status(400).json({ error: 'Could not generate valid forecast' });
+      allDays.push(...futureDays);
     }
+    
+    // Ensure we have 8 days total
+    while (allDays.length < 8) {
+      const lastDate = new Date(allDays[allDays.length - 1]?.date || todayMidnight);
+      lastDate.setDate(lastDate.getDate() + 1);
+      allDays.push({
+        date: lastDate.toISOString(),
+        dayName: lastDate.toLocaleDateString('en-US', { weekday: 'short' }),
+        direction: 'neutral',
+        confidence: 30,
+        expectedMove: 0,
+        summary: 'Awaiting forecast...',
+        predictedPrices: [],
+        actualPrices: [],
+        isFuture: true
+      });
+    }
+    
+    res.json({ 
+      days: allDays.slice(0, 8),
+      asset: asset,
+      generatedAt: new Date().toISOString()
+    });
   } catch (e) {
     console.error('Error generating forecast:', e);
     res.status(500).json({ error: e.message });
