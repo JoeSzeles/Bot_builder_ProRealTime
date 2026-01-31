@@ -11625,7 +11625,7 @@ function setupMediaUploadHandlers() {
   
   // Save selections when user changes dropdowns
   const selectIds = ['customAvatarSelect', 'customBgVideoSelect', 'customBgMusicSelect', 
-                     'speakerVideoCaelix', 'speakerVideoSophie', 'speakerVideoJack'];
+                     'speakerVideoCaelix', 'speakerVideoSophie', 'speakerVideoJack', 'speakerVideoBateman', 'speakerVideoMcafee'];
   selectIds.forEach(id => {
     document.getElementById(id)?.addEventListener('change', saveMediaSelections);
   });
@@ -11749,7 +11749,7 @@ function populateMediaSelects() {
   }
   
   // Per-speaker video selects
-  const speakerSelects = ['speakerVideoCaelix', 'speakerVideoSophie', 'speakerVideoJack', 'speakerVideoBateman'];
+  const speakerSelects = ['speakerVideoCaelix', 'speakerVideoSophie', 'speakerVideoJack', 'speakerVideoBateman', 'speakerVideoMcafee'];
   speakerSelects.forEach(selectId => {
     const select = document.getElementById(selectId);
     if (select) {
@@ -11776,7 +11776,8 @@ function getSelectedMediaUrls() {
       caelix: document.getElementById('speakerVideoCaelix')?.value || null,
       sophie: document.getElementById('speakerVideoSophie')?.value || null,
       jack: document.getElementById('speakerVideoJack')?.value || null,
-      bateman: document.getElementById('speakerVideoBateman')?.value || null
+      bateman: document.getElementById('speakerVideoBateman')?.value || null,
+      mcafee: document.getElementById('speakerVideoMcafee')?.value || null
     }
   };
 }
@@ -11797,7 +11798,8 @@ function saveMediaSelections() {
     speakerVideoCaelix: document.getElementById('speakerVideoCaelix')?.value || existing.speakerVideoCaelix || '',
     speakerVideoSophie: document.getElementById('speakerVideoSophie')?.value || existing.speakerVideoSophie || '',
     speakerVideoJack: document.getElementById('speakerVideoJack')?.value || existing.speakerVideoJack || '',
-    speakerVideoBateman: document.getElementById('speakerVideoBateman')?.value || existing.speakerVideoBateman || ''
+    speakerVideoBateman: document.getElementById('speakerVideoBateman')?.value || existing.speakerVideoBateman || '',
+    speakerVideoMcafee: document.getElementById('speakerVideoMcafee')?.value || existing.speakerVideoMcafee || ''
   };
   localStorage.setItem('mediaSelections', JSON.stringify(selections));
 }
@@ -11818,6 +11820,7 @@ function loadMediaSelections() {
     const sophieSelect = document.getElementById('speakerVideoSophie');
     const jackSelect = document.getElementById('speakerVideoJack');
     const batemanSelect = document.getElementById('speakerVideoBateman');
+    const mcafeeSelect = document.getElementById('speakerVideoMcafee');
     
     if (avatarSelect && selections.avatar) avatarSelect.value = selections.avatar;
     if (videoSelect && selections.video) videoSelect.value = selections.video;
@@ -11830,6 +11833,7 @@ function loadMediaSelections() {
     if (sophieSelect && selections.speakerVideoSophie) sophieSelect.value = selections.speakerVideoSophie;
     if (jackSelect && selections.speakerVideoJack) jackSelect.value = selections.speakerVideoJack;
     if (batemanSelect && selections.speakerVideoBateman) batemanSelect.value = selections.speakerVideoBateman;
+    if (mcafeeSelect && selections.speakerVideoMcafee) mcafeeSelect.value = selections.speakerVideoMcafee;
   } catch (e) {
     console.error('Failed to load media selections:', e);
   }
