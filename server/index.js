@@ -43,63 +43,63 @@ app.use('/downloads/media', express.static(MEDIA_DIR));
 // Valid media types (whitelist for security)
 const VALID_MEDIA_TYPES = ['avatar', 'video', 'music'];
 
-// Configure multer for media uploads
-const mediaStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const type = req.body.type || 'avatar';
-    // Validate type against whitelist
-    if (!VALID_MEDIA_TYPES.includes(type)) {
-      return cb(new Error('Invalid media type'));
-    }
-    const subDir = path.join(MEDIA_DIR, type);
-    if (!fs.existsSync(subDir)) fs.mkdirSync(subDir, { recursive: true });
-    cb(null, subDir);
-  },
-  filename: (req, file, cb) => {
-    // Sanitize filename - only allow alphanumeric, dots, underscores, dashes
-    const ext = path.extname(file.originalname).toLowerCase();
-    const baseName = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, '_');
-    const name = `${Date.now()}-${baseName}${ext}`;
-    cb(null, name);
-  }
-});
+const ALLOWED_EXTENSIONS = {
+  avatar: ['.png', '.jpg', '.jpeg', '.gif', '.webp'],
+  video: ['.mp4', '.webm', '.mov'],
+  music: ['.mp3', '.ogg', '.wav', '.m4a']
+};
 
-const mediaUpload = multer({
-  storage: mediaStorage,
-  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB max
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = {
-      avatar: ['.png', '.jpg', '.jpeg', '.gif', '.webp'],
-      video: ['.mp4', '.webm', '.mov'],
-      music: ['.mp3', '.ogg', '.wav', '.m4a']
-    };
-    const type = req.body.type || 'avatar';
-    // Validate type against whitelist
-    if (!VALID_MEDIA_TYPES.includes(type)) {
-      return cb(new Error('Invalid media type'));
+// Create multer upload handler for a specific type
+function createMediaUploader(type) {
+  const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+      const subDir = path.join(MEDIA_DIR, type);
+      if (!fs.existsSync(subDir)) fs.mkdirSync(subDir, { recursive: true });
+      cb(null, subDir);
+    },
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      const baseName = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, '_');
+      const name = `${Date.now()}-${baseName}${ext}`;
+      cb(null, name);
     }
-    const ext = path.extname(file.originalname).toLowerCase();
-    const allowed = allowedTypes[type] || allowedTypes.avatar;
-    if (allowed.includes(ext)) {
-      cb(null, true);
-    } else {
-      cb(new Error(`Invalid file type. Allowed: ${allowed.join(', ')}`));
-    }
-  }
-});
+  });
 
-// Upload media file endpoint
-app.post('/api/media/upload', mediaUpload.single('file'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'No file uploaded' });
+  return multer({
+    storage,
+    limits: { fileSize: type === 'video' ? 100 * 1024 * 1024 : 20 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      if (ALLOWED_EXTENSIONS[type].includes(ext)) {
+        cb(null, true);
+      } else {
+        cb(new Error(`Invalid file type. Allowed: ${ALLOWED_EXTENSIONS[type].join(', ')}`));
+      }
+    }
+  });
+}
+
+// Upload media file endpoints - separate for each type to avoid body parsing issues
+app.post('/api/media/upload/:type', (req, res, next) => {
+  const type = req.params.type;
+  if (!VALID_MEDIA_TYPES.includes(type)) {
+    return res.status(400).json({ error: 'Invalid media type' });
   }
-  const type = req.body.type || 'avatar';
-  const url = `/downloads/media/${type}/${req.file.filename}`;
-  res.json({ 
-    success: true, 
-    url, 
-    filename: req.file.filename,
-    type 
+  const uploader = createMediaUploader(type);
+  uploader.single('file')(req, res, (err) => {
+    if (err) {
+      return res.status(400).json({ error: err.message });
+    }
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+    const url = `/downloads/media/${type}/${req.file.filename}`;
+    res.json({ 
+      success: true, 
+      url, 
+      filename: req.file.filename,
+      type 
+    });
   });
 });
 
@@ -5249,21 +5249,25 @@ app.post('/api/newscast/generate-video', async (req, res) => {
     }
     
     // Build ffmpeg command based on available inputs
+    // Video/music shorter than audio will loop, longer will be trimmed to audio duration
     let ffmpegArgs = [];
     
     if (bgVideoPath && fs.existsSync(bgVideoPath)) {
-      // Use background video with avatar overlay
+      // Use background video with avatar overlay - loop video if shorter than audio
       ffmpegArgs = [
+        '-stream_loop', '-1',  // Loop video indefinitely
         '-i', bgVideoPath,
         '-i', mainPresenterImage,
         '-i', audioPath
       ];
       
       if (bgMusicPath && fs.existsSync(bgMusicPath)) {
+        // Loop music indefinitely too
+        ffmpegArgs.splice(3, 0, '-stream_loop', '-1');
         ffmpegArgs.push('-i', bgMusicPath);
         ffmpegArgs.push(
           '-filter_complex', 
-          `[0:v]scale=1280:720,setsar=1[bg];[1:v]scale=200:200[avatar];[bg][avatar]overlay=(W-w)/2:(H-h)/2-50[v];[2:a]volume=1[speech];[3:a]volume=0.3[music];[speech][music]amix=inputs=2:duration=first[a]`,
+          `[0:v]scale=1280:720,setsar=1[bg];[1:v]scale=200:200[avatar];[bg][avatar]overlay=(W-w)/2:(H-h)/2-50[v];[2:a]volume=1[speech];[3:a]volume=0.3,afade=t=out:st=${Math.max(0, audioDuration - 3)}:d=3[music];[speech][music]amix=inputs=2:duration=first[a]`,
           '-map', '[v]',
           '-map', '[a]'
         );
@@ -5281,8 +5285,7 @@ app.post('/api/newscast/generate-video', async (req, res) => {
         '-c:a', 'aac',
         '-b:a', '192k',
         '-pix_fmt', 'yuv420p',
-        '-shortest',
-        '-t', String(audioDuration),
+        '-t', String(audioDuration),  // Trim to exact audio duration
         '-y',
         outputPath
       );
@@ -5295,10 +5298,12 @@ app.post('/api/newscast/generate-video', async (req, res) => {
       ];
       
       if (bgMusicPath && fs.existsSync(bgMusicPath)) {
+        // Loop music indefinitely
+        ffmpegArgs.splice(0, 0, '-stream_loop', '-1');
         ffmpegArgs.push('-i', bgMusicPath);
         ffmpegArgs.push(
           '-filter_complex',
-          `[1:a]volume=1[speech];[2:a]volume=0.3[music];[speech][music]amix=inputs=2:duration=first[a]`,
+          `[1:a]volume=1[speech];[2:a]volume=0.3,afade=t=out:st=${Math.max(0, audioDuration - 3)}:d=3[music];[speech][music]amix=inputs=2:duration=first[a]`,
           '-map', '0:v',
           '-map', '[a]'
         );
@@ -5311,8 +5316,7 @@ app.post('/api/newscast/generate-video', async (req, res) => {
         '-b:a', '192k',
         '-pix_fmt', 'yuv420p',
         '-vf', `scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,drawtext=text='Market Radio':fontsize=48:fontcolor=white:x=(w-text_w)/2:y=h-80:shadowcolor=black:shadowx=2:shadowy=2`,
-        '-shortest',
-        '-t', String(audioDuration),
+        '-t', String(audioDuration),  // Trim to exact audio duration
         '-y',
         outputPath
       );

@@ -11338,9 +11338,8 @@ async function uploadMediaFile(file, type, statusId) {
   try {
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('type', type);
     
-    const response = await fetch('/api/media/upload', {
+    const response = await fetch(`/api/media/upload/${type}`, {
       method: 'POST',
       body: formData
     });
