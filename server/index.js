@@ -5489,6 +5489,7 @@ app.use('/downloads/videos', express.static(path.join(__dirname, '..', 'download
 app.get('/share/:audioId', (req, res) => {
   const { audioId } = req.params;
   const audioDir = path.join(__dirname, '..', 'downloads', 'broadcasts');
+  const videoDir = path.join(__dirname, '..', 'downloads', 'videos');
   const metaPath = path.join(audioDir, `${audioId}.json`);
   
   // Default metadata if file not found
@@ -5508,9 +5509,17 @@ app.get('/share/:audioId', (req, res) => {
     }
   }
   
+  // Check if video exists for this broadcast
+  const timestamp = audioId.replace('broadcast-', '');
+  const videoFileName = `video-${timestamp}.mp4`;
+  const videoPath = path.join(videoDir, videoFileName);
+  const hasVideo = fs.existsSync(videoPath);
+  const videoUrl = hasVideo ? `/downloads/videos/${videoFileName}` : null;
+  
   // Get the base URL for absolute URLs
   const baseUrl = `${req.protocol}://${req.get('host')}`;
   const absoluteAudioUrl = `${baseUrl}${metadata.audioUrl}`;
+  const absoluteVideoUrl = hasVideo ? `${baseUrl}${videoUrl}` : null;
   const shareUrl = `${baseUrl}/share/${audioId}`;
   
   // Use default share image from meta-images folder for reliable social previews
@@ -5546,21 +5555,39 @@ app.get('/share/:audioId', (req, res) => {
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="1200">
   <meta property="og:image:alt" content="${metadata.presenterName} - Market Radio">
-  <meta property="og:type" content="website">
+  <meta property="og:type" content="${hasVideo ? 'video.other' : 'website'}">
   <meta property="og:url" content="${shareUrl}">
   <meta property="og:title" content="${metadata.title}">
-  <meta property="og:description" content="Listen to this market broadcast from ${metadata.presenterName} on ${metadata.stationName}">
+  <meta property="og:description" content="${hasVideo ? 'Watch' : 'Listen to'} this market broadcast from ${metadata.presenterName} on ${metadata.stationName}">
   <meta property="og:site_name" content="Bot Builder Market Radio">
+  ${hasVideo ? `
+  <meta property="og:video" content="${absoluteVideoUrl}">
+  <meta property="og:video:secure_url" content="${absoluteVideoUrl}">
+  <meta property="og:video:type" content="video/mp4">
+  <meta property="og:video:width" content="1280">
+  <meta property="og:video:height" content="720">
+  ` : `
   <meta property="og:audio" content="${absoluteAudioUrl}">
   <meta property="og:audio:secure_url" content="${absoluteAudioUrl}">
   <meta property="og:audio:type" content="audio/mpeg">
+  `}
   
-  <!-- Twitter Card - summary_large_image for better previews -->
+  <!-- Twitter Card - player card for video, summary_large_image for audio -->
+  ${hasVideo ? `
+  <meta name="twitter:card" content="player">
+  <meta name="twitter:title" content="${metadata.title}">
+  <meta name="twitter:description" content="Watch this market broadcast from ${metadata.presenterName} on ${metadata.stationName}">
+  <meta name="twitter:image" content="${absoluteAvatarUrl}">
+  <meta name="twitter:player" content="${baseUrl}/embed/${audioId}">
+  <meta name="twitter:player:width" content="640">
+  <meta name="twitter:player:height" content="360">
+  ` : `
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="${metadata.title}">
   <meta name="twitter:description" content="Listen to this market broadcast from ${metadata.presenterName} on ${metadata.stationName}">
   <meta name="twitter:image" content="${absoluteAvatarUrl}">
   <meta name="twitter:image:alt" content="${metadata.presenterName} - Market Radio">
+  `}
   
   <!-- oEmbed for rich embeds -->
   <link rel="alternate" type="application/json+oembed" href="${baseUrl}/oembed?url=${encodeURIComponent(shareUrl)}" title="${metadata.title}">
@@ -5627,6 +5654,20 @@ app.get('/share/:audioId', (req, res) => {
       outline: none;
       height: 50px;
     }
+    video {
+      width: 100%;
+      border-radius: 16px;
+      background: #000;
+    }
+    .video-container {
+      width: 100%;
+      max-width: 800px;
+      margin-bottom: 20px;
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 12px 60px rgba(255,107,157,0.4), 0 8px 40px rgba(0,0,0,0.5);
+      border: 4px solid rgba(255,107,157,0.5);
+    }
     .powered-by {
       margin-top: 15px;
       color: rgba(255,255,255,0.4);
@@ -5639,6 +5680,20 @@ app.get('/share/:audioId', (req, res) => {
   </style>
 </head>
 <body>
+  ${hasVideo ? `
+  <div class="video-container">
+    <video controls autoplay preload="auto" poster="${metadata.avatar}">
+      <source src="${videoUrl}" type="video/mp4">
+      Your browser does not support the video element.
+    </video>
+  </div>
+  <div class="player-card">
+    <h1 class="title">${metadata.title}</h1>
+    <p class="station">${metadata.stationName}</p>
+    <p class="presenter">Presented by ${metadata.presenterName}</p>
+    <p class="powered-by">Powered by <a href="/">Bot Builder</a></p>
+  </div>
+  ` : `
   <div class="hero-image">
     <img src="${metadata.avatar}" alt="${metadata.presenterName}">
   </div>
@@ -5652,6 +5707,7 @@ app.get('/share/:audioId', (req, res) => {
     </audio>
     <p class="powered-by">Powered by <a href="/">Bot Builder</a></p>
   </div>
+  `}
 </body>
 </html>`;
   
@@ -5698,6 +5754,7 @@ app.get('/oembed', (req, res) => {
 app.get('/embed/:audioId', (req, res) => {
   const { audioId } = req.params;
   const audioDir = path.join(__dirname, '..', 'downloads', 'broadcasts');
+  const videoDir = path.join(__dirname, '..', 'downloads', 'videos');
   const metaPath = path.join(audioDir, `${audioId}.json`);
   
   let metadata = {
@@ -5713,9 +5770,51 @@ app.get('/embed/:audioId', (req, res) => {
     } catch (e) {}
   }
   
+  // Check if video exists
+  const timestamp = audioId.replace('broadcast-', '');
+  const videoFileName = `video-${timestamp}.mp4`;
+  const videoPath = path.join(videoDir, videoFileName);
+  const hasVideo = fs.existsSync(videoPath);
+  const videoUrl = hasVideo ? `/downloads/videos/${videoFileName}` : null;
+  
   const baseUrl = `${req.protocol}://${req.get('host')}`;
   
-  // Minimal responsive player optimized for Twitter iframe embed
+  // Video embed player
+  if (hasVideo) {
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${metadata.title}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { 
+      width: 100%; 
+      height: 100%; 
+      background: #000;
+      overflow: hidden;
+    }
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+  </style>
+</head>
+<body>
+  <video controls autoplay preload="auto" poster="${metadata.avatar}">
+    <source src="${videoUrl}" type="video/mp4">
+  </video>
+</body>
+</html>`;
+    
+    res.setHeader('Content-Type', 'text/html');
+    res.setHeader('X-Frame-Options', 'ALLOWALL');
+    return res.send(html);
+  }
+  
+  // Audio embed player (original)
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
