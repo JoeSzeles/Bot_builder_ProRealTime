@@ -688,18 +688,50 @@
                   <span class="text-gray-700 dark:text-gray-300 font-medium">Media Customization</span>
                   <button id="toggleMediaCustomization" class="text-xs text-purple-500 hover:text-purple-700">Show</button>
                 </div>
-                <div id="mediaCustomizationPanel" class="hidden space-y-2">
-                  <div>
-                    <label class="text-xs text-gray-500 dark:text-gray-400">Avatar Image URL (current presenter)</label>
-                    <input type="text" id="customAvatarUrl" placeholder="https://... or leave empty for default" class="w-full px-2 py-1 text-xs bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded focus:ring-purple-500 focus:border-purple-500 text-gray-800 dark:text-white">
+                <div id="mediaCustomizationPanel" class="hidden space-y-3">
+                  <!-- Avatar -->
+                  <div class="p-2 bg-gray-100 dark:bg-gray-700/50 rounded">
+                    <div class="flex items-center justify-between mb-1">
+                      <label class="text-xs text-gray-600 dark:text-gray-300 font-medium">Avatar Image</label>
+                      <label class="text-xs text-purple-500 hover:text-purple-700 cursor-pointer">
+                        <input type="file" id="avatarFileInput" accept=".png,.jpg,.jpeg,.gif,.webp" class="hidden">
+                        Upload
+                      </label>
+                    </div>
+                    <select id="customAvatarSelect" class="w-full px-2 py-1 text-xs bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-gray-800 dark:text-white">
+                      <option value="">Default presenter image</option>
+                    </select>
+                    <div id="avatarUploadStatus" class="text-xs text-gray-500 mt-1 hidden"></div>
                   </div>
-                  <div>
-                    <label class="text-xs text-gray-500 dark:text-gray-400">Background Video URL (for video output)</label>
-                    <input type="text" id="customBgVideoUrl" placeholder="https://... mp4/webm video" class="w-full px-2 py-1 text-xs bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded focus:ring-purple-500 focus:border-purple-500 text-gray-800 dark:text-white">
+                  
+                  <!-- Background Video -->
+                  <div class="p-2 bg-gray-100 dark:bg-gray-700/50 rounded">
+                    <div class="flex items-center justify-between mb-1">
+                      <label class="text-xs text-gray-600 dark:text-gray-300 font-medium">Background Video</label>
+                      <label class="text-xs text-purple-500 hover:text-purple-700 cursor-pointer">
+                        <input type="file" id="videoFileInput" accept=".mp4,.webm,.mov" class="hidden">
+                        Upload
+                      </label>
+                    </div>
+                    <select id="customBgVideoSelect" class="w-full px-2 py-1 text-xs bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-gray-800 dark:text-white">
+                      <option value="">No background video</option>
+                    </select>
+                    <div id="videoUploadStatus" class="text-xs text-gray-500 mt-1 hidden"></div>
                   </div>
-                  <div>
-                    <label class="text-xs text-gray-500 dark:text-gray-400">Background Music URL (50% volume mix)</label>
-                    <input type="text" id="customBgMusicUrl" placeholder="https://... mp3/ogg audio" class="w-full px-2 py-1 text-xs bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded focus:ring-purple-500 focus:border-purple-500 text-gray-800 dark:text-white">
+                  
+                  <!-- Background Music -->
+                  <div class="p-2 bg-gray-100 dark:bg-gray-700/50 rounded">
+                    <div class="flex items-center justify-between mb-1">
+                      <label class="text-xs text-gray-600 dark:text-gray-300 font-medium">Background Music (30% volume)</label>
+                      <label class="text-xs text-purple-500 hover:text-purple-700 cursor-pointer">
+                        <input type="file" id="musicFileInput" accept=".mp3,.ogg,.wav,.m4a" class="hidden">
+                        Upload
+                      </label>
+                    </div>
+                    <select id="customBgMusicSelect" class="w-full px-2 py-1 text-xs bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-gray-800 dark:text-white">
+                      <option value="">No background music</option>
+                    </select>
+                    <div id="musicUploadStatus" class="text-xs text-gray-500 mt-1 hidden"></div>
                   </div>
                 </div>
               </div>

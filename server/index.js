@@ -33,6 +33,119 @@ if (!fs.existsSync(DOWNLOADS_DIR)) {
 app.use('/downloads', express.static(DOWNLOADS_DIR));
 app.use('/images', express.static(path.join(__dirname, '..', 'client', 'public', 'images')));
 
+// Media uploads directory
+const MEDIA_DIR = path.join(DOWNLOADS_DIR, 'media');
+if (!fs.existsSync(MEDIA_DIR)) {
+  fs.mkdirSync(MEDIA_DIR, { recursive: true });
+}
+app.use('/downloads/media', express.static(MEDIA_DIR));
+
+// Valid media types (whitelist for security)
+const VALID_MEDIA_TYPES = ['avatar', 'video', 'music'];
+
+// Configure multer for media uploads
+const mediaStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const type = req.body.type || 'avatar';
+    // Validate type against whitelist
+    if (!VALID_MEDIA_TYPES.includes(type)) {
+      return cb(new Error('Invalid media type'));
+    }
+    const subDir = path.join(MEDIA_DIR, type);
+    if (!fs.existsSync(subDir)) fs.mkdirSync(subDir, { recursive: true });
+    cb(null, subDir);
+  },
+  filename: (req, file, cb) => {
+    // Sanitize filename - only allow alphanumeric, dots, underscores, dashes
+    const ext = path.extname(file.originalname).toLowerCase();
+    const baseName = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const name = `${Date.now()}-${baseName}${ext}`;
+    cb(null, name);
+  }
+});
+
+const mediaUpload = multer({
+  storage: mediaStorage,
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB max
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = {
+      avatar: ['.png', '.jpg', '.jpeg', '.gif', '.webp'],
+      video: ['.mp4', '.webm', '.mov'],
+      music: ['.mp3', '.ogg', '.wav', '.m4a']
+    };
+    const type = req.body.type || 'avatar';
+    // Validate type against whitelist
+    if (!VALID_MEDIA_TYPES.includes(type)) {
+      return cb(new Error('Invalid media type'));
+    }
+    const ext = path.extname(file.originalname).toLowerCase();
+    const allowed = allowedTypes[type] || allowedTypes.avatar;
+    if (allowed.includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Invalid file type. Allowed: ${allowed.join(', ')}`));
+    }
+  }
+});
+
+// Upload media file endpoint
+app.post('/api/media/upload', mediaUpload.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+  const type = req.body.type || 'avatar';
+  const url = `/downloads/media/${type}/${req.file.filename}`;
+  res.json({ 
+    success: true, 
+    url, 
+    filename: req.file.filename,
+    type 
+  });
+});
+
+// List available media files
+app.get('/api/media/list', (req, res) => {
+  const result = { avatar: [], video: [], music: [] };
+  
+  for (const type of ['avatar', 'video', 'music']) {
+    const dir = path.join(MEDIA_DIR, type);
+    if (fs.existsSync(dir)) {
+      const files = fs.readdirSync(dir)
+        .filter(f => !f.startsWith('.'))
+        .map(f => ({
+          filename: f,
+          url: `/downloads/media/${type}/${f}`,
+          size: fs.statSync(path.join(dir, f)).size
+        }))
+        .sort((a, b) => b.filename.localeCompare(a.filename)); // newest first
+      result[type] = files.slice(0, 20); // Keep last 20
+    }
+  }
+  
+  res.json(result);
+});
+
+// Delete media file
+app.delete('/api/media/:type/:filename', (req, res) => {
+  const { type, filename } = req.params;
+  // Validate type
+  if (!VALID_MEDIA_TYPES.includes(type)) {
+    return res.status(400).json({ error: 'Invalid type' });
+  }
+  // Sanitize filename - use basename and validate safe pattern
+  const safeFilename = path.basename(filename);
+  if (!safeFilename || safeFilename !== filename || !/^[\w.-]+$/.test(safeFilename)) {
+    return res.status(400).json({ error: 'Invalid filename' });
+  }
+  const filePath = path.join(MEDIA_DIR, type, safeFilename);
+  if (fs.existsSync(filePath)) {
+    fs.unlinkSync(filePath);
+    res.json({ success: true });
+  } else {
+    res.status(404).json({ error: 'File not found' });
+  }
+});
+
 const anthropic = new Anthropic({
   apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
   baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL,
@@ -5026,21 +5139,29 @@ app.post('/api/newscast/generate-video', async (req, res) => {
     
     let mainPresenterImage = presenterImages[presenter] || presenterImages.caelix;
     
-    // Download custom avatar if provided (validated)
-    if (safeCustomAvatarUrl) {
-      try {
-        const customAvatarPath = path.join(tempDir, `avatar-${videoId}.png`);
-        const avatarResponse = await fetch(safeCustomAvatarUrl, { signal: AbortSignal.timeout(30000) });
-        if (avatarResponse.ok) {
-          const avatarBuffer = await avatarResponse.arrayBuffer();
-          // Limit to 10MB
-          if (avatarBuffer.byteLength <= 10 * 1024 * 1024) {
-            fs.writeFileSync(customAvatarPath, Buffer.from(avatarBuffer));
-            mainPresenterImage = customAvatarPath;
-          }
+    // Use custom avatar if provided (local path or validated URL)
+    if (customAvatarUrl) {
+      if (customAvatarUrl.startsWith('/downloads/')) {
+        // Local uploaded file
+        const localPath = path.join(__dirname, '..', customAvatarUrl.replace(/^\//, ''));
+        if (fs.existsSync(localPath)) {
+          mainPresenterImage = localPath;
         }
-      } catch (e) {
-        console.warn('Could not download custom avatar:', e.message);
+      } else if (safeCustomAvatarUrl) {
+        // External URL - download
+        try {
+          const customAvatarPath = path.join(tempDir, `avatar-${videoId}.png`);
+          const avatarResponse = await fetch(safeCustomAvatarUrl, { signal: AbortSignal.timeout(30000) });
+          if (avatarResponse.ok) {
+            const avatarBuffer = await avatarResponse.arrayBuffer();
+            if (avatarBuffer.byteLength <= 10 * 1024 * 1024) {
+              fs.writeFileSync(customAvatarPath, Buffer.from(avatarBuffer));
+              mainPresenterImage = customAvatarPath;
+            }
+          }
+        } catch (e) {
+          console.warn('Could not download custom avatar:', e.message);
+        }
       }
     }
     
@@ -5065,47 +5186,65 @@ app.post('/api/newscast/generate-video', async (req, res) => {
     const outputPath = path.join(videoDir, `${videoId}.mp4`);
     const thumbnailPath = path.join(videoDir, `${videoId}-thumb.jpg`);
     
-    // Download background video if provided (validated, max 100MB)
+    // Use background video if provided (local path or validated URL)
     let bgVideoPath = null;
-    if (safeCustomBgVideoUrl) {
-      try {
-        bgVideoPath = path.join(tempDir, `bgvideo-${videoId}.mp4`);
-        const bgResponse = await fetch(safeCustomBgVideoUrl, { signal: AbortSignal.timeout(60000) });
-        if (bgResponse.ok) {
-          const bgBuffer = await bgResponse.arrayBuffer();
-          if (bgBuffer.byteLength <= 100 * 1024 * 1024) {
-            fs.writeFileSync(bgVideoPath, Buffer.from(bgBuffer));
+    if (customBgVideoUrl) {
+      if (customBgVideoUrl.startsWith('/downloads/')) {
+        // Local uploaded file
+        const localPath = path.join(__dirname, '..', customBgVideoUrl.replace(/^\//, ''));
+        if (fs.existsSync(localPath)) {
+          bgVideoPath = localPath;
+        }
+      } else if (safeCustomBgVideoUrl) {
+        // External URL - download
+        try {
+          bgVideoPath = path.join(tempDir, `bgvideo-${videoId}.mp4`);
+          const bgResponse = await fetch(safeCustomBgVideoUrl, { signal: AbortSignal.timeout(60000) });
+          if (bgResponse.ok) {
+            const bgBuffer = await bgResponse.arrayBuffer();
+            if (bgBuffer.byteLength <= 100 * 1024 * 1024) {
+              fs.writeFileSync(bgVideoPath, Buffer.from(bgBuffer));
+            } else {
+              bgVideoPath = null;
+            }
           } else {
             bgVideoPath = null;
           }
-        } else {
+        } catch (e) {
+          console.warn('Could not download background video:', e.message);
           bgVideoPath = null;
         }
-      } catch (e) {
-        console.warn('Could not download background video:', e.message);
-        bgVideoPath = null;
       }
     }
     
-    // Download background music if provided (validated, max 20MB)
+    // Use background music if provided (local path or validated URL)
     let bgMusicPath = null;
-    if (safeCustomBgMusicUrl) {
-      try {
-        bgMusicPath = path.join(tempDir, `bgmusic-${videoId}.mp3`);
-        const musicResponse = await fetch(safeCustomBgMusicUrl, { signal: AbortSignal.timeout(30000) });
-        if (musicResponse.ok) {
-          const musicBuffer = await musicResponse.arrayBuffer();
-          if (musicBuffer.byteLength <= 20 * 1024 * 1024) {
-            fs.writeFileSync(bgMusicPath, Buffer.from(musicBuffer));
+    if (customBgMusicUrl) {
+      if (customBgMusicUrl.startsWith('/downloads/')) {
+        // Local uploaded file
+        const localPath = path.join(__dirname, '..', customBgMusicUrl.replace(/^\//, ''));
+        if (fs.existsSync(localPath)) {
+          bgMusicPath = localPath;
+        }
+      } else if (safeCustomBgMusicUrl) {
+        // External URL - download
+        try {
+          bgMusicPath = path.join(tempDir, `bgmusic-${videoId}.mp3`);
+          const musicResponse = await fetch(safeCustomBgMusicUrl, { signal: AbortSignal.timeout(30000) });
+          if (musicResponse.ok) {
+            const musicBuffer = await musicResponse.arrayBuffer();
+            if (musicBuffer.byteLength <= 20 * 1024 * 1024) {
+              fs.writeFileSync(bgMusicPath, Buffer.from(musicBuffer));
+            } else {
+              bgMusicPath = null;
+            }
           } else {
             bgMusicPath = null;
           }
-        } else {
+        } catch (e) {
+          console.warn('Could not download background music:', e.message);
           bgMusicPath = null;
         }
-      } catch (e) {
-        console.warn('Could not download background music:', e.message);
-        bgMusicPath = null;
       }
     }
     

@@ -10847,10 +10847,8 @@ function saveNewscastHistory(entry) {
     const saved = localStorage.getItem('newscastHistory');
     newscastHistory = saved ? JSON.parse(saved) : [];
     
-    // Get custom media URLs from inputs
-    const customAvatarUrl = document.getElementById('customAvatarUrl')?.value?.trim() || null;
-    const customBgVideoUrl = document.getElementById('customBgVideoUrl')?.value?.trim() || null;
-    const customBgMusicUrl = document.getElementById('customBgMusicUrl')?.value?.trim() || null;
+    // Get custom media URLs from selects
+    const mediaUrls = getSelectedMediaUrls();
     
     // Add new entry at the beginning
     newscastHistory.unshift({
@@ -10863,9 +10861,9 @@ function saveNewscastHistory(entry) {
       thumbnailUrl: entry.thumbnailUrl || null,
       createdAt: new Date().toISOString(),
       duration: entry.duration || null,
-      customAvatarUrl: customAvatarUrl,
-      customBgVideoUrl: customBgVideoUrl,
-      customBgMusicUrl: customBgMusicUrl
+      customAvatarUrl: mediaUrls.customAvatarUrl,
+      customBgVideoUrl: mediaUrls.customBgVideoUrl,
+      customBgMusicUrl: mediaUrls.customBgMusicUrl
     });
     
     // Keep only last 20 entries
@@ -11185,8 +11183,14 @@ function setupNewscastHandlers() {
     if (panel && btn) {
       panel.classList.toggle('hidden');
       btn.textContent = panel.classList.contains('hidden') ? 'Show' : 'Hide';
+      if (!panel.classList.contains('hidden')) {
+        loadMediaFiles(); // Refresh file list when panel opens
+      }
     }
   });
+  
+  // Media file upload handlers
+  setupMediaUploadHandlers();
   
   // Video player popup handlers
   setupVideoPlayerPopup();
@@ -11243,13 +11247,15 @@ async function generateNewscastVideo() {
   if (statusText) statusText.textContent = 'Generating video (this may take a minute)...';
   
   try {
+    const mediaUrls = getSelectedMediaUrls();
     const response = await fetch('/api/newscast/generate-video', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         audioUrl: newscastAudioUrl,
         podcastSegments: newscastPodcastSegments,
-        presenter: selectedPresenter
+        presenter: selectedPresenter,
+        ...mediaUrls
       })
     });
     
@@ -11291,6 +11297,144 @@ async function generateNewscastVideo() {
   } finally {
     if (videoBtn) videoBtn.disabled = false;
   }
+}
+
+// Media upload and file management
+let availableMediaFiles = { avatar: [], video: [], music: [] };
+
+function setupMediaUploadHandlers() {
+  // Avatar upload
+  document.getElementById('avatarFileInput')?.addEventListener('change', async (e) => {
+    if (e.target.files?.length) {
+      await uploadMediaFile(e.target.files[0], 'avatar', 'avatarUploadStatus');
+      e.target.value = '';
+    }
+  });
+  
+  // Video upload
+  document.getElementById('videoFileInput')?.addEventListener('change', async (e) => {
+    if (e.target.files?.length) {
+      await uploadMediaFile(e.target.files[0], 'video', 'videoUploadStatus');
+      e.target.value = '';
+    }
+  });
+  
+  // Music upload
+  document.getElementById('musicFileInput')?.addEventListener('change', async (e) => {
+    if (e.target.files?.length) {
+      await uploadMediaFile(e.target.files[0], 'music', 'musicUploadStatus');
+      e.target.value = '';
+    }
+  });
+}
+
+async function uploadMediaFile(file, type, statusId) {
+  const statusEl = document.getElementById(statusId);
+  if (statusEl) {
+    statusEl.textContent = `Uploading ${file.name}...`;
+    statusEl.classList.remove('hidden');
+  }
+  
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('type', type);
+    
+    const response = await fetch('/api/media/upload', {
+      method: 'POST',
+      body: formData
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Upload failed');
+    }
+    
+    const data = await response.json();
+    if (statusEl) {
+      statusEl.textContent = `Uploaded: ${data.filename}`;
+      setTimeout(() => statusEl.classList.add('hidden'), 3000);
+    }
+    
+    // Refresh file list and select the new file
+    await loadMediaFiles();
+    const selectId = type === 'avatar' ? 'customAvatarSelect' : 
+                     type === 'video' ? 'customBgVideoSelect' : 'customBgMusicSelect';
+    const select = document.getElementById(selectId);
+    if (select) select.value = data.url;
+    
+  } catch (e) {
+    console.error('Upload error:', e);
+    if (statusEl) {
+      statusEl.textContent = `Error: ${e.message}`;
+      statusEl.classList.remove('hidden');
+    }
+  }
+}
+
+async function loadMediaFiles() {
+  try {
+    const response = await fetch('/api/media/list');
+    if (response.ok) {
+      availableMediaFiles = await response.json();
+      populateMediaSelects();
+    }
+  } catch (e) {
+    console.error('Failed to load media files:', e);
+  }
+}
+
+function populateMediaSelects() {
+  // Avatar select
+  const avatarSelect = document.getElementById('customAvatarSelect');
+  if (avatarSelect) {
+    const currentValue = avatarSelect.value;
+    avatarSelect.innerHTML = '<option value="">Default presenter image</option>';
+    availableMediaFiles.avatar.forEach(f => {
+      const opt = document.createElement('option');
+      opt.value = f.url;
+      opt.textContent = f.filename.substring(14); // Remove timestamp prefix
+      avatarSelect.appendChild(opt);
+    });
+    if (currentValue) avatarSelect.value = currentValue;
+  }
+  
+  // Video select
+  const videoSelect = document.getElementById('customBgVideoSelect');
+  if (videoSelect) {
+    const currentValue = videoSelect.value;
+    videoSelect.innerHTML = '<option value="">No background video</option>';
+    availableMediaFiles.video.forEach(f => {
+      const opt = document.createElement('option');
+      opt.value = f.url;
+      opt.textContent = f.filename.substring(14);
+      videoSelect.appendChild(opt);
+    });
+    if (currentValue) videoSelect.value = currentValue;
+  }
+  
+  // Music select
+  const musicSelect = document.getElementById('customBgMusicSelect');
+  if (musicSelect) {
+    const currentValue = musicSelect.value;
+    musicSelect.innerHTML = '<option value="">No background music</option>';
+    availableMediaFiles.music.forEach(f => {
+      const opt = document.createElement('option');
+      opt.value = f.url;
+      opt.textContent = f.filename.substring(14);
+      musicSelect.appendChild(opt);
+    });
+    if (currentValue) musicSelect.value = currentValue;
+  }
+}
+
+// Get selected media URLs from dropdowns
+function getSelectedMediaUrls() {
+  return {
+    customAvatarUrl: document.getElementById('customAvatarSelect')?.value || null,
+    customBgVideoUrl: document.getElementById('customBgVideoSelect')?.value || null,
+    customBgMusicUrl: document.getElementById('customBgMusicSelect')?.value || null
+  };
 }
 
 function toggleSharePanel() {
