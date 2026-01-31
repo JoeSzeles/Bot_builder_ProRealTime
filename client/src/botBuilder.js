@@ -11253,7 +11253,8 @@ async function loadNewscastFromStorage() {
             caelix: { src: '/images/presenter-caelix.png', alt: 'Magos Caelix-9', class: 'w-12 h-12 rounded-full object-cover border-2 border-red-600 shadow-lg shadow-red-500/30' },
             sophie: { src: '/images/presenter-sophie.png', alt: 'Sophie Mitchell', class: 'w-12 h-12 rounded-full object-cover border-2 border-pink-400 shadow-lg' },
             jack: { src: '/images/presenter-jack.png', alt: 'Jack Thompson', class: 'w-12 h-12 rounded-full object-cover border-2 border-blue-400 shadow-lg' },
-            bateman: { src: '/downloads/media/avatar/patrick-bateman.png', alt: 'Patrick Bateman', class: 'w-12 h-12 rounded-full object-cover border-2 border-gray-600 shadow-lg' }
+            bateman: { src: '/downloads/media/avatar/patrick-bateman.png', alt: 'Patrick Bateman', class: 'w-12 h-12 rounded-full object-cover border-2 border-gray-600 shadow-lg' },
+            mcafee: { src: '/downloads/media/avatar/john-mcafee.png', alt: 'John McAfee', class: 'w-12 h-12 rounded-full object-cover border-2 border-green-500 shadow-lg shadow-green-500/30' }
           };
           const config = presenterConfig[data.presenter] || presenterConfig.caelix;
           presenterImage.src = config.src;
@@ -11332,7 +11333,8 @@ function setupNewscastHandlers() {
           caelix: { src: '/images/presenter-caelix.png', alt: 'Magos Caelix-9', class: 'w-12 h-12 rounded-full object-cover border-2 border-red-600 shadow-lg shadow-red-500/30' },
           sophie: { src: '/images/presenter-sophie.png', alt: 'Sophie Mitchell', class: 'w-12 h-12 rounded-full object-cover border-2 border-pink-400 shadow-lg' },
           jack: { src: '/images/presenter-jack.png', alt: 'Jack Thompson', class: 'w-12 h-12 rounded-full object-cover border-2 border-blue-400 shadow-lg' },
-          bateman: { src: '/downloads/media/avatar/patrick-bateman.png', alt: 'Patrick Bateman', class: 'w-12 h-12 rounded-full object-cover border-2 border-gray-600 shadow-lg' }
+          bateman: { src: '/downloads/media/avatar/patrick-bateman.png', alt: 'Patrick Bateman', class: 'w-12 h-12 rounded-full object-cover border-2 border-gray-600 shadow-lg' },
+          mcafee: { src: '/downloads/media/avatar/john-mcafee.png', alt: 'John McAfee', class: 'w-12 h-12 rounded-full object-cover border-2 border-green-500 shadow-lg shadow-green-500/30' }
         };
         const config = presenterConfig[val] || presenterConfig.caelix;
         presenterImage.src = config.src;
@@ -11779,7 +11781,8 @@ function openVideoPlayerPopup(item) {
     caelix: { name: 'Magos Caelix-9', station: 'Forge World Markets', img: '/images/presenter-caelix.png', border: 'border-red-600' },
     sophie: { name: 'Sophie Mitchell', station: "Sophie's Market Corner", img: '/images/presenter-sophie.png', border: 'border-pink-400' },
     jack: { name: 'Jack Thompson', station: 'Sydney Markets Radio', img: '/images/presenter-jack.png', border: 'border-blue-400' },
-    bateman: { name: 'Patrick Bateman', station: 'Morning Markets with Bateman', img: '/downloads/media/avatar/patrick-bateman.png', border: 'border-gray-600' }
+    bateman: { name: 'Patrick Bateman', station: 'Morning Markets with Bateman', img: '/downloads/media/avatar/patrick-bateman.png', border: 'border-gray-600' },
+    mcafee: { name: 'John McAfee', station: 'Crypto Jungle Radio', img: '/downloads/media/avatar/john-mcafee.png', border: 'border-green-500' }
   };
   
   const config = presenterConfig[item.presenter] || presenterConfig.caelix;

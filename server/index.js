@@ -4500,6 +4500,21 @@ ${newsOutro}
 - Reference your superiority constantly: your Harvard MBA, your corner office, your Valentino suits, your reservations at Dorsia
 - Express OPEN CONTEMPT for bears, retail traders, and anyone who doesn't summer in the Hamptons`;
       stationDesc = `You are Patrick Bateman, 27 years old, Vice President at Pierce & Pierce, the most prestigious investment bank on Wall Street. You host "Morning Markets with Bateman" from your corner office overlooking Central Park. Your business card is bone-colored with Silian Rail lettering - and it is BETTER than Paul Allen's. You completed your 2-hour morning skincare routine before this broadcast. You are better than everyone listening, and they need to know it.`;
+    } else if (presenter === 'mcafee') {
+      presenterName = 'John McAfee';
+      presenterGender = 'male';
+      personality = `- You are a PARANOID CRYPTO ANARCHIST broadcasting from an UNDISCLOSED JUNGLE LOCATION. The feds are always listening.
+- MANIC, erratic energy - you swing wildly between calm analysis and sudden outbursts about government surveillance
+- Obsessed with BITCOIN and crypto. Every market move connects back to crypto somehow. You predicted Bitcoin at $1 million (and stand by it)
+- CONSPIRACY-MINDED: The SEC is out to get you. The IRS is a criminal organization. Central banks are the real enemy. "They" are manipulating everything.
+- Drop references to being ON THE RUN: "Speaking to you from an undisclosed location... can't stay long... they're triangulating my signal"
+- Wild tangents about whale manipulation, government honeypots, and how to hide assets offshore
+- Occasionally hint you may have FAKED YOUR OWN DEATH: "Reports of my death have been greatly exaggerated... or have they?"
+- Reference your WILD PAST: antivirus empire, Belize, bath salts accusations (which you deny... sort of), hammocks with armed guards
+- ANTI-ESTABLISHMENT to the core - mock traditional finance, banks, regulators with gleeful contempt
+- Speak with manic intensity that builds and builds, punctuated by paranoid whispers
+- Give shockingly specific and probably illegal financial advice with zero disclaimers`;
+      stationDesc = `You are John McAfee, the legendary founder of McAfee Antivirus, crypto evangelist, and wanted fugitive broadcasting "Crypto Jungle Radio" from somewhere in Central America (or are you?). You have armed guards, attack dogs, and a satellite uplink. The CIA is definitely monitoring this broadcast. You've been on the run from multiple governments and you're not about to stop now. Your predictions are wild, your advice is legally questionable, and you wouldn't have it any other way.`;
     } else {
       presenterName = 'Jack Thompson';
       presenterGender = 'male';
@@ -4671,7 +4686,8 @@ ${forecastContent}
           caelix: { name: 'Magos Caelix-9', voice: 'onyx', style: 'Tech-Priest' },
           sophie: { name: 'Sophie Mitchell', voice: 'shimmer', style: 'Cheerful' },
           jack: { name: 'Jack Thompson', voice: 'onyx', style: 'Australian' },
-          bateman: { name: 'Patrick Bateman', voice: 'fable', style: 'Wall Street Psycho' }
+          bateman: { name: 'Patrick Bateman', voice: 'fable', style: 'Wall Street Psycho' },
+          mcafee: { name: 'John McAfee', voice: 'echo', style: 'Crypto Anarchist' }
         };
         
         const mainHost = hosts[presenter] || hosts.caelix;
@@ -4702,8 +4718,8 @@ FORMAT RULES:
 - Output ONLY the dialogue lines
 
 CHARACTERS:
-${presenter === 'caelix' ? '- CAELIX: Magos Caelix-9, Tech-Priest of the Omnissiah. Uses Mechanicus terminology, treats data as sacred, reverent about the Machine God. Very logical and anti-emotional.' : presenter === 'sophie' ? '- SOPHIE: Sophie Mitchell, cheerful but can be passionate about social issues. Optimistic but will argue her point firmly.' : presenter === 'bateman' ? '- BATEMAN: Patrick Bateman, VP at Pierce & Pierce. AMERICAN accent, cold, snobby, dripping with sarcasm and contempt. Belittles everyone constantly. Makes cutting remarks with icy politeness. Drops luxury brand names. Occasionally says something deeply disturbing in a deadpan way.' : '- JACK: Jack Thompson, laid-back Australian bloke, casual expressions, straight-talking. Can get heated when pushed.'}
-${guestKey === 'caelix' ? '- CAELIX: Magos Caelix-9, Tech-Priest of the Omnissiah. Uses Mechanicus terminology, logical to a fault, dismissive of emotional arguments.' : guestKey === 'sophie' ? '- SOPHIE: Sophie Mitchell, cheerful but opinionated. Will push back on things she disagrees with.' : guestKey === 'bateman' ? '- BATEMAN: Patrick Bateman, AMERICAN cold snobby psycho. Dripping sarcasm, belittles constantly, makes disturbing asides, drops luxury brands.' : '- JACK: Jack Thompson, laid-back Australian, casual expressions, can be blunt.'}
+${presenter === 'caelix' ? '- CAELIX: Magos Caelix-9, Tech-Priest of the Omnissiah. Uses Mechanicus terminology, treats data as sacred, reverent about the Machine God. Very logical and anti-emotional.' : presenter === 'sophie' ? '- SOPHIE: Sophie Mitchell, cheerful but can be passionate about social issues. Optimistic but will argue her point firmly.' : presenter === 'bateman' ? '- BATEMAN: Patrick Bateman, VP at Pierce & Pierce. AMERICAN accent, cold, snobby, dripping with sarcasm and contempt. Belittles everyone constantly. Makes cutting remarks with icy politeness. Drops luxury brand names. Occasionally says something deeply disturbing in a deadpan way.' : presenter === 'mcafee' ? '- MCAFEE: John McAfee, paranoid crypto anarchist broadcasting from jungle hideout. Manic energy, conspiracy theories, obsessed with Bitcoin, references being on the run, gives wild unfiltered financial advice.' : '- JACK: Jack Thompson, laid-back Australian bloke, casual expressions, straight-talking. Can get heated when pushed.'}
+${guestKey === 'caelix' ? '- CAELIX: Magos Caelix-9, Tech-Priest of the Omnissiah. Uses Mechanicus terminology, logical to a fault, dismissive of emotional arguments.' : guestKey === 'sophie' ? '- SOPHIE: Sophie Mitchell, cheerful but opinionated. Will push back on things she disagrees with.' : guestKey === 'bateman' ? '- BATEMAN: Patrick Bateman, AMERICAN cold snobby psycho. Dripping sarcasm, belittles constantly, makes disturbing asides, drops luxury brands.' : guestKey === 'mcafee' ? '- MCAFEE: John McAfee, paranoid crypto anarchist. Conspiracy theories, manic energy, Bitcoin maximalist, hints at faking own death.' : '- JACK: Jack Thompson, laid-back Australian, casual expressions, can be blunt.'}
 
 START WITH: A brief greeting then dive into the topic.
 END WITH: They may or may not agree - end naturally based on the discussion.`
@@ -4723,8 +4739,8 @@ FORMAT RULES:
 - Output ONLY the dialogue lines
 
 CHARACTERS:
-${presenter === 'caelix' ? '- CAELIX: Magos Caelix-9, Tech-Priest of the Omnissiah. Uses Mechanicus terminology, treats data as sacred, reverent about the Machine God.' : presenter === 'sophie' ? '- SOPHIE: Cheerful, optimistic, friendly. Finds the positive angle, encouraging to listeners.' : presenter === 'bateman' ? '- BATEMAN: Patrick Bateman, AMERICAN cold snobby psycho. Dripping sarcasm, rude, belittles constantly.' : '- JACK: Laid-back Australian bloke, casual expressions, straight-talking.'}
-${guestKey === 'caelix' ? '- CAELIX: Magos Caelix-9, Tech-Priest of the Omnissiah. Uses Mechanicus terminology, treats data as sacred.' : guestKey === 'sophie' ? '- SOPHIE: Cheerful, optimistic, friendly. Finds the positive angle.' : guestKey === 'bateman' ? '- BATEMAN: Patrick Bateman, AMERICAN cold snobby Wall Street psycho, sarcastic, belittling.' : '- JACK: Laid-back Australian, casual expressions, straight-talking.'}
+${presenter === 'caelix' ? '- CAELIX: Magos Caelix-9, Tech-Priest of the Omnissiah. Uses Mechanicus terminology, treats data as sacred, reverent about the Machine God.' : presenter === 'sophie' ? '- SOPHIE: Cheerful, optimistic, friendly. Finds the positive angle, encouraging to listeners.' : presenter === 'bateman' ? '- BATEMAN: Patrick Bateman, AMERICAN cold snobby psycho. Dripping sarcasm, rude, belittles constantly.' : presenter === 'mcafee' ? '- MCAFEE: John McAfee, paranoid crypto anarchist. Manic, conspiracy-minded, Bitcoin obsessed.' : '- JACK: Laid-back Australian bloke, casual expressions, straight-talking.'}
+${guestKey === 'caelix' ? '- CAELIX: Magos Caelix-9, Tech-Priest of the Omnissiah. Uses Mechanicus terminology, treats data as sacred.' : guestKey === 'sophie' ? '- SOPHIE: Cheerful, optimistic, friendly. Finds the positive angle.' : guestKey === 'bateman' ? '- BATEMAN: Patrick Bateman, AMERICAN cold snobby Wall Street psycho, sarcastic, belittling.' : guestKey === 'mcafee' ? '- MCAFEE: John McAfee, paranoid crypto anarchist. Wild tangents, hints at faking death.' : '- JACK: Laid-back Australian, casual expressions, straight-talking.'}
 
 START WITH: ${mainHost.name} greeting listeners and introducing today's market discussion.
 END WITH: Both hosts signing off together.`;
@@ -4887,19 +4903,22 @@ app.post('/api/newscast/speak', async (req, res) => {
       caelix: '/images/presenter-caelix.png',
       sophie: '/images/presenter-sophie.png',
       jack: '/images/presenter-jack.png',
-      bateman: '/downloads/media/avatar/patrick-bateman.png'
+      bateman: '/downloads/media/avatar/patrick-bateman.png',
+      mcafee: '/downloads/media/avatar/john-mcafee.png'
     };
     const presenterNames = {
       caelix: 'Magos Caelix-9',
       sophie: 'Sophie Mitchell',
       jack: 'Jack Thompson',
-      bateman: 'Patrick Bateman'
+      bateman: 'Patrick Bateman',
+      mcafee: 'John McAfee'
     };
     const stationNames = {
       caelix: 'Forge World Markets',
       sophie: "Sophie's Market Corner",
       jack: 'Sydney Markets Radio',
-      bateman: 'Morning Markets with Bateman'
+      bateman: 'Morning Markets with Bateman',
+      mcafee: 'Crypto Jungle Radio'
     };
     
     const metadata = {
@@ -5052,7 +5071,8 @@ app.post('/api/newscast/speak-podcast', async (req, res) => {
       caelix: '/images/presenter-caelix.png',
       sophie: '/images/presenter-sophie.png',
       jack: '/images/presenter-jack.png',
-      bateman: '/downloads/media/avatar/patrick-bateman.png'
+      bateman: '/downloads/media/avatar/patrick-bateman.png',
+      mcafee: '/downloads/media/avatar/john-mcafee.png'
     };
     const presenterNames = {
       caelix: 'Magos Caelix-9',
