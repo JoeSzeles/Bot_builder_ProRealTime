@@ -10830,12 +10830,153 @@ function saveNewscastToStorage() {
       text: newscastText,
       audioUrl: newscastAudioUrl,
       presenter: selectedPresenter,
+      isPodcast: newscastIsPodcast,
+      podcastSegments: newscastPodcastSegments,
       timestamp: Date.now()
     }));
   } catch (e) {
     console.warn('Failed to save newscast:', e);
   }
 }
+
+// Podcast history storage
+let newscastHistory = [];
+
+function saveNewscastHistory(entry) {
+  try {
+    const saved = localStorage.getItem('newscastHistory');
+    newscastHistory = saved ? JSON.parse(saved) : [];
+    
+    // Add new entry at the beginning
+    newscastHistory.unshift({
+      id: Date.now(),
+      text: entry.text,
+      presenter: entry.presenter,
+      isPodcast: entry.isPodcast || false,
+      audioUrl: entry.audioUrl,
+      videoUrl: entry.videoUrl || null,
+      thumbnailUrl: entry.thumbnailUrl || null,
+      createdAt: new Date().toISOString(),
+      duration: entry.duration || null
+    });
+    
+    // Keep only last 20 entries
+    newscastHistory = newscastHistory.slice(0, 20);
+    localStorage.setItem('newscastHistory', JSON.stringify(newscastHistory));
+    
+    renderNewscastHistory();
+  } catch (e) {
+    console.warn('Failed to save newscast history:', e);
+  }
+}
+
+function loadNewscastHistory() {
+  try {
+    const saved = localStorage.getItem('newscastHistory');
+    newscastHistory = saved ? JSON.parse(saved) : [];
+    renderNewscastHistory();
+  } catch (e) {
+    console.warn('Failed to load newscast history:', e);
+    newscastHistory = [];
+  }
+}
+
+function renderNewscastHistory() {
+  const container = document.getElementById('newscastHistoryList');
+  const countEl = document.getElementById('newscastHistoryCount');
+  
+  if (countEl) countEl.textContent = `${newscastHistory.length} broadcast${newscastHistory.length !== 1 ? 's' : ''}`;
+  
+  if (!container) return;
+  
+  if (newscastHistory.length === 0) {
+    container.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400 text-center py-4">No broadcasts yet. Generate your first newscast above!</p>';
+    return;
+  }
+  
+  container.innerHTML = newscastHistory.map((item, idx) => {
+    const date = new Date(item.createdAt);
+    const dateStr = date.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    const presenterName = item.presenter === 'caelix' ? 'Caelix-9' : item.presenter === 'sophie' ? 'Sophie' : 'Jack';
+    const presenterImg = `/images/presenter-${item.presenter || 'caelix'}.png`;
+    
+    // Icon based on type
+    const typeIcon = item.videoUrl 
+      ? '<svg class="w-5 h-5 text-purple-500" fill="currentColor" viewBox="0 0 24 24"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg>'
+      : '<svg class="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>';
+    
+    const typeLabel = item.isPodcast ? 'Podcast' : 'Broadcast';
+    
+    return `
+      <div class="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow" data-history-idx="${idx}">
+        <div class="relative flex-shrink-0">
+          <img src="${presenterImg}" alt="${presenterName}" class="w-12 h-12 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600" onerror="this.src='/images/presenter-caelix.png'">
+          <div class="absolute -bottom-1 -right-1 bg-white dark:bg-gray-700 rounded-full p-0.5">${typeIcon}</div>
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium text-gray-800 dark:text-white truncate">${typeLabel} - ${presenterName}</p>
+          <p class="text-xs text-gray-500 dark:text-gray-400">${dateStr}</p>
+          <p class="text-xs text-gray-600 dark:text-gray-400 truncate mt-0.5">${(item.text || '').substring(0, 60)}...</p>
+        </div>
+        <div class="flex items-center gap-1 flex-shrink-0">
+          ${item.audioUrl ? `<button onclick="playHistoryItem(${idx})" class="p-2 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400" title="Play"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>` : ''}
+          ${item.audioUrl ? `<a href="${item.audioUrl}" download class="p-2 text-gray-500 hover:text-green-600 dark:hover:text-green-400" title="Download MP3"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg></a>` : ''}
+          ${item.videoUrl ? `<a href="${item.videoUrl}" download class="p-2 text-gray-500 hover:text-purple-600 dark:hover:text-purple-400" title="Download Video"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg></a>` : ''}
+          <button onclick="shareHistoryItem(${idx})" class="p-2 text-gray-500 hover:text-orange-600 dark:hover:text-orange-400" title="Share"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg></button>
+          <button onclick="deleteHistoryItem(${idx})" class="p-2 text-gray-500 hover:text-red-600 dark:hover:text-red-400" title="Delete"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// Global functions for history actions
+window.playHistoryItem = function(idx) {
+  const item = newscastHistory[idx];
+  if (!item?.audioUrl) return;
+  
+  // Stop current audio if playing
+  if (newscastAudio && newscastIsPlaying) {
+    newscastAudio.pause();
+    newscastIsPlaying = false;
+  }
+  
+  newscastAudio = new Audio(item.audioUrl);
+  newscastAudio.play();
+  newscastIsPlaying = true;
+  
+  const statusEl = document.getElementById('newscastStatus');
+  if (statusEl) statusEl.textContent = 'Playing from history...';
+  
+  newscastAudio.addEventListener('ended', () => {
+    newscastIsPlaying = false;
+    if (statusEl) statusEl.textContent = 'Finished';
+  });
+};
+
+window.shareHistoryItem = function(idx) {
+  const item = newscastHistory[idx];
+  if (!item) return;
+  
+  const shareUrl = item.videoUrl || item.audioUrl || window.location.href;
+  if (navigator.share) {
+    navigator.share({
+      title: 'Market Radio Broadcast',
+      text: `Check out this market update from ${item.presenter === 'caelix' ? 'Magos Caelix-9' : item.presenter === 'sophie' ? 'Sophie Mitchell' : 'Jack Thompson'}`,
+      url: shareUrl
+    }).catch(() => {});
+  } else {
+    navigator.clipboard.writeText(shareUrl);
+    alert('Link copied to clipboard!');
+  }
+};
+
+window.deleteHistoryItem = function(idx) {
+  if (!confirm('Delete this broadcast?')) return;
+  newscastHistory.splice(idx, 1);
+  localStorage.setItem('newscastHistory', JSON.stringify(newscastHistory));
+  renderNewscastHistory();
+};
 
 async function loadNewscastFromStorage() {
   try {
@@ -10845,11 +10986,22 @@ async function loadNewscastFromStorage() {
       if (Date.now() - data.timestamp < 24 * 60 * 60 * 1000) {
         newscastText = data.text || '';
         newscastAudioUrl = data.audioUrl || null;
+        newscastIsPodcast = data.isPodcast || false;
+        newscastPodcastSegments = data.podcastSegments || null;
         if (data.presenter) selectedPresenter = data.presenter;
         
         const transcriptEl = document.getElementById('newscastTranscript');
         if (transcriptEl && newscastText) {
-          transcriptEl.textContent = newscastText;
+          // Use proper formatting for podcasts
+          if (newscastIsPodcast && newscastPodcastSegments && newscastPodcastSegments.length > 0) {
+            const formattedTranscript = newscastPodcastSegments.map(seg => 
+              `<div class="mb-2"><span class="font-bold text-purple-600 dark:text-purple-400">${seg.speakerName}:</span> <span class="text-gray-700 dark:text-gray-300">${seg.text}</span></div>`
+            ).join('');
+            transcriptEl.innerHTML = `<div class="text-sm">${formattedTranscript}</div>`;
+          } else {
+            // Regular broadcast - use whitespace-pre-wrap for line breaks
+            transcriptEl.innerHTML = `<p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">${newscastText}</p>`;
+          }
         }
         
         const presenterSelect = document.getElementById('newscastPresenterSelect');
@@ -10910,6 +11062,7 @@ async function loadNewscastFromStorage() {
 
 function setupNewscastHandlers() {
   loadNewscastFromStorage();
+  loadNewscastHistory();
   
   const generateBtn = document.getElementById('newscastGenerateBtn');
   const playBtn = document.getElementById('newscastPlayBtn');
@@ -10999,6 +11152,8 @@ function setupNewscastHandlers() {
     }
   });
   
+  document.getElementById('newscastGenerateVideo')?.addEventListener('click', generateNewscastVideo);
+  
   document.getElementById('newscastProgressTrack')?.addEventListener('click', (e) => {
     if (newscastAudio && newscastAudio.duration) {
       const rect = e.currentTarget.getBoundingClientRect();
@@ -11006,6 +11161,72 @@ function setupNewscastHandlers() {
       newscastAudio.currentTime = percent * newscastAudio.duration;
     }
   });
+}
+
+// Generate video from current podcast/broadcast
+async function generateNewscastVideo() {
+  if (!newscastAudioUrl) {
+    alert('Generate and play a broadcast first before creating a video');
+    return;
+  }
+  
+  const videoBtn = document.getElementById('newscastGenerateVideo');
+  const statusDiv = document.getElementById('newscastVideoStatus');
+  const statusText = document.getElementById('newscastVideoStatusText');
+  
+  if (videoBtn) videoBtn.disabled = true;
+  if (statusDiv) statusDiv.classList.remove('hidden');
+  if (statusText) statusText.textContent = 'Generating video (this may take a minute)...';
+  
+  try {
+    const response = await fetch('/api/newscast/generate-video', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        audioUrl: newscastAudioUrl,
+        podcastSegments: newscastPodcastSegments,
+        presenter: selectedPresenter
+      })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to generate video');
+    }
+    
+    const data = await response.json();
+    
+    if (statusText) statusText.textContent = 'Video ready! Downloading...';
+    
+    // Update history with video URL
+    if (newscastHistory.length > 0) {
+      newscastHistory[0].videoUrl = data.videoUrl;
+      newscastHistory[0].thumbnailUrl = data.thumbnailUrl;
+      localStorage.setItem('newscastHistory', JSON.stringify(newscastHistory));
+      renderNewscastHistory();
+    }
+    
+    // Trigger download
+    const a = document.createElement('a');
+    a.href = data.videoUrl;
+    a.download = `market-radio-${new Date().toISOString().split('T')[0]}.mp4`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    
+    setTimeout(() => {
+      if (statusDiv) statusDiv.classList.add('hidden');
+    }, 3000);
+    
+  } catch (e) {
+    console.error('Video generation error:', e);
+    if (statusText) statusText.textContent = `Error: ${e.message}`;
+    setTimeout(() => {
+      if (statusDiv) statusDiv.classList.add('hidden');
+    }, 5000);
+  } finally {
+    if (videoBtn) videoBtn.disabled = false;
+  }
 }
 
 function toggleSharePanel() {
@@ -11246,6 +11467,18 @@ async function toggleNewscastPlayback() {
     newscastAudioUrl = data.audioUrl;
     newscastShareUrl = data.shareUrl || null;
     saveNewscastToStorage();
+    
+    // Save to history
+    saveNewscastHistory({
+      text: newscastText,
+      presenter: selectedPresenter,
+      isPodcast: newscastIsPodcast,
+      audioUrl: newscastAudioUrl
+    });
+    
+    // Update history count
+    const countEl = document.getElementById('newscastHistoryCount');
+    if (countEl) countEl.textContent = `${newscastHistory.length} broadcast${newscastHistory.length !== 1 ? 's' : ''}`;
     
     const audioData = atob(data.audio);
     const audioArray = new Uint8Array(audioData.length);

@@ -51,12 +51,15 @@ The application features a modern full-stack architecture with a focus on AI int
     -   Presenters: Caelix-9 (Warhammer 40K Tech-Priest), Sophie Mitchell (cheerful), Jack Thompson (Australian)
     -   Daily and 7-day forecasts based on real Yahoo Finance 1h candle data
     -   Daily Podcast mode: Multi-host discussions with voice swapping between speakers
+    -   Video Podcast Generation: Creates MP4 videos with presenter images and audio using ffmpeg
+    -   Broadcast History Panel: Shows all generated broadcasts with thumbnails, play/download/share buttons
     -   Customizable broadcast content (news, weather, ads, editorial)
     -   Social sharing via Discord/Twitter Player Cards
 
 **Known Limitations (Future Improvements):**
 -   Market context analysis uses 24h rolling windows instead of true trading session boundaries
--   Podcast MP3 concatenation uses buffer joining (works for MVP, may need ffmpeg for production)
+-   Video podcasts use static presenter images (future: could add animated backgrounds or video loops)
+-   Background music layer not yet implemented for video podcasts
 
 ## External Dependencies
 -   **Vite**: Frontend build tool.

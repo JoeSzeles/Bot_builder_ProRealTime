@@ -4954,6 +4954,156 @@ app.post('/api/newscast/speak-podcast', async (req, res) => {
   }
 });
 
+// Video podcast generation endpoint
+const { exec, spawn } = require('child_process');
+const util = require('util');
+const execPromise = util.promisify(exec);
+
+app.post('/api/newscast/generate-video', async (req, res) => {
+  const { audioUrl, podcastSegments, presenter, backgroundMusicUrl } = req.body;
+  
+  if (!audioUrl) {
+    return res.status(400).json({ error: 'Audio URL is required' });
+  }
+  
+  try {
+    const videoId = `video-${Date.now()}`;
+    const videoDir = path.join(__dirname, '..', 'downloads', 'videos');
+    const tempDir = path.join(__dirname, '..', 'downloads', 'temp');
+    
+    if (!fs.existsSync(videoDir)) fs.mkdirSync(videoDir, { recursive: true });
+    if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+    
+    // Presenter image paths
+    const presenterImages = {
+      caelix: path.join(__dirname, '..', 'client', 'public', 'images', 'presenter-caelix.png'),
+      sophie: path.join(__dirname, '..', 'client', 'public', 'images', 'presenter-sophie.png'),
+      jack: path.join(__dirname, '..', 'client', 'public', 'images', 'presenter-jack.png')
+    };
+    
+    const mainPresenterImage = presenterImages[presenter] || presenterImages.caelix;
+    
+    // Get audio file path
+    const audioPath = path.join(__dirname, '..', audioUrl.replace(/^\//, ''));
+    
+    if (!fs.existsSync(audioPath)) {
+      return res.status(400).json({ error: 'Audio file not found' });
+    }
+    
+    // Get audio duration
+    let audioDuration = 60; // Default fallback
+    try {
+      const probeResult = await execPromise(`ffprobe -v error -show_entries format=duration -of csv=p=0 "${audioPath}"`);
+      audioDuration = Math.ceil(parseFloat(probeResult.stdout.trim()) || 60);
+    } catch (e) {
+      console.warn('Could not probe audio duration:', e.message);
+    }
+    
+    console.log(`Generating video for ${audioDuration}s audio...`);
+    
+    const outputPath = path.join(videoDir, `${videoId}.mp4`);
+    const thumbnailPath = path.join(videoDir, `${videoId}-thumb.jpg`);
+    
+    // Build ffmpeg command
+    // Creates a video with the presenter image as a static frame, with the audio
+    // Uses a simple filter to add a pulsing animation effect
+    const ffmpegArgs = [
+      '-loop', '1',
+      '-i', mainPresenterImage,
+      '-i', audioPath,
+      '-c:v', 'libx264',
+      '-tune', 'stillimage',
+      '-c:a', 'aac',
+      '-b:a', '192k',
+      '-pix_fmt', 'yuv420p',
+      '-vf', `scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,drawtext=text='Market Radio':fontsize=48:fontcolor=white:x=(w-text_w)/2:y=h-80:shadowcolor=black:shadowx=2:shadowy=2`,
+      '-shortest',
+      '-t', String(audioDuration),
+      '-y',
+      outputPath
+    ];
+    
+    // Execute ffmpeg
+    await new Promise((resolve, reject) => {
+      const ffmpeg = spawn('ffmpeg', ffmpegArgs);
+      let stderr = '';
+      
+      ffmpeg.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+      
+      ffmpeg.on('close', (code) => {
+        if (code === 0) {
+          resolve();
+        } else {
+          reject(new Error(`ffmpeg exited with code ${code}: ${stderr.slice(-500)}`));
+        }
+      });
+      
+      ffmpeg.on('error', reject);
+    });
+    
+    // Generate thumbnail
+    try {
+      await execPromise(`ffmpeg -i "${outputPath}" -ss 00:00:01 -vframes 1 -y "${thumbnailPath}"`);
+    } catch (e) {
+      console.warn('Could not generate thumbnail:', e.message);
+    }
+    
+    // Save metadata
+    const presenterNames = {
+      caelix: 'Magos Caelix-9',
+      sophie: 'Sophie Mitchell',
+      jack: 'Jack Thompson'
+    };
+    
+    const metadata = {
+      id: videoId,
+      presenter: presenter || 'caelix',
+      presenterName: presenterNames[presenter] || 'Magos Caelix-9',
+      videoUrl: `/downloads/videos/${videoId}.mp4`,
+      thumbnailUrl: fs.existsSync(thumbnailPath) ? `/downloads/videos/${videoId}-thumb.jpg` : null,
+      audioUrl: audioUrl,
+      duration: audioDuration,
+      createdAt: new Date().toISOString()
+    };
+    
+    fs.writeFileSync(path.join(videoDir, `${videoId}.json`), JSON.stringify(metadata, null, 2));
+    
+    // Cleanup old videos (keep last 5)
+    try {
+      const files = fs.readdirSync(videoDir).filter(f => f.endsWith('.mp4')).sort().reverse();
+      if (files.length > 5) {
+        for (const oldFile of files.slice(5)) {
+          fs.unlinkSync(path.join(videoDir, oldFile));
+          const oldMeta = oldFile.replace('.mp4', '.json');
+          const oldThumb = oldFile.replace('.mp4', '-thumb.jpg');
+          if (fs.existsSync(path.join(videoDir, oldMeta))) fs.unlinkSync(path.join(videoDir, oldMeta));
+          if (fs.existsSync(path.join(videoDir, oldThumb))) fs.unlinkSync(path.join(videoDir, oldThumb));
+        }
+      }
+    } catch (cleanupErr) {
+      console.error('Video cleanup error:', cleanupErr.message);
+    }
+    
+    console.log(`Video generated: ${videoId}.mp4`);
+    
+    res.json({
+      videoUrl: `/downloads/videos/${videoId}.mp4`,
+      thumbnailUrl: metadata.thumbnailUrl,
+      videoId: videoId,
+      duration: audioDuration
+    });
+    
+  } catch (e) {
+    console.error('Video generation error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Serve video files
+app.use('/downloads/videos', express.static(path.join(__dirname, '..', 'downloads', 'videos')));
+
 // Shareable broadcast page with Open Graph meta tags
 app.get('/share/:audioId', (req, res) => {
   const { audioId } = req.params;
