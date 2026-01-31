@@ -10906,8 +10906,22 @@ function renderNewscastHistory() {
   container.innerHTML = newscastHistory.map((item, idx) => {
     const date = new Date(item.createdAt);
     const dateStr = date.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-    const presenterName = item.presenter === 'caelix' ? 'Caelix-9' : item.presenter === 'sophie' ? 'Sophie' : 'Jack';
-    const presenterImg = `/images/presenter-${item.presenter || 'caelix'}.png`;
+    const presenterNameMap = {
+      caelix: 'Caelix-9',
+      sophie: 'Sophie',
+      jack: 'Jack',
+      bateman: 'Bateman',
+      mcafee: 'McAfee'
+    };
+    const presenterName = presenterNameMap[item.presenter] || 'Jack';
+    const presenterImgMap = {
+      caelix: '/images/presenter-caelix.png',
+      sophie: '/images/presenter-sophie.png',
+      jack: '/images/presenter-jack.png',
+      bateman: '/downloads/media/avatar/patrick-bateman.png',
+      mcafee: '/downloads/media/avatar/john-mcafee.png'
+    };
+    const presenterImg = presenterImgMap[item.presenter] || '/images/presenter-caelix.png';
     
     // Icon based on type
     const typeIcon = item.videoUrl 
