@@ -4845,30 +4845,39 @@ app.post('/api/newscast/speak', async (req, res) => {
   }
   
   try {
-    const isCaelix = presenter === 'caelix';
-    const isSophie = presenter === 'sophie';
+    let voice, presenterName, presenterDesc, speakStyle, speedInstruction;
     
-    let voice, presenterName, presenterDesc, speakStyle;
-    
-    if (isCaelix) {
+    if (presenter === 'caelix') {
       voice = 'onyx';
       presenterName = 'Magos Caelix-9';
       presenterDesc = 'an ancient Tech-Priest of the Adeptus Mechanicus with a deep, gravelly voice like grinding gears and sacred machinery';
       speakStyle = 'Read with a deep, authoritative voice at a measured but steady pace. You are a Tech-Priest delivering important data. Speak clearly and with conviction, like a commanding officer. Your voice is deep and resonant but not sluggish.';
-    } else if (isSophie) {
+      speedInstruction = 'Speak at a brisk, energetic pace - about 20% faster than normal conversational speed. Keep it lively and engaging.';
+    } else if (presenter === 'sophie') {
       voice = 'shimmer';
       presenterName = 'Sophie Mitchell';
       presenterDesc = 'a warm, friendly, and cheerful young woman with a pleasant voice';
       speakStyle = 'Read with a warm, friendly tone. Be cheerful and positive but natural. Make listeners feel happy and motivated!';
+      speedInstruction = 'Speak at a brisk, energetic pace - about 20% faster than normal conversational speed. Keep it lively and engaging.';
+    } else if (presenter === 'bateman') {
+      voice = 'fable';
+      presenterName = 'Patrick Bateman';
+      presenterDesc = 'a cold, snobby Wall Street psychopath with an icy, contemptuous American accent dripping with sarcasm';
+      speakStyle = 'Read with cold precision and barely concealed contempt. Your voice drips with superiority and sarcasm. Pause dramatically before insults. Speak like you are addressing people far beneath you.';
+      speedInstruction = 'Speak at a measured, deliberate pace. Each word is chosen carefully to maximize condescension.';
+    } else if (presenter === 'mcafee') {
+      voice = 'alloy';
+      presenterName = 'John McAfee';
+      presenterDesc = 'a 75-year-old paranoid crypto anarchist with manic energy, broadcasting from a hidden bunker. American with hints of Southern drawl.';
+      speakStyle = 'Read with MANIC, FRANTIC energy! You are paranoid, excited, urgent. Your words tumble out rapidly. Interrupt yourself with "Ha!" and sudden intensity. You are on the run and the CIA is listening. Every sentence builds in urgency.';
+      speedInstruction = 'Speak EXTREMELY FAST - at DOUBLE normal speed! Words tumbling out in a frantic rush. Racing, manic, breathless delivery like you have limited time before they trace your signal!';
     } else {
       voice = 'onyx';
       presenterName = 'Jack Thompson';
       presenterDesc = 'a confident and relaxed Australian radio presenter with a natural masculine voice';
       speakStyle = 'Read naturally and conversationally with a pleasant Australian accent. Add appropriate pauses and emphasis for key numbers and trading recommendations.';
+      speedInstruction = 'Speak at a brisk, energetic pace - about 20% faster than normal conversational speed. Keep it lively and engaging.';
     }
-    
-    // Add speed instruction to all presenters
-    const speedInstruction = 'Speak at a brisk, energetic pace - about 20% faster than normal conversational speed. Keep it lively and engaging.';
     
     const response = await openai.chat.completions.create({
       model: 'gpt-audio-mini',
@@ -5204,11 +5213,15 @@ app.post('/api/newscast/tts-from-text', async (req, res) => {
     const voice = voiceMap[presenter] || 'onyx';
     
     // Generate TTS
+    // McAfee gets double speed
+    const speed = presenter === 'mcafee' ? 2.0 : 1.0;
+    
     const ttsResponse = await openai.audio.speech.create({
       model: 'tts-1',
       voice: voice,
       input: text.trim(),
-      response_format: 'mp3'
+      response_format: 'mp3',
+      speed: speed
     });
     
     const audioData = Buffer.from(await ttsResponse.arrayBuffer()).toString('base64');
