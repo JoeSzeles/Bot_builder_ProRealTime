@@ -10972,8 +10972,13 @@ window.shareHistoryItem = function(idx) {
   showShareModal(shareUrl, shareText, presenterName, item.videoUrl, item.audioUrl);
 };
 
-// Share modal for social media options
+// Share modal for social media options - stores data for button handlers
+let currentShareData = null;
+
 function showShareModal(shareUrl, shareText, presenterName, videoUrl = null, audioUrl = null) {
+  // Store share data globally for button handlers
+  currentShareData = { shareUrl, shareText, videoUrl, audioUrl };
+  
   // Remove existing modal if present
   const existingModal = document.getElementById('shareModal');
   if (existingModal) existingModal.remove();
@@ -10982,18 +10987,18 @@ function showShareModal(shareUrl, shareText, presenterName, videoUrl = null, aud
   let downloadButtons = '';
   if (videoUrl) {
     downloadButtons += `
-      <a href="${videoUrl}" download class="w-full flex items-center gap-3 p-3 bg-purple-700 hover:bg-purple-600 rounded-lg transition-colors">
+      <button onclick="downloadShareVideo()" class="w-full flex items-center gap-3 p-3 bg-purple-700 hover:bg-purple-600 rounded-lg transition-colors">
         <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg>
         <span class="text-white font-medium">Download Video (MP4)</span>
-      </a>
+      </button>
     `;
   }
   if (audioUrl) {
     downloadButtons += `
-      <a href="${audioUrl}" download class="w-full flex items-center gap-3 p-3 bg-green-700 hover:bg-green-600 rounded-lg transition-colors">
+      <button onclick="downloadShareAudio()" class="w-full flex items-center gap-3 p-3 bg-green-700 hover:bg-green-600 rounded-lg transition-colors">
         <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
         <span class="text-white font-medium">Download Audio (MP3)</span>
-      </a>
+      </button>
     `;
   }
   
@@ -11012,15 +11017,15 @@ function showShareModal(shareUrl, shareText, presenterName, videoUrl = null, aud
       </div>
       <p class="text-gray-400 text-sm mb-4">Share ${presenterName}'s broadcast on social media for rich previews!</p>
       <div class="space-y-3">
-        <button onclick="shareToTwitter('${encodeURIComponent(shareText)}', '${encodeURIComponent(shareUrl)}')" class="w-full flex items-center gap-3 p-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors">
+        <button onclick="doShareToTwitter()" class="w-full flex items-center gap-3 p-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors">
           <span class="text-xl">𝕏</span>
           <span class="text-white font-medium">Share on X (Twitter)</span>
         </button>
-        <button onclick="shareToDiscord('${shareUrl}')" class="w-full flex items-center gap-3 p-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors">
+        <button onclick="doShareToDiscord()" class="w-full flex items-center gap-3 p-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors">
           <span class="text-xl">💬</span>
           <span class="text-white font-medium">Copy for Discord</span>
         </button>
-        <button onclick="copyShareLink('${shareUrl}')" class="w-full flex items-center gap-3 p-3 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
+        <button onclick="doCopyShareLink()" class="w-full flex items-center gap-3 p-3 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
           <span class="text-xl">📋</span>
           <span class="text-white font-medium">Copy Share Link</span>
         </button>
@@ -11033,30 +11038,63 @@ function showShareModal(shareUrl, shareText, presenterName, videoUrl = null, aud
   document.body.appendChild(modal);
 }
 
-window.shareToTwitter = function(text, url) {
-  window.open(`https://twitter.com/intent/tweet?text=${text}&url=${url}`, '_blank', 'width=600,height=400');
+window.doShareToTwitter = function() {
+  if (!currentShareData) return;
+  const { shareUrl, shareText } = currentShareData;
+  window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`, '_blank', 'width=600,height=400');
   document.getElementById('shareModal')?.remove();
 };
 
-window.shareToDiscord = async function(url) {
+window.doShareToDiscord = async function() {
+  if (!currentShareData) return;
+  const { shareUrl } = currentShareData;
   try {
-    await navigator.clipboard.writeText(url);
+    await navigator.clipboard.writeText(shareUrl);
     alert('Link copied! Paste in Discord for a rich embed with presenter image.');
   } catch (e) {
-    prompt('Copy this link and paste in Discord:', url);
+    prompt('Copy this link and paste in Discord:', shareUrl);
   }
   document.getElementById('shareModal')?.remove();
 };
 
-window.copyShareLink = async function(url) {
+window.doCopyShareLink = async function() {
+  if (!currentShareData) return;
+  const { shareUrl } = currentShareData;
   try {
-    await navigator.clipboard.writeText(url);
+    await navigator.clipboard.writeText(shareUrl);
     alert('Share link copied to clipboard!');
   } catch (e) {
-    prompt('Copy this share link:', url);
+    prompt('Copy this share link:', shareUrl);
   }
   document.getElementById('shareModal')?.remove();
 };
+
+window.downloadShareVideo = function() {
+  if (!currentShareData?.videoUrl) return;
+  const a = document.createElement('a');
+  a.href = currentShareData.videoUrl;
+  a.download = '';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  document.getElementById('shareModal')?.remove();
+};
+
+window.downloadShareAudio = function() {
+  if (!currentShareData?.audioUrl) return;
+  const a = document.createElement('a');
+  a.href = currentShareData.audioUrl;
+  a.download = '';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  document.getElementById('shareModal')?.remove();
+};
+
+// Keep old functions for backward compatibility
+window.shareToTwitter = window.doShareToTwitter;
+window.shareToDiscord = window.doShareToDiscord;
+window.copyShareLink = window.doCopyShareLink;
 
 window.deleteHistoryItem = function(idx) {
   if (!confirm('Delete this broadcast?')) return;
