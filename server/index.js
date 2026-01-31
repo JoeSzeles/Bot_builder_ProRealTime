@@ -2358,7 +2358,9 @@ const YAHOO_SYMBOLS = {
   tsla: 'TSLA',
   meta: 'META',
   // Crypto
+  btc: 'BTC-USD',
   btcusd: 'BTC-USD',
+  eth: 'ETH-USD',
   ethusd: 'ETH-USD',
   solusd: 'SOL-USD',
   xrpusd: 'XRP-USD',
