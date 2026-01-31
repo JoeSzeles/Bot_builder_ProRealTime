@@ -10968,15 +10968,34 @@ window.shareHistoryItem = function(idx) {
   const shareUrl = `${window.location.origin}/share/${audioId}`;
   const shareText = `Listen to ${presenterName}'s market update!`;
   
-  // Show share modal with social options
-  showShareModal(shareUrl, shareText, presenterName);
+  // Show share modal with social options and download links
+  showShareModal(shareUrl, shareText, presenterName, item.videoUrl, item.audioUrl);
 };
 
 // Share modal for social media options
-function showShareModal(shareUrl, shareText, presenterName) {
+function showShareModal(shareUrl, shareText, presenterName, videoUrl = null, audioUrl = null) {
   // Remove existing modal if present
   const existingModal = document.getElementById('shareModal');
   if (existingModal) existingModal.remove();
+  
+  // Build download buttons HTML
+  let downloadButtons = '';
+  if (videoUrl) {
+    downloadButtons += `
+      <a href="${videoUrl}" download class="w-full flex items-center gap-3 p-3 bg-purple-700 hover:bg-purple-600 rounded-lg transition-colors">
+        <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg>
+        <span class="text-white font-medium">Download Video (MP4)</span>
+      </a>
+    `;
+  }
+  if (audioUrl) {
+    downloadButtons += `
+      <a href="${audioUrl}" download class="w-full flex items-center gap-3 p-3 bg-green-700 hover:bg-green-600 rounded-lg transition-colors">
+        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+        <span class="text-white font-medium">Download Audio (MP3)</span>
+      </a>
+    `;
+  }
   
   const modal = document.createElement('div');
   modal.id = 'shareModal';
@@ -11001,10 +11020,11 @@ function showShareModal(shareUrl, shareText, presenterName) {
           <span class="text-xl">💬</span>
           <span class="text-white font-medium">Copy for Discord</span>
         </button>
-        <button onclick="copyShareLink('${shareUrl}')" class="w-full flex items-center gap-3 p-3 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors">
+        <button onclick="copyShareLink('${shareUrl}')" class="w-full flex items-center gap-3 p-3 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
           <span class="text-xl">📋</span>
-          <span class="text-white font-medium">Copy Link</span>
+          <span class="text-white font-medium">Copy Share Link</span>
         </button>
+        ${downloadButtons ? '<hr class="border-gray-600 my-2">' + downloadButtons : ''}
       </div>
       <p class="text-gray-500 text-xs mt-4 text-center">Links show rich previews with presenter image on Discord & X</p>
     </div>
@@ -11626,7 +11646,13 @@ function openVideoPlayerPopup(item) {
     mainVideo.src = item.videoUrl;
     mainVideo.classList.remove('hidden');
     if (audioMode) audioMode.classList.add('hidden');
-    if (controlsSection) controlsSection.classList.add('hidden'); // Use video's native controls
+    // Keep controls visible for share/download buttons but hide audio-specific controls
+    const playBtn = document.getElementById('videoPlayerPlayBtn');
+    const progressTrack = document.getElementById('videoPlayerProgressTrack');
+    const timeEl = document.getElementById('videoPlayerTime');
+    if (playBtn) playBtn.classList.add('hidden');
+    if (progressTrack) progressTrack.classList.add('hidden');
+    if (timeEl) timeEl.classList.add('hidden');
     mainVideo.play();
     videoPlayerIsPlaying = true;
     
@@ -11640,7 +11666,13 @@ function openVideoPlayerPopup(item) {
       mainVideo.src = '';
     }
     if (audioMode) audioMode.classList.remove('hidden');
-    if (controlsSection) controlsSection.classList.remove('hidden');
+    // Show audio controls
+    const playBtn = document.getElementById('videoPlayerPlayBtn');
+    const progressTrack = document.getElementById('videoPlayerProgressTrack');
+    const timeEl = document.getElementById('videoPlayerTime');
+    if (playBtn) playBtn.classList.remove('hidden');
+    if (progressTrack) progressTrack.classList.remove('hidden');
+    if (timeEl) timeEl.classList.remove('hidden');
     
     if (item.audioUrl) {
       if (videoPlayerAudio) {
@@ -11737,8 +11769,8 @@ async function shareVideoPlayer(item) {
   const shareUrl = `${window.location.origin}/share/${audioId}`;
   const shareText = `Listen to ${presenterName}'s market update!`;
   
-  // Use the same share modal as history items
-  showShareModal(shareUrl, shareText, presenterName);
+  // Use the same share modal as history items, include download links
+  showShareModal(shareUrl, shareText, presenterName, item.videoUrl, item.audioUrl);
 }
 
 function shareToSocial(platform) {
