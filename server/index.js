@@ -5276,20 +5276,20 @@ app.post('/api/newscast/generate-video', async (req, res) => {
     // Build ffmpeg command based on available inputs
     // Video/music shorter than audio will loop, longer will be trimmed to audio duration
     let ffmpegArgs = [];
+    const hasBgMusic = bgMusicPath && fs.existsSync(bgMusicPath);
     
     if (bgVideoPath && fs.existsSync(bgVideoPath)) {
       // Use background video with avatar overlay - loop video if shorter than audio
       ffmpegArgs = [
-        '-stream_loop', '-1',  // Loop video indefinitely
+        '-stream_loop', '-1',
         '-i', bgVideoPath,
         '-i', mainPresenterImage,
         '-i', audioPath
       ];
       
-      if (bgMusicPath && fs.existsSync(bgMusicPath)) {
-        // Loop music indefinitely too
-        ffmpegArgs.splice(3, 0, '-stream_loop', '-1');
-        ffmpegArgs.push('-i', bgMusicPath);
+      if (hasBgMusic) {
+        // Add looped music input
+        ffmpegArgs.push('-stream_loop', '-1', '-i', bgMusicPath);
         ffmpegArgs.push(
           '-filter_complex', 
           `[0:v]scale=1280:720,setsar=1[bg];[1:v]scale=200:200[avatar];[bg][avatar]overlay=(W-w)/2:(H-h)/2-50[v];[2:a]volume=1[speech];[3:a]volume=0.3,afade=t=out:st=${Math.max(0, audioDuration - 3)}:d=3[music];[speech][music]amix=inputs=2:duration=first[a]`,
@@ -5310,28 +5310,33 @@ app.post('/api/newscast/generate-video', async (req, res) => {
         '-c:a', 'aac',
         '-b:a', '192k',
         '-pix_fmt', 'yuv420p',
-        '-t', String(audioDuration),  // Trim to exact audio duration
+        '-t', String(audioDuration),
         '-y',
         outputPath
       );
     } else {
       // Static image with optional background music
-      ffmpegArgs = [
-        '-loop', '1',
-        '-i', mainPresenterImage,
-        '-i', audioPath
-      ];
-      
-      if (bgMusicPath && fs.existsSync(bgMusicPath)) {
-        // Loop music indefinitely
-        ffmpegArgs.splice(0, 0, '-stream_loop', '-1');
-        ffmpegArgs.push('-i', bgMusicPath);
+      if (hasBgMusic) {
+        // Music needs stream_loop before its input
+        ffmpegArgs = [
+          '-loop', '1',
+          '-i', mainPresenterImage,
+          '-i', audioPath,
+          '-stream_loop', '-1',
+          '-i', bgMusicPath
+        ];
         ffmpegArgs.push(
           '-filter_complex',
           `[1:a]volume=1[speech];[2:a]volume=0.3,afade=t=out:st=${Math.max(0, audioDuration - 3)}:d=3[music];[speech][music]amix=inputs=2:duration=first[a]`,
           '-map', '0:v',
           '-map', '[a]'
         );
+      } else {
+        ffmpegArgs = [
+          '-loop', '1',
+          '-i', mainPresenterImage,
+          '-i', audioPath
+        ];
       }
       
       ffmpegArgs.push(
@@ -5341,7 +5346,7 @@ app.post('/api/newscast/generate-video', async (req, res) => {
         '-b:a', '192k',
         '-pix_fmt', 'yuv420p',
         '-vf', `scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,drawtext=text='Market Radio':fontsize=48:fontcolor=white:x=(w-text_w)/2:y=h-80:shadowcolor=black:shadowx=2:shadowy=2`,
-        '-t', String(audioDuration),  // Trim to exact audio duration
+        '-t', String(audioDuration),
         '-y',
         outputPath
       );
