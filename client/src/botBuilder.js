@@ -11669,14 +11669,20 @@ function getSelectedMediaUrls() {
 
 // Save media selections to localStorage
 function saveMediaSelections() {
+  // Get current saved values to avoid overwriting with empty
+  let existing = {};
+  try {
+    existing = JSON.parse(localStorage.getItem('mediaSelections') || '{}');
+  } catch (e) {}
+  
   const selections = {
-    avatar: document.getElementById('customAvatarSelect')?.value || '',
-    video: document.getElementById('customBgVideoSelect')?.value || '',
-    music: document.getElementById('customBgMusicSelect')?.value || '',
-    musicVolume: document.getElementById('bgMusicVolume')?.value || '15',
-    speakerVideoCaelix: document.getElementById('speakerVideoCaelix')?.value || '',
-    speakerVideoSophie: document.getElementById('speakerVideoSophie')?.value || '',
-    speakerVideoJack: document.getElementById('speakerVideoJack')?.value || ''
+    avatar: document.getElementById('customAvatarSelect')?.value || existing.avatar || '',
+    video: document.getElementById('customBgVideoSelect')?.value || existing.video || '',
+    music: document.getElementById('customBgMusicSelect')?.value || existing.music || '',
+    musicVolume: document.getElementById('bgMusicVolume')?.value || existing.musicVolume || '15',
+    speakerVideoCaelix: document.getElementById('speakerVideoCaelix')?.value || existing.speakerVideoCaelix || '',
+    speakerVideoSophie: document.getElementById('speakerVideoSophie')?.value || existing.speakerVideoSophie || '',
+    speakerVideoJack: document.getElementById('speakerVideoJack')?.value || existing.speakerVideoJack || ''
   };
   localStorage.setItem('mediaSelections', JSON.stringify(selections));
 }
