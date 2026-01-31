@@ -10847,6 +10847,11 @@ function saveNewscastHistory(entry) {
     const saved = localStorage.getItem('newscastHistory');
     newscastHistory = saved ? JSON.parse(saved) : [];
     
+    // Get custom media URLs from inputs
+    const customAvatarUrl = document.getElementById('customAvatarUrl')?.value?.trim() || null;
+    const customBgVideoUrl = document.getElementById('customBgVideoUrl')?.value?.trim() || null;
+    const customBgMusicUrl = document.getElementById('customBgMusicUrl')?.value?.trim() || null;
+    
     // Add new entry at the beginning
     newscastHistory.unshift({
       id: Date.now(),
@@ -10857,7 +10862,10 @@ function saveNewscastHistory(entry) {
       videoUrl: entry.videoUrl || null,
       thumbnailUrl: entry.thumbnailUrl || null,
       createdAt: new Date().toISOString(),
-      duration: entry.duration || null
+      duration: entry.duration || null,
+      customAvatarUrl: customAvatarUrl,
+      customBgVideoUrl: customBgVideoUrl,
+      customBgMusicUrl: customBgMusicUrl
     });
     
     // Keep only last 20 entries
@@ -10921,7 +10929,8 @@ function renderNewscastHistory() {
         <div class="flex items-center gap-1 flex-shrink-0">
           ${item.audioUrl ? `<button onclick="playHistoryItem(${idx})" class="p-2 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400" title="Play"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>` : ''}
           ${item.audioUrl ? `<a href="${item.audioUrl}" download class="p-2 text-gray-500 hover:text-green-600 dark:hover:text-green-400" title="Download MP3"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg></a>` : ''}
-          ${item.videoUrl ? `<a href="${item.videoUrl}" download class="p-2 text-gray-500 hover:text-purple-600 dark:hover:text-purple-400" title="Download Video"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg></a>` : ''}
+          ${item.videoUrl ? `<a href="${item.videoUrl}" download class="p-2 text-gray-500 hover:text-purple-600 dark:hover:text-purple-400" title="Download MP4"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg></a>` : ''}
+          ${!item.videoUrl && item.audioUrl ? `<button onclick="generateVideoForHistoryItem(${idx})" class="p-2 text-gray-500 hover:text-purple-600 dark:hover:text-purple-400" title="Generate Video"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button>` : ''}
           <button onclick="shareHistoryItem(${idx})" class="p-2 text-gray-500 hover:text-orange-600 dark:hover:text-orange-400" title="Share"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg></button>
           <button onclick="deleteHistoryItem(${idx})" class="p-2 text-gray-500 hover:text-red-600 dark:hover:text-red-400" title="Delete"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
         </div>
@@ -10941,17 +10950,8 @@ window.playHistoryItem = function(idx) {
     newscastIsPlaying = false;
   }
   
-  newscastAudio = new Audio(item.audioUrl);
-  newscastAudio.play();
-  newscastIsPlaying = true;
-  
-  const statusEl = document.getElementById('newscastStatus');
-  if (statusEl) statusEl.textContent = 'Playing from history...';
-  
-  newscastAudio.addEventListener('ended', () => {
-    newscastIsPlaying = false;
-    if (statusEl) statusEl.textContent = 'Finished';
-  });
+  // Open video player popup
+  openVideoPlayerPopup(item);
 };
 
 window.shareHistoryItem = function(idx) {
@@ -10976,6 +10976,57 @@ window.deleteHistoryItem = function(idx) {
   newscastHistory.splice(idx, 1);
   localStorage.setItem('newscastHistory', JSON.stringify(newscastHistory));
   renderNewscastHistory();
+};
+
+window.generateVideoForHistoryItem = async function(idx) {
+  const item = newscastHistory[idx];
+  if (!item?.audioUrl) return;
+  
+  const statusDiv = document.getElementById('newscastVideoStatus');
+  const statusText = document.getElementById('newscastVideoStatusText');
+  
+  if (statusDiv) statusDiv.classList.remove('hidden');
+  if (statusText) statusText.textContent = 'Generating video (this may take a minute)...';
+  
+  try {
+    const response = await fetch('/api/newscast/generate-video', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        audioUrl: item.audioUrl,
+        presenter: item.presenter,
+        customAvatarUrl: item.customAvatarUrl,
+        customBgVideoUrl: item.customBgVideoUrl,
+        customBgMusicUrl: item.customBgMusicUrl
+      })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to generate video');
+    }
+    
+    const data = await response.json();
+    
+    // Update history item with video URL
+    newscastHistory[idx].videoUrl = data.videoUrl;
+    newscastHistory[idx].thumbnailUrl = data.thumbnailUrl;
+    localStorage.setItem('newscastHistory', JSON.stringify(newscastHistory));
+    renderNewscastHistory();
+    
+    if (statusText) statusText.textContent = 'Video ready!';
+    
+    setTimeout(() => {
+      if (statusDiv) statusDiv.classList.add('hidden');
+    }, 3000);
+    
+  } catch (e) {
+    console.error('Video generation error:', e);
+    if (statusText) statusText.textContent = `Error: ${e.message}`;
+    setTimeout(() => {
+      if (statusDiv) statusDiv.classList.add('hidden');
+    }, 5000);
+  }
 };
 
 async function loadNewscastFromStorage() {
@@ -11127,6 +11178,19 @@ function setupNewscastHandlers() {
   document.getElementById('shareLinkedInBtn')?.addEventListener('click', () => shareToSocial('linkedin'));
   document.getElementById('shareCopyBtn')?.addEventListener('click', copyNewscastToClipboard);
   
+  // Media customization toggle
+  document.getElementById('toggleMediaCustomization')?.addEventListener('click', () => {
+    const panel = document.getElementById('mediaCustomizationPanel');
+    const btn = document.getElementById('toggleMediaCustomization');
+    if (panel && btn) {
+      panel.classList.toggle('hidden');
+      btn.textContent = panel.classList.contains('hidden') ? 'Show' : 'Hide';
+    }
+  });
+  
+  // Video player popup handlers
+  setupVideoPlayerPopup();
+  
   document.getElementById('newscastSkipBack')?.addEventListener('click', () => {
     if (newscastAudio) {
       newscastAudio.currentTime = Math.max(0, newscastAudio.currentTime - 10);
@@ -11233,6 +11297,174 @@ function toggleSharePanel() {
   const panel = document.getElementById('newscastSharePanel');
   if (panel) {
     panel.classList.toggle('hidden');
+  }
+}
+
+// Video Player Popup
+let videoPlayerAudio = null;
+let videoPlayerIsPlaying = false;
+let currentVideoPlayerItem = null;
+
+function setupVideoPlayerPopup() {
+  const popup = document.getElementById('videoPlayerPopup');
+  const closeBtn = document.getElementById('closeVideoPlayer');
+  const playBtn = document.getElementById('videoPlayerPlayBtn');
+  const progressTrack = document.getElementById('videoPlayerProgressTrack');
+  
+  closeBtn?.addEventListener('click', closeVideoPlayerPopup);
+  popup?.addEventListener('click', (e) => {
+    if (e.target === popup) closeVideoPlayerPopup();
+  });
+  
+  playBtn?.addEventListener('click', toggleVideoPlayerPlayback);
+  
+  progressTrack?.addEventListener('click', (e) => {
+    if (videoPlayerAudio && videoPlayerAudio.duration) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const percent = (e.clientX - rect.left) / rect.width;
+      videoPlayerAudio.currentTime = percent * videoPlayerAudio.duration;
+    }
+  });
+}
+
+function openVideoPlayerPopup(item) {
+  const popup = document.getElementById('videoPlayerPopup');
+  if (!popup || !item) return;
+  
+  currentVideoPlayerItem = item;
+  
+  const presenterConfig = {
+    caelix: { name: 'Magos Caelix-9', station: 'Forge World Markets', img: '/images/presenter-caelix.png', border: 'border-red-600' },
+    sophie: { name: 'Sophie Mitchell', station: "Sophie's Market Corner", img: '/images/presenter-sophie.png', border: 'border-pink-400' },
+    jack: { name: 'Jack Thompson', station: 'Sydney Markets Radio', img: '/images/presenter-jack.png', border: 'border-blue-400' }
+  };
+  
+  const config = presenterConfig[item.presenter] || presenterConfig.caelix;
+  const avatarUrl = item.customAvatarUrl || config.img;
+  
+  document.getElementById('videoPlayerAvatar').src = avatarUrl;
+  document.getElementById('videoPlayerPresenterSmall').src = avatarUrl;
+  document.getElementById('videoPlayerPresenterName').textContent = config.name;
+  document.getElementById('videoPlayerStationName').textContent = config.station;
+  
+  const downloadMp3 = document.getElementById('videoPlayerDownloadMp3');
+  const downloadMp4 = document.getElementById('videoPlayerDownloadMp4');
+  const mainVideo = document.getElementById('videoPlayerMainVideo');
+  const audioMode = document.getElementById('videoPlayerAudioMode');
+  const controlsSection = document.querySelector('#videoPlayerPopup .p-4.bg-gray-800 > .flex:last-child');
+  
+  if (downloadMp3 && item.audioUrl) {
+    downloadMp3.href = item.audioUrl;
+    downloadMp3.classList.remove('hidden');
+  }
+  
+  if (downloadMp4 && item.videoUrl) {
+    downloadMp4.href = item.videoUrl;
+    downloadMp4.classList.remove('hidden');
+  } else if (downloadMp4) {
+    downloadMp4.classList.add('hidden');
+  }
+  
+  popup.classList.remove('hidden');
+  popup.classList.add('flex');
+  
+  // If video exists, play the actual MP4 video
+  if (item.videoUrl && mainVideo) {
+    mainVideo.src = item.videoUrl;
+    mainVideo.classList.remove('hidden');
+    if (audioMode) audioMode.classList.add('hidden');
+    if (controlsSection) controlsSection.classList.add('hidden'); // Use video's native controls
+    mainVideo.play();
+    videoPlayerIsPlaying = true;
+    
+    mainVideo.addEventListener('ended', () => {
+      videoPlayerIsPlaying = false;
+    });
+  } else {
+    // Audio-only mode with presenter avatar
+    if (mainVideo) {
+      mainVideo.classList.add('hidden');
+      mainVideo.src = '';
+    }
+    if (audioMode) audioMode.classList.remove('hidden');
+    if (controlsSection) controlsSection.classList.remove('hidden');
+    
+    if (item.audioUrl) {
+      if (videoPlayerAudio) {
+        videoPlayerAudio.pause();
+      }
+      videoPlayerAudio = new Audio(item.audioUrl);
+      videoPlayerAudio.play();
+      videoPlayerIsPlaying = true;
+      updateVideoPlayerPlayIcon(true);
+      
+      videoPlayerAudio.addEventListener('timeupdate', updateVideoPlayerProgress);
+      videoPlayerAudio.addEventListener('ended', () => {
+        videoPlayerIsPlaying = false;
+        updateVideoPlayerPlayIcon(false);
+      });
+    }
+  }
+}
+
+function closeVideoPlayerPopup() {
+  const popup = document.getElementById('videoPlayerPopup');
+  if (popup) {
+    popup.classList.add('hidden');
+    popup.classList.remove('flex');
+  }
+  
+  if (videoPlayerAudio) {
+    videoPlayerAudio.pause();
+    videoPlayerAudio = null;
+  }
+  videoPlayerIsPlaying = false;
+  
+  const mainVideo = document.getElementById('videoPlayerMainVideo');
+  if (mainVideo) {
+    mainVideo.pause();
+    mainVideo.src = '';
+  }
+}
+
+function toggleVideoPlayerPlayback() {
+  if (!videoPlayerAudio) return;
+  
+  if (videoPlayerIsPlaying) {
+    videoPlayerAudio.pause();
+    videoPlayerIsPlaying = false;
+  } else {
+    videoPlayerAudio.play();
+    videoPlayerIsPlaying = true;
+  }
+  updateVideoPlayerPlayIcon(videoPlayerIsPlaying);
+}
+
+function updateVideoPlayerPlayIcon(isPlaying) {
+  const icon = document.getElementById('videoPlayerPlayIcon');
+  if (icon) {
+    icon.innerHTML = isPlaying 
+      ? '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>'
+      : '<path d="M8 5v14l11-7z"/>';
+  }
+}
+
+function updateVideoPlayerProgress() {
+  if (!videoPlayerAudio) return;
+  
+  const progress = document.getElementById('videoPlayerProgress');
+  const timeEl = document.getElementById('videoPlayerTime');
+  
+  const percent = (videoPlayerAudio.currentTime / videoPlayerAudio.duration) * 100;
+  if (progress) progress.style.width = `${percent}%`;
+  
+  if (timeEl) {
+    const formatTime = (s) => {
+      const m = Math.floor(s / 60);
+      const sec = Math.floor(s % 60);
+      return `${m}:${sec.toString().padStart(2, '0')}`;
+    };
+    timeEl.textContent = `${formatTime(videoPlayerAudio.currentTime)} / ${formatTime(videoPlayerAudio.duration || 0)}`;
   }
 }
 

@@ -52,14 +52,15 @@ The application features a modern full-stack architecture with a focus on AI int
     -   Daily and 7-day forecasts based on real Yahoo Finance 1h candle data
     -   Daily Podcast mode: Multi-host discussions with voice swapping between speakers
     -   Video Podcast Generation: Creates MP4 videos with presenter images and audio using ffmpeg
-    -   Broadcast History Panel: Shows all generated broadcasts with thumbnails, play/download/share buttons
+    -   Media Customization Panel: Custom avatar URL, background video URL, and background music URL per broadcast
+    -   Video Player Popup: Opens when playing from history, shows presenter image/video with audio controls
+    -   Background music mixing at 50% volume with speech audio
+    -   Broadcast History Panel: Shows all generated broadcasts with play/MP3 download/MP4 download/generate video/share/delete buttons
     -   Customizable broadcast content (news, weather, ads, editorial)
     -   Social sharing via Discord/Twitter Player Cards
 
 **Known Limitations (Future Improvements):**
 -   Market context analysis uses 24h rolling windows instead of true trading session boundaries
--   Video podcasts use static presenter images (future: could add animated backgrounds or video loops)
--   Background music layer not yet implemented for video podcasts
 
 ## External Dependencies
 -   **Vite**: Frontend build tool.

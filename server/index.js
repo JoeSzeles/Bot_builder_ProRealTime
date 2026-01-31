@@ -4959,12 +4959,55 @@ const { exec, spawn } = require('child_process');
 const util = require('util');
 const execPromise = util.promisify(exec);
 
+// Validate URL is safe (HTTPS only, no private IPs)
+function isValidMediaUrl(url) {
+  if (!url || typeof url !== 'string') return false;
+  try {
+    const parsed = new URL(url);
+    // Only allow HTTPS
+    if (parsed.protocol !== 'https:') return false;
+    // Block private/local hostnames and IPs
+    const hostname = parsed.hostname.toLowerCase();
+    // Block localhost variants
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || 
+        hostname === '[::1]' || hostname.endsWith('.localhost') || hostname.endsWith('.local')) {
+      return false;
+    }
+    // Block private IPv4 ranges (RFC 1918)
+    if (/^10\./.test(hostname) || /^192\.168\./.test(hostname) || 
+        /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname)) {
+      return false;
+    }
+    // Block IPv6 loopback and link-local
+    if (hostname.startsWith('fe80:') || hostname.startsWith('[fe80:') || 
+        hostname.startsWith('fc') || hostname.startsWith('fd')) {
+      return false;
+    }
+    // Block CGNAT range
+    if (/^100\.(6[4-9]|[7-9][0-9]|1[0-2][0-9])\./.test(hostname)) {
+      return false;
+    }
+    // Block internal/metadata endpoints
+    if (hostname === '169.254.169.254' || hostname.includes('metadata')) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 app.post('/api/newscast/generate-video', async (req, res) => {
-  const { audioUrl, podcastSegments, presenter, backgroundMusicUrl } = req.body;
+  const { audioUrl, podcastSegments, presenter, customAvatarUrl, customBgVideoUrl, customBgMusicUrl } = req.body;
   
   if (!audioUrl) {
     return res.status(400).json({ error: 'Audio URL is required' });
   }
+  
+  // Validate custom URLs if provided
+  const safeCustomAvatarUrl = isValidMediaUrl(customAvatarUrl) ? customAvatarUrl : null;
+  const safeCustomBgVideoUrl = isValidMediaUrl(customBgVideoUrl) ? customBgVideoUrl : null;
+  const safeCustomBgMusicUrl = isValidMediaUrl(customBgMusicUrl) ? customBgMusicUrl : null;
   
   try {
     const videoId = `video-${Date.now()}`;
@@ -4981,7 +5024,25 @@ app.post('/api/newscast/generate-video', async (req, res) => {
       jack: path.join(__dirname, '..', 'client', 'public', 'images', 'presenter-jack.png')
     };
     
-    const mainPresenterImage = presenterImages[presenter] || presenterImages.caelix;
+    let mainPresenterImage = presenterImages[presenter] || presenterImages.caelix;
+    
+    // Download custom avatar if provided (validated)
+    if (safeCustomAvatarUrl) {
+      try {
+        const customAvatarPath = path.join(tempDir, `avatar-${videoId}.png`);
+        const avatarResponse = await fetch(safeCustomAvatarUrl, { signal: AbortSignal.timeout(30000) });
+        if (avatarResponse.ok) {
+          const avatarBuffer = await avatarResponse.arrayBuffer();
+          // Limit to 10MB
+          if (avatarBuffer.byteLength <= 10 * 1024 * 1024) {
+            fs.writeFileSync(customAvatarPath, Buffer.from(avatarBuffer));
+            mainPresenterImage = customAvatarPath;
+          }
+        }
+      } catch (e) {
+        console.warn('Could not download custom avatar:', e.message);
+      }
+    }
     
     // Get audio file path
     const audioPath = path.join(__dirname, '..', audioUrl.replace(/^\//, ''));
@@ -5004,26 +5065,122 @@ app.post('/api/newscast/generate-video', async (req, res) => {
     const outputPath = path.join(videoDir, `${videoId}.mp4`);
     const thumbnailPath = path.join(videoDir, `${videoId}-thumb.jpg`);
     
-    // Build ffmpeg command
-    // Creates a video with the presenter image as a static frame, with the audio
-    // Uses a simple filter to add a pulsing animation effect
-    const ffmpegArgs = [
-      '-loop', '1',
-      '-i', mainPresenterImage,
-      '-i', audioPath,
-      '-c:v', 'libx264',
-      '-tune', 'stillimage',
-      '-c:a', 'aac',
-      '-b:a', '192k',
-      '-pix_fmt', 'yuv420p',
-      '-vf', `scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,drawtext=text='Market Radio':fontsize=48:fontcolor=white:x=(w-text_w)/2:y=h-80:shadowcolor=black:shadowx=2:shadowy=2`,
-      '-shortest',
-      '-t', String(audioDuration),
-      '-y',
-      outputPath
-    ];
+    // Download background video if provided (validated, max 100MB)
+    let bgVideoPath = null;
+    if (safeCustomBgVideoUrl) {
+      try {
+        bgVideoPath = path.join(tempDir, `bgvideo-${videoId}.mp4`);
+        const bgResponse = await fetch(safeCustomBgVideoUrl, { signal: AbortSignal.timeout(60000) });
+        if (bgResponse.ok) {
+          const bgBuffer = await bgResponse.arrayBuffer();
+          if (bgBuffer.byteLength <= 100 * 1024 * 1024) {
+            fs.writeFileSync(bgVideoPath, Buffer.from(bgBuffer));
+          } else {
+            bgVideoPath = null;
+          }
+        } else {
+          bgVideoPath = null;
+        }
+      } catch (e) {
+        console.warn('Could not download background video:', e.message);
+        bgVideoPath = null;
+      }
+    }
+    
+    // Download background music if provided (validated, max 20MB)
+    let bgMusicPath = null;
+    if (safeCustomBgMusicUrl) {
+      try {
+        bgMusicPath = path.join(tempDir, `bgmusic-${videoId}.mp3`);
+        const musicResponse = await fetch(safeCustomBgMusicUrl, { signal: AbortSignal.timeout(30000) });
+        if (musicResponse.ok) {
+          const musicBuffer = await musicResponse.arrayBuffer();
+          if (musicBuffer.byteLength <= 20 * 1024 * 1024) {
+            fs.writeFileSync(bgMusicPath, Buffer.from(musicBuffer));
+          } else {
+            bgMusicPath = null;
+          }
+        } else {
+          bgMusicPath = null;
+        }
+      } catch (e) {
+        console.warn('Could not download background music:', e.message);
+        bgMusicPath = null;
+      }
+    }
+    
+    // Build ffmpeg command based on available inputs
+    let ffmpegArgs = [];
+    
+    if (bgVideoPath && fs.existsSync(bgVideoPath)) {
+      // Use background video with avatar overlay
+      ffmpegArgs = [
+        '-i', bgVideoPath,
+        '-i', mainPresenterImage,
+        '-i', audioPath
+      ];
+      
+      if (bgMusicPath && fs.existsSync(bgMusicPath)) {
+        ffmpegArgs.push('-i', bgMusicPath);
+        ffmpegArgs.push(
+          '-filter_complex', 
+          `[0:v]scale=1280:720,setsar=1[bg];[1:v]scale=200:200[avatar];[bg][avatar]overlay=(W-w)/2:(H-h)/2-50[v];[2:a]volume=1[speech];[3:a]volume=0.3[music];[speech][music]amix=inputs=2:duration=first[a]`,
+          '-map', '[v]',
+          '-map', '[a]'
+        );
+      } else {
+        ffmpegArgs.push(
+          '-filter_complex', 
+          `[0:v]scale=1280:720,setsar=1[bg];[1:v]scale=200:200[avatar];[bg][avatar]overlay=(W-w)/2:(H-h)/2-50[v]`,
+          '-map', '[v]',
+          '-map', '2:a'
+        );
+      }
+      
+      ffmpegArgs.push(
+        '-c:v', 'libx264',
+        '-c:a', 'aac',
+        '-b:a', '192k',
+        '-pix_fmt', 'yuv420p',
+        '-shortest',
+        '-t', String(audioDuration),
+        '-y',
+        outputPath
+      );
+    } else {
+      // Static image with optional background music
+      ffmpegArgs = [
+        '-loop', '1',
+        '-i', mainPresenterImage,
+        '-i', audioPath
+      ];
+      
+      if (bgMusicPath && fs.existsSync(bgMusicPath)) {
+        ffmpegArgs.push('-i', bgMusicPath);
+        ffmpegArgs.push(
+          '-filter_complex',
+          `[1:a]volume=1[speech];[2:a]volume=0.3[music];[speech][music]amix=inputs=2:duration=first[a]`,
+          '-map', '0:v',
+          '-map', '[a]'
+        );
+      }
+      
+      ffmpegArgs.push(
+        '-c:v', 'libx264',
+        '-tune', 'stillimage',
+        '-c:a', 'aac',
+        '-b:a', '192k',
+        '-pix_fmt', 'yuv420p',
+        '-vf', `scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,drawtext=text='Market Radio':fontsize=48:fontcolor=white:x=(w-text_w)/2:y=h-80:shadowcolor=black:shadowx=2:shadowy=2`,
+        '-shortest',
+        '-t', String(audioDuration),
+        '-y',
+        outputPath
+      );
+    }
     
     // Execute ffmpeg
+    console.log('Running ffmpeg with args:', ffmpegArgs.join(' '));
     await new Promise((resolve, reject) => {
       const ffmpeg = spawn('ffmpeg', ffmpegArgs);
       let stderr = '';
@@ -5042,6 +5199,16 @@ app.post('/api/newscast/generate-video', async (req, res) => {
       
       ffmpeg.on('error', reject);
     });
+    
+    // Cleanup temp files
+    try {
+      if (bgVideoPath && fs.existsSync(bgVideoPath)) fs.unlinkSync(bgVideoPath);
+      if (bgMusicPath && fs.existsSync(bgMusicPath)) fs.unlinkSync(bgMusicPath);
+      const customAvatarPath = path.join(tempDir, `avatar-${videoId}.png`);
+      if (fs.existsSync(customAvatarPath)) fs.unlinkSync(customAvatarPath);
+    } catch (e) {
+      console.warn('Cleanup temp files error:', e.message);
+    }
     
     // Generate thumbnail
     try {
