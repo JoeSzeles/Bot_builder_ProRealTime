@@ -8660,6 +8660,9 @@ document.addEventListener('DOMContentLoaded', () => {
   setTimeout(initAiTrading, 500);
   setTimeout(loadLastSessionOnStartup, 800);
   setTimeout(initForecastOnStartup, 1000);
+  setTimeout(() => {
+    if (typeof loadMediaFiles === 'function') loadMediaFiles();
+  }, 1200);
   setupBlankAppButton();
 });
 
