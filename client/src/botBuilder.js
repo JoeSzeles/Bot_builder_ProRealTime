@@ -11537,6 +11537,16 @@ function setupMediaUploadHandlers() {
     if (volumeLabel) volumeLabel.textContent = `${volumeSlider.value}%`;
     saveMediaSelections();
   });
+  
+  // Script length slider updates label
+  const scriptLengthSlider = document.getElementById('scriptLengthSlider');
+  const scriptLengthLabel = document.getElementById('scriptLengthLabel');
+  scriptLengthSlider?.addEventListener('input', () => {
+    const val = parseInt(scriptLengthSlider.value);
+    const minWords = val - 50;
+    const maxWords = val + 50;
+    if (scriptLengthLabel) scriptLengthLabel.textContent = `${minWords}-${maxWords} words`;
+  });
 }
 
 async function uploadMediaFile(file, type, statusId) {
@@ -12039,6 +12049,8 @@ async function generateNewscast() {
     const guestParticipationCheckbox = document.getElementById('newscastGuestCheck');
     const adTopicInput = document.getElementById('newscastAdTopic');
     const podcastTopicInput = document.getElementById('podcastTopicInput');
+    const scriptLengthSlider = document.getElementById('scriptLengthSlider');
+    const scriptLength = scriptLengthSlider ? parseInt(scriptLengthSlider.value) : 200;
     const includeMarketForecast = marketForecastCheckbox ? marketForecastCheckbox.checked : true;
     const include7DayForecast = sevenDayForecastCheckbox ? sevenDayForecastCheckbox.checked : false;
     const includeIntroAd = introAdCheckbox ? introAdCheckbox.checked : false;
@@ -12066,7 +12078,8 @@ async function generateNewscast() {
         isDailyPodcast,
         includeGuest,
         adTopic,
-        podcastTopic
+        podcastTopic,
+        scriptLength
       })
     });
     

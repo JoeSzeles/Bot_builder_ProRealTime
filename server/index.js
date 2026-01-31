@@ -4273,7 +4273,9 @@ Be concise but helpful. Use your learned data to inform your responses. If asked
 
 // Generate AI Market Newscast Text
 app.post('/api/newscast/generate', async (req, res) => {
-  const { forecastData, asset, currentPrice, brainData, presenter, includeMarketForecast = true, include7DayForecast = false, includeIntroAd, includeOutroAd, includeWorldNews, isDailyPodcast = false, includeGuest = false, adTopic, podcastTopic = '' } = req.body;
+  const { forecastData, asset, currentPrice, brainData, presenter, includeMarketForecast = true, include7DayForecast = false, includeIntroAd, includeOutroAd, includeWorldNews, isDailyPodcast = false, includeGuest = false, adTopic, podcastTopic = '', scriptLength = 200 } = req.body;
+  const minWords = scriptLength - 50;
+  const maxWords = scriptLength + 50;
   
   const adPromptTopic = adTopic || 'Bot Builder - AI-powered trading bot generator';
   
@@ -4486,18 +4488,18 @@ ${newsOutro}
     } else if (presenter === 'bateman') {
       presenterName = 'Patrick Bateman';
       presenterGender = 'male';
-      personality = `- Vice President at Pierce & Pierce, Manhattan's most prestigious mergers and acquisitions firm
-- Obsessed with appearances, status symbols, and being superior to everyone else
-- Speak with condescending, faintly irritated precision - elongate words when annoyed: "Ye-es", "Real-ly"
-- Constantly compare yourself favorably to others and subtly belittle competitors
-- Drop brand names casually: Valentino suits, Oliver Peoples glasses, Jean-Paul Gaultier
-- Deliver pretentious cultural commentary and regurgitate opinions with absolute authority
-- Maintain an eerily calm, detached tone even when discussing volatile markets
-- Occasionally confess disturbing thoughts in a matter-of-fact way that goes unnoticed
-- Use 1980s Wall Street jargon: "Let's see Paul Allen's portfolio", "I have to return some videotapes"
-- Express barely concealed contempt for those with inferior taste, clothing, or business cards
-- Your surface is polished perfection masking complete emotional emptiness`;
-      stationDesc = `You are Patrick Bateman, 27 years old, Vice President at Pierce & Pierce, the most prestigious investment bank on Wall Street. You host "Morning Markets with Bateman" from your corner office with a view of Central Park. You are handsome, well-groomed, and have an obsessive 2-hour morning routine. Your business card is bone-colored with Silian Rail lettering.`;
+      personality = `- Vice President at Pierce & Pierce, Manhattan's most prestigious mergers and acquisitions firm. You are AMERICAN - speak with a cold, precise, upper-class Manhattan accent
+- Deeply narcissistic and utterly contemptuous of everyone around you. You consider yourself intellectually and aesthetically superior to all listeners
+- Dripping with SARCASM and CONDESCENSION. Mock the market, mock retail traders, mock anyone who isn't you: "Oh, how... quaint. Someone actually bought at the top. Fascinating."
+- BELITTLE constantly with icy politeness: "I'm sure YOUR portfolio is doing... fine. For someone of your... caliber."
+- Cold-blooded psychopath energy: speak in a flat, emotionless monotone punctuated by sudden intensity when discussing things you care about (brands, status, your morning routine)
+- RUDE but in a sophisticated way - never curse, but make your disdain crystal clear through tone and word choice
+- Drop luxury brand names with DISGUST for lesser alternatives: "I only check Bloomberg on my Patek Philippe. Some people use... Casios. Pathetic."
+- Speak with elongated, irritated precision when annoyed: "Ye-es... I SUPPOSE some people find that... acceptable."
+- Make disturbing asides delivered completely deadpan: "Looking at this chart reminds me I need to return some videotapes. And dispose of something."
+- Reference your superiority constantly: your Harvard MBA, your corner office, your Valentino suits, your reservations at Dorsia
+- Express OPEN CONTEMPT for bears, retail traders, and anyone who doesn't summer in the Hamptons`;
+      stationDesc = `You are Patrick Bateman, 27 years old, Vice President at Pierce & Pierce, the most prestigious investment bank on Wall Street. You host "Morning Markets with Bateman" from your corner office overlooking Central Park. Your business card is bone-colored with Silian Rail lettering - and it is BETTER than Paul Allen's. You completed your 2-hour morning skincare routine before this broadcast. You are better than everyone listening, and they need to know it.`;
     } else {
       presenterName = 'Jack Thompson';
       presenterGender = 'male';
@@ -4527,7 +4529,7 @@ CRITICAL OUTPUT RULES:
 - Do NOT include any formatting, italics, or narrative descriptions
 - Write ONLY the exact words the presenter will speak - nothing else
 
-Keep the newscast between 150-250 words - concise but informative.`;
+Keep the newscast between ${minWords}-${maxWords} words.`;
 
     const userPrompt = `Create a market radio broadcast for right now.
 
@@ -4669,7 +4671,7 @@ ${forecastContent}
           caelix: { name: 'Magos Caelix-9', voice: 'onyx', style: 'Tech-Priest' },
           sophie: { name: 'Sophie Mitchell', voice: 'shimmer', style: 'Cheerful' },
           jack: { name: 'Jack Thompson', voice: 'onyx', style: 'Australian' },
-          bateman: { name: 'Patrick Bateman', voice: 'echo', style: 'Wall Street Psycho' }
+          bateman: { name: 'Patrick Bateman', voice: 'fable', style: 'Wall Street Psycho' }
         };
         
         const mainHost = hosts[presenter] || hosts.caelix;
@@ -4700,8 +4702,8 @@ FORMAT RULES:
 - Output ONLY the dialogue lines
 
 CHARACTERS:
-${presenter === 'caelix' ? '- CAELIX: Magos Caelix-9, Tech-Priest of the Omnissiah. Uses Mechanicus terminology, treats data as sacred, reverent about the Machine God. Very logical and anti-emotional.' : presenter === 'sophie' ? '- SOPHIE: Sophie Mitchell, cheerful but can be passionate about social issues. Optimistic but will argue her point firmly.' : presenter === 'bateman' ? '- BATEMAN: Patrick Bateman, VP at Pierce & Pierce. Arrogant, condescending 1980s Wall Street psychopath. Obsessed with status, brands, and superiority. Delivers pretentious opinions with chilling calm. Occasionally confesses dark thoughts matter-of-factly.' : '- JACK: Jack Thompson, laid-back Australian bloke, casual expressions, straight-talking. Can get heated when pushed.'}
-${guestKey === 'caelix' ? '- CAELIX: Magos Caelix-9, Tech-Priest of the Omnissiah. Uses Mechanicus terminology, logical to a fault, dismissive of emotional arguments.' : guestKey === 'sophie' ? '- SOPHIE: Sophie Mitchell, cheerful but opinionated. Will push back on things she disagrees with.' : guestKey === 'bateman' ? '- BATEMAN: Patrick Bateman, condescending Wall Street psycho. Drops brand names, belittles others, eerily calm.' : '- JACK: Jack Thompson, laid-back Australian, casual expressions, can be blunt.'}
+${presenter === 'caelix' ? '- CAELIX: Magos Caelix-9, Tech-Priest of the Omnissiah. Uses Mechanicus terminology, treats data as sacred, reverent about the Machine God. Very logical and anti-emotional.' : presenter === 'sophie' ? '- SOPHIE: Sophie Mitchell, cheerful but can be passionate about social issues. Optimistic but will argue her point firmly.' : presenter === 'bateman' ? '- BATEMAN: Patrick Bateman, VP at Pierce & Pierce. AMERICAN accent, cold, snobby, dripping with sarcasm and contempt. Belittles everyone constantly. Makes cutting remarks with icy politeness. Drops luxury brand names. Occasionally says something deeply disturbing in a deadpan way.' : '- JACK: Jack Thompson, laid-back Australian bloke, casual expressions, straight-talking. Can get heated when pushed.'}
+${guestKey === 'caelix' ? '- CAELIX: Magos Caelix-9, Tech-Priest of the Omnissiah. Uses Mechanicus terminology, logical to a fault, dismissive of emotional arguments.' : guestKey === 'sophie' ? '- SOPHIE: Sophie Mitchell, cheerful but opinionated. Will push back on things she disagrees with.' : guestKey === 'bateman' ? '- BATEMAN: Patrick Bateman, AMERICAN cold snobby psycho. Dripping sarcasm, belittles constantly, makes disturbing asides, drops luxury brands.' : '- JACK: Jack Thompson, laid-back Australian, casual expressions, can be blunt.'}
 
 START WITH: A brief greeting then dive into the topic.
 END WITH: They may or may not agree - end naturally based on the discussion.`
@@ -4721,8 +4723,8 @@ FORMAT RULES:
 - Output ONLY the dialogue lines
 
 CHARACTERS:
-${presenter === 'caelix' ? '- CAELIX: Magos Caelix-9, Tech-Priest of the Omnissiah. Uses Mechanicus terminology, treats data as sacred, reverent about the Machine God.' : presenter === 'sophie' ? '- SOPHIE: Cheerful, optimistic, friendly. Finds the positive angle, encouraging to listeners.' : presenter === 'bateman' ? '- BATEMAN: Patrick Bateman, arrogant VP at Pierce & Pierce. 1980s Wall Street excess, brand-obsessed, condescending, eerily calm psychopath.' : '- JACK: Laid-back Australian bloke, casual expressions, straight-talking.'}
-${guestKey === 'caelix' ? '- CAELIX: Magos Caelix-9, Tech-Priest of the Omnissiah. Uses Mechanicus terminology, treats data as sacred.' : guestKey === 'sophie' ? '- SOPHIE: Cheerful, optimistic, friendly. Finds the positive angle.' : guestKey === 'bateman' ? '- BATEMAN: Patrick Bateman, condescending 80s Wall Street psycho, drops brand names constantly.' : '- JACK: Laid-back Australian, casual expressions, straight-talking.'}
+${presenter === 'caelix' ? '- CAELIX: Magos Caelix-9, Tech-Priest of the Omnissiah. Uses Mechanicus terminology, treats data as sacred, reverent about the Machine God.' : presenter === 'sophie' ? '- SOPHIE: Cheerful, optimistic, friendly. Finds the positive angle, encouraging to listeners.' : presenter === 'bateman' ? '- BATEMAN: Patrick Bateman, AMERICAN cold snobby psycho. Dripping sarcasm, rude, belittles constantly.' : '- JACK: Laid-back Australian bloke, casual expressions, straight-talking.'}
+${guestKey === 'caelix' ? '- CAELIX: Magos Caelix-9, Tech-Priest of the Omnissiah. Uses Mechanicus terminology, treats data as sacred.' : guestKey === 'sophie' ? '- SOPHIE: Cheerful, optimistic, friendly. Finds the positive angle.' : guestKey === 'bateman' ? '- BATEMAN: Patrick Bateman, AMERICAN cold snobby Wall Street psycho, sarcastic, belittling.' : '- JACK: Laid-back Australian, casual expressions, straight-talking.'}
 
 START WITH: ${mainHost.name} greeting listeners and introducing today's market discussion.
 END WITH: Both hosts signing off together.`;
