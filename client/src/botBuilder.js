@@ -11543,6 +11543,12 @@ function openVideoPlayerPopup(item) {
     downloadMp4.classList.add('hidden');
   }
   
+  // Setup share button
+  const shareBtn = document.getElementById('videoPlayerShareBtn');
+  if (shareBtn) {
+    shareBtn.onclick = () => shareVideoPlayer(item);
+  }
+  
   popup.classList.remove('hidden');
   popup.classList.add('flex');
   
@@ -11643,6 +11649,54 @@ function updateVideoPlayerProgress() {
       return `${m}:${sec.toString().padStart(2, '0')}`;
     };
     timeEl.textContent = `${formatTime(videoPlayerAudio.currentTime)} / ${formatTime(videoPlayerAudio.duration || 0)}`;
+  }
+}
+
+async function shareVideoPlayer(item) {
+  if (!item) return;
+  
+  const presenterNames = { caelix: 'Magos Caelix-9', sophie: 'Sophie Mitchell', jack: 'Jack Thompson' };
+  const presenterName = presenterNames[item.presenter] || presenterNames.caelix;
+  
+  // Extract broadcast ID from audio URL
+  const audioId = item.audioUrl?.match(/broadcast-\d+/)?.[0];
+  if (!audioId) {
+    alert('Could not generate share link');
+    return;
+  }
+  
+  const shareUrl = `${window.location.origin}/share/${audioId}`;
+  const shareText = `Listen to ${presenterName}'s market update!`;
+  
+  // Show share options modal
+  const shareOptions = [
+    { name: 'Copy Link', icon: '📋', action: async () => {
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        alert('Link copied! Share on Discord or X for rich previews.');
+      } catch (e) {
+        prompt('Copy this link:', shareUrl);
+      }
+    }},
+    { name: 'Twitter/X', icon: '𝕏', action: () => {
+      window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`, '_blank', 'width=600,height=400');
+    }},
+    { name: 'Discord', icon: '💬', action: async () => {
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        alert('Link copied! Paste in Discord for rich embed preview.');
+      } catch (e) {
+        prompt('Copy and paste in Discord:', shareUrl);
+      }
+    }}
+  ];
+  
+  // Simple share - just copy to clipboard with instructions
+  try {
+    await navigator.clipboard.writeText(shareUrl);
+    alert(`Share link copied!\n\nPaste on Discord or X for rich previews with the presenter image.\n\nLink: ${shareUrl}`);
+  } catch (e) {
+    prompt('Copy this share link:', shareUrl);
   }
 }
 

@@ -32,6 +32,7 @@ if (!fs.existsSync(DOWNLOADS_DIR)) {
 
 app.use('/downloads', express.static(DOWNLOADS_DIR));
 app.use('/images', express.static(path.join(__dirname, '..', 'client', 'public', 'images')));
+app.use('/meta-images', express.static(path.join(__dirname, '..', 'client', 'public', 'meta-images')));
 
 // Media uploads directory
 const MEDIA_DIR = path.join(DOWNLOADS_DIR, 'media');
@@ -5510,8 +5511,20 @@ app.get('/share/:audioId', (req, res) => {
   // Get the base URL for absolute URLs
   const baseUrl = `${req.protocol}://${req.get('host')}`;
   const absoluteAudioUrl = `${baseUrl}${metadata.audioUrl}`;
-  const absoluteAvatarUrl = `${baseUrl}${metadata.avatar}`;
   const shareUrl = `${baseUrl}/share/${audioId}`;
+  
+  // Use default share image from meta-images folder for reliable social previews
+  // Custom avatars may not be publicly accessible, so we use a known good default
+  const defaultShareImage = `${baseUrl}/meta-images/default-share.png`;
+  
+  // Check if avatar is a public presenter image (not a custom upload)
+  const isPublicAvatar = metadata.avatar && (
+    metadata.avatar.includes('/images/presenter-') || 
+    metadata.avatar.startsWith('/images/')
+  );
+  const absoluteAvatarUrl = isPublicAvatar 
+    ? `${baseUrl}${metadata.avatar}` 
+    : defaultShareImage;
   
   const html = `<!DOCTYPE html>
 <html lang="en" prefix="og: http://ogp.me/ns#">
@@ -5530,8 +5543,9 @@ app.get('/share/:audioId', (req, res) => {
   <meta property="og:image:url" content="${absoluteAvatarUrl}">
   <meta property="og:image:secure_url" content="${absoluteAvatarUrl}">
   <meta property="og:image:type" content="image/png">
-  <meta property="og:image:width" content="512">
-  <meta property="og:image:height" content="512">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="1200">
+  <meta property="og:image:alt" content="${metadata.presenterName} - Market Radio">
   <meta property="og:type" content="website">
   <meta property="og:url" content="${shareUrl}">
   <meta property="og:title" content="${metadata.title}">
@@ -5541,16 +5555,12 @@ app.get('/share/:audioId', (req, res) => {
   <meta property="og:audio:secure_url" content="${absoluteAudioUrl}">
   <meta property="og:audio:type" content="audio/mpeg">
   
-  <!-- Twitter Player Card - enables inline audio playback -->
-  <meta name="twitter:card" content="player">
+  <!-- Twitter Card - summary_large_image for better previews -->
+  <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="${metadata.title}">
   <meta name="twitter:description" content="Listen to this market broadcast from ${metadata.presenterName} on ${metadata.stationName}">
   <meta name="twitter:image" content="${absoluteAvatarUrl}">
-  <meta name="twitter:player" content="${baseUrl}/embed/${audioId}">
-  <meta name="twitter:player:width" content="480">
-  <meta name="twitter:player:height" content="120">
-  <meta name="twitter:player:stream" content="${absoluteAudioUrl}">
-  <meta name="twitter:player:stream:content_type" content="audio/mpeg">
+  <meta name="twitter:image:alt" content="${metadata.presenterName} - Market Radio">
   
   <!-- oEmbed for rich embeds -->
   <link rel="alternate" type="application/json+oembed" href="${baseUrl}/oembed?url=${encodeURIComponent(shareUrl)}" title="${metadata.title}">
@@ -5568,15 +5578,20 @@ app.get('/share/:audioId', (req, res) => {
     }
     .hero-image {
       width: 100%;
-      max-width: 500px;
-      margin-bottom: 20px;
+      max-width: 600px;
+      margin-bottom: 30px;
     }
     .hero-image img {
       width: 100%;
       height: auto;
-      border-radius: 16px;
-      box-shadow: 0 8px 40px rgba(0,0,0,0.5);
-      border: 3px solid rgba(255,107,157,0.3);
+      border-radius: 20px;
+      box-shadow: 0 12px 60px rgba(255,107,157,0.4), 0 8px 40px rgba(0,0,0,0.5);
+      border: 4px solid rgba(255,107,157,0.5);
+      animation: glow 3s ease-in-out infinite alternate;
+    }
+    @keyframes glow {
+      from { box-shadow: 0 12px 60px rgba(255,107,157,0.3), 0 8px 40px rgba(0,0,0,0.5); }
+      to { box-shadow: 0 12px 80px rgba(255,107,157,0.6), 0 8px 40px rgba(0,0,0,0.5); }
     }
     .player-card {
       background: rgba(255,255,255,0.1);
