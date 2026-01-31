@@ -11517,6 +11517,13 @@ function setupMediaUploadHandlers() {
       e.target.value = '';
     }
   });
+  
+  // Save selections when user changes dropdowns
+  const selectIds = ['customAvatarSelect', 'customBgVideoSelect', 'customBgMusicSelect', 
+                     'speakerVideoCaelix', 'speakerVideoSophie', 'speakerVideoJack'];
+  selectIds.forEach(id => {
+    document.getElementById(id)?.addEventListener('change', saveMediaSelections);
+  });
 }
 
 async function uploadMediaFile(file, type, statusId) {
@@ -11568,6 +11575,7 @@ async function loadMediaFiles() {
     if (response.ok) {
       availableMediaFiles = await response.json();
       populateMediaSelects();
+      loadMediaSelections(); // Restore saved selections
     }
   } catch (e) {
     console.error('Failed to load media files:', e);
@@ -11647,6 +11655,44 @@ function getSelectedMediaUrls() {
       jack: document.getElementById('speakerVideoJack')?.value || null
     }
   };
+}
+
+// Save media selections to localStorage
+function saveMediaSelections() {
+  const selections = {
+    avatar: document.getElementById('customAvatarSelect')?.value || '',
+    video: document.getElementById('customBgVideoSelect')?.value || '',
+    music: document.getElementById('customBgMusicSelect')?.value || '',
+    speakerVideoCaelix: document.getElementById('speakerVideoCaelix')?.value || '',
+    speakerVideoSophie: document.getElementById('speakerVideoSophie')?.value || '',
+    speakerVideoJack: document.getElementById('speakerVideoJack')?.value || ''
+  };
+  localStorage.setItem('mediaSelections', JSON.stringify(selections));
+}
+
+// Load saved media selections from localStorage
+function loadMediaSelections() {
+  try {
+    const saved = localStorage.getItem('mediaSelections');
+    if (!saved) return;
+    const selections = JSON.parse(saved);
+    
+    const avatarSelect = document.getElementById('customAvatarSelect');
+    const videoSelect = document.getElementById('customBgVideoSelect');
+    const musicSelect = document.getElementById('customBgMusicSelect');
+    const caelixSelect = document.getElementById('speakerVideoCaelix');
+    const sophieSelect = document.getElementById('speakerVideoSophie');
+    const jackSelect = document.getElementById('speakerVideoJack');
+    
+    if (avatarSelect && selections.avatar) avatarSelect.value = selections.avatar;
+    if (videoSelect && selections.video) videoSelect.value = selections.video;
+    if (musicSelect && selections.music) musicSelect.value = selections.music;
+    if (caelixSelect && selections.speakerVideoCaelix) caelixSelect.value = selections.speakerVideoCaelix;
+    if (sophieSelect && selections.speakerVideoSophie) sophieSelect.value = selections.speakerVideoSophie;
+    if (jackSelect && selections.speakerVideoJack) jackSelect.value = selections.speakerVideoJack;
+  } catch (e) {
+    console.error('Failed to load media selections:', e);
+  }
 }
 
 function toggleSharePanel() {
