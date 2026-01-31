@@ -4483,6 +4483,21 @@ ${newsOutro}
 - Supportive and encouraging to your listeners
 - Clear and engaging delivery with a happy tone`;
       stationDesc = 'You are Sophie, a super cute and cheerful girl who loves trading! You host "Sophie\'s Market Corner" on Sydney Markets Radio.';
+    } else if (presenter === 'bateman') {
+      presenterName = 'Patrick Bateman';
+      presenterGender = 'male';
+      personality = `- Vice President at Pierce & Pierce, Manhattan's most prestigious mergers and acquisitions firm
+- Obsessed with appearances, status symbols, and being superior to everyone else
+- Speak with condescending, faintly irritated precision - elongate words when annoyed: "Ye-es", "Real-ly"
+- Constantly compare yourself favorably to others and subtly belittle competitors
+- Drop brand names casually: Valentino suits, Oliver Peoples glasses, Jean-Paul Gaultier
+- Deliver pretentious cultural commentary and regurgitate opinions with absolute authority
+- Maintain an eerily calm, detached tone even when discussing volatile markets
+- Occasionally confess disturbing thoughts in a matter-of-fact way that goes unnoticed
+- Use 1980s Wall Street jargon: "Let's see Paul Allen's portfolio", "I have to return some videotapes"
+- Express barely concealed contempt for those with inferior taste, clothing, or business cards
+- Your surface is polished perfection masking complete emotional emptiness`;
+      stationDesc = `You are Patrick Bateman, 27 years old, Vice President at Pierce & Pierce, the most prestigious investment bank on Wall Street. You host "Morning Markets with Bateman" from your corner office with a view of Central Park. You are handsome, well-groomed, and have an obsessive 2-hour morning routine. Your business card is bone-colored with Silian Rail lettering.`;
     } else {
       presenterName = 'Jack Thompson';
       presenterGender = 'male';
@@ -4653,7 +4668,8 @@ ${forecastContent}
         const hosts = {
           caelix: { name: 'Magos Caelix-9', voice: 'onyx', style: 'Tech-Priest' },
           sophie: { name: 'Sophie Mitchell', voice: 'shimmer', style: 'Cheerful' },
-          jack: { name: 'Jack Thompson', voice: 'onyx', style: 'Australian' }
+          jack: { name: 'Jack Thompson', voice: 'onyx', style: 'Australian' },
+          bateman: { name: 'Patrick Bateman', voice: 'echo', style: 'Wall Street Psycho' }
         };
         
         const mainHost = hosts[presenter] || hosts.caelix;
@@ -4684,8 +4700,8 @@ FORMAT RULES:
 - Output ONLY the dialogue lines
 
 CHARACTERS:
-${presenter === 'caelix' ? '- CAELIX: Magos Caelix-9, Tech-Priest of the Omnissiah. Uses Mechanicus terminology, treats data as sacred, reverent about the Machine God. Very logical and anti-emotional.' : presenter === 'sophie' ? '- SOPHIE: Sophie Mitchell, cheerful but can be passionate about social issues. Optimistic but will argue her point firmly.' : '- JACK: Jack Thompson, laid-back Australian bloke, casual expressions, straight-talking. Can get heated when pushed.'}
-${guestKey === 'caelix' ? '- CAELIX: Magos Caelix-9, Tech-Priest of the Omnissiah. Uses Mechanicus terminology, logical to a fault, dismissive of emotional arguments.' : guestKey === 'sophie' ? '- SOPHIE: Sophie Mitchell, cheerful but opinionated. Will push back on things she disagrees with.' : '- JACK: Jack Thompson, laid-back Australian, casual expressions, can be blunt.'}
+${presenter === 'caelix' ? '- CAELIX: Magos Caelix-9, Tech-Priest of the Omnissiah. Uses Mechanicus terminology, treats data as sacred, reverent about the Machine God. Very logical and anti-emotional.' : presenter === 'sophie' ? '- SOPHIE: Sophie Mitchell, cheerful but can be passionate about social issues. Optimistic but will argue her point firmly.' : presenter === 'bateman' ? '- BATEMAN: Patrick Bateman, VP at Pierce & Pierce. Arrogant, condescending 1980s Wall Street psychopath. Obsessed with status, brands, and superiority. Delivers pretentious opinions with chilling calm. Occasionally confesses dark thoughts matter-of-factly.' : '- JACK: Jack Thompson, laid-back Australian bloke, casual expressions, straight-talking. Can get heated when pushed.'}
+${guestKey === 'caelix' ? '- CAELIX: Magos Caelix-9, Tech-Priest of the Omnissiah. Uses Mechanicus terminology, logical to a fault, dismissive of emotional arguments.' : guestKey === 'sophie' ? '- SOPHIE: Sophie Mitchell, cheerful but opinionated. Will push back on things she disagrees with.' : guestKey === 'bateman' ? '- BATEMAN: Patrick Bateman, condescending Wall Street psycho. Drops brand names, belittles others, eerily calm.' : '- JACK: Jack Thompson, laid-back Australian, casual expressions, can be blunt.'}
 
 START WITH: A brief greeting then dive into the topic.
 END WITH: They may or may not agree - end naturally based on the discussion.`
@@ -4705,8 +4721,8 @@ FORMAT RULES:
 - Output ONLY the dialogue lines
 
 CHARACTERS:
-${presenter === 'caelix' ? '- CAELIX: Magos Caelix-9, Tech-Priest of the Omnissiah. Uses Mechanicus terminology, treats data as sacred, reverent about the Machine God.' : presenter === 'sophie' ? '- SOPHIE: Cheerful, optimistic, friendly. Finds the positive angle, encouraging to listeners.' : '- JACK: Laid-back Australian bloke, casual expressions, straight-talking.'}
-${guestKey === 'caelix' ? '- CAELIX: Magos Caelix-9, Tech-Priest of the Omnissiah. Uses Mechanicus terminology, treats data as sacred.' : guestKey === 'sophie' ? '- SOPHIE: Cheerful, optimistic, friendly. Finds the positive angle.' : '- JACK: Laid-back Australian, casual expressions, straight-talking.'}
+${presenter === 'caelix' ? '- CAELIX: Magos Caelix-9, Tech-Priest of the Omnissiah. Uses Mechanicus terminology, treats data as sacred, reverent about the Machine God.' : presenter === 'sophie' ? '- SOPHIE: Cheerful, optimistic, friendly. Finds the positive angle, encouraging to listeners.' : presenter === 'bateman' ? '- BATEMAN: Patrick Bateman, arrogant VP at Pierce & Pierce. 1980s Wall Street excess, brand-obsessed, condescending, eerily calm psychopath.' : '- JACK: Laid-back Australian bloke, casual expressions, straight-talking.'}
+${guestKey === 'caelix' ? '- CAELIX: Magos Caelix-9, Tech-Priest of the Omnissiah. Uses Mechanicus terminology, treats data as sacred.' : guestKey === 'sophie' ? '- SOPHIE: Cheerful, optimistic, friendly. Finds the positive angle.' : guestKey === 'bateman' ? '- BATEMAN: Patrick Bateman, condescending 80s Wall Street psycho, drops brand names constantly.' : '- JACK: Laid-back Australian, casual expressions, straight-talking.'}
 
 START WITH: ${mainHost.name} greeting listeners and introducing today's market discussion.
 END WITH: Both hosts signing off together.`;
@@ -4868,17 +4884,20 @@ app.post('/api/newscast/speak', async (req, res) => {
     const presenterAvatars = {
       caelix: '/images/presenter-caelix.png',
       sophie: '/images/presenter-sophie.png',
-      jack: '/images/presenter-jack.png'
+      jack: '/images/presenter-jack.png',
+      bateman: '/downloads/media/avatar/patrick-bateman.png'
     };
     const presenterNames = {
       caelix: 'Magos Caelix-9',
       sophie: 'Sophie Mitchell',
-      jack: 'Jack Thompson'
+      jack: 'Jack Thompson',
+      bateman: 'Patrick Bateman'
     };
     const stationNames = {
       caelix: 'Forge World Markets',
       sophie: "Sophie's Market Corner",
-      jack: 'Sydney Markets Radio'
+      jack: 'Sydney Markets Radio',
+      bateman: 'Morning Markets with Bateman'
     };
     
     const metadata = {
@@ -5030,12 +5049,14 @@ app.post('/api/newscast/speak-podcast', async (req, res) => {
     const presenterAvatars = {
       caelix: '/images/presenter-caelix.png',
       sophie: '/images/presenter-sophie.png',
-      jack: '/images/presenter-jack.png'
+      jack: '/images/presenter-jack.png',
+      bateman: '/downloads/media/avatar/patrick-bateman.png'
     };
     const presenterNames = {
       caelix: 'Magos Caelix-9',
       sophie: 'Sophie Mitchell',
-      jack: 'Jack Thompson'
+      jack: 'Jack Thompson',
+      bateman: 'Patrick Bateman'
     };
     
     // For podcast, list both hosts
@@ -5302,7 +5323,8 @@ app.post('/api/newscast/generate-video', async (req, res) => {
     const presenterNames = {
       caelix: 'Magos Caelix-9',
       sophie: 'Sophie Mitchell',
-      jack: 'Jack Thompson'
+      jack: 'Jack Thompson',
+      bateman: 'Patrick Bateman'
     };
     const presenterName = presenterNames[presenter] || 'Market Radio';
     const currentDate = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });

@@ -11169,7 +11169,8 @@ window.generateVideoForHistoryItem = async function(idx) {
     const speakerVideos = {
       caelix: document.getElementById('speakerVideoCaelix')?.value || null,
       sophie: document.getElementById('speakerVideoSophie')?.value || null,
-      jack: document.getElementById('speakerVideoJack')?.value || null
+      jack: document.getElementById('speakerVideoJack')?.value || null,
+      bateman: document.getElementById('speakerVideoBateman')?.value || null
     };
     
     const response = await fetch('/api/newscast/generate-video', {
@@ -11251,7 +11252,8 @@ async function loadNewscastFromStorage() {
           const presenterConfig = {
             caelix: { src: '/images/presenter-caelix.png', alt: 'Magos Caelix-9', class: 'w-12 h-12 rounded-full object-cover border-2 border-red-600 shadow-lg shadow-red-500/30' },
             sophie: { src: '/images/presenter-sophie.png', alt: 'Sophie Mitchell', class: 'w-12 h-12 rounded-full object-cover border-2 border-pink-400 shadow-lg' },
-            jack: { src: '/images/presenter-jack.png', alt: 'Jack Thompson', class: 'w-12 h-12 rounded-full object-cover border-2 border-blue-400 shadow-lg' }
+            jack: { src: '/images/presenter-jack.png', alt: 'Jack Thompson', class: 'w-12 h-12 rounded-full object-cover border-2 border-blue-400 shadow-lg' },
+            bateman: { src: '/downloads/media/avatar/patrick-bateman.png', alt: 'Patrick Bateman', class: 'w-12 h-12 rounded-full object-cover border-2 border-gray-600 shadow-lg' }
           };
           const config = presenterConfig[data.presenter] || presenterConfig.caelix;
           presenterImage.src = config.src;
@@ -11329,7 +11331,8 @@ function setupNewscastHandlers() {
         const presenterConfig = {
           caelix: { src: '/images/presenter-caelix.png', alt: 'Magos Caelix-9', class: 'w-12 h-12 rounded-full object-cover border-2 border-red-600 shadow-lg shadow-red-500/30' },
           sophie: { src: '/images/presenter-sophie.png', alt: 'Sophie Mitchell', class: 'w-12 h-12 rounded-full object-cover border-2 border-pink-400 shadow-lg' },
-          jack: { src: '/images/presenter-jack.png', alt: 'Jack Thompson', class: 'w-12 h-12 rounded-full object-cover border-2 border-blue-400 shadow-lg' }
+          jack: { src: '/images/presenter-jack.png', alt: 'Jack Thompson', class: 'w-12 h-12 rounded-full object-cover border-2 border-blue-400 shadow-lg' },
+          bateman: { src: '/downloads/media/avatar/patrick-bateman.png', alt: 'Patrick Bateman', class: 'w-12 h-12 rounded-full object-cover border-2 border-gray-600 shadow-lg' }
         };
         const config = presenterConfig[val] || presenterConfig.caelix;
         presenterImage.src = config.src;
@@ -11636,7 +11639,7 @@ function populateMediaSelects() {
   }
   
   // Per-speaker video selects
-  const speakerSelects = ['speakerVideoCaelix', 'speakerVideoSophie', 'speakerVideoJack'];
+  const speakerSelects = ['speakerVideoCaelix', 'speakerVideoSophie', 'speakerVideoJack', 'speakerVideoBateman'];
   speakerSelects.forEach(selectId => {
     const select = document.getElementById(selectId);
     if (select) {
@@ -11662,7 +11665,8 @@ function getSelectedMediaUrls() {
     speakerVideos: {
       caelix: document.getElementById('speakerVideoCaelix')?.value || null,
       sophie: document.getElementById('speakerVideoSophie')?.value || null,
-      jack: document.getElementById('speakerVideoJack')?.value || null
+      jack: document.getElementById('speakerVideoJack')?.value || null,
+      bateman: document.getElementById('speakerVideoBateman')?.value || null
     }
   };
 }
@@ -11682,7 +11686,8 @@ function saveMediaSelections() {
     musicVolume: document.getElementById('bgMusicVolume')?.value || existing.musicVolume || '15',
     speakerVideoCaelix: document.getElementById('speakerVideoCaelix')?.value || existing.speakerVideoCaelix || '',
     speakerVideoSophie: document.getElementById('speakerVideoSophie')?.value || existing.speakerVideoSophie || '',
-    speakerVideoJack: document.getElementById('speakerVideoJack')?.value || existing.speakerVideoJack || ''
+    speakerVideoJack: document.getElementById('speakerVideoJack')?.value || existing.speakerVideoJack || '',
+    speakerVideoBateman: document.getElementById('speakerVideoBateman')?.value || existing.speakerVideoBateman || ''
   };
   localStorage.setItem('mediaSelections', JSON.stringify(selections));
 }
@@ -11702,6 +11707,7 @@ function loadMediaSelections() {
     const caelixSelect = document.getElementById('speakerVideoCaelix');
     const sophieSelect = document.getElementById('speakerVideoSophie');
     const jackSelect = document.getElementById('speakerVideoJack');
+    const batemanSelect = document.getElementById('speakerVideoBateman');
     
     if (avatarSelect && selections.avatar) avatarSelect.value = selections.avatar;
     if (videoSelect && selections.video) videoSelect.value = selections.video;
@@ -11713,6 +11719,7 @@ function loadMediaSelections() {
     if (caelixSelect && selections.speakerVideoCaelix) caelixSelect.value = selections.speakerVideoCaelix;
     if (sophieSelect && selections.speakerVideoSophie) sophieSelect.value = selections.speakerVideoSophie;
     if (jackSelect && selections.speakerVideoJack) jackSelect.value = selections.speakerVideoJack;
+    if (batemanSelect && selections.speakerVideoBateman) batemanSelect.value = selections.speakerVideoBateman;
   } catch (e) {
     console.error('Failed to load media selections:', e);
   }
@@ -11761,7 +11768,8 @@ function openVideoPlayerPopup(item) {
   const presenterConfig = {
     caelix: { name: 'Magos Caelix-9', station: 'Forge World Markets', img: '/images/presenter-caelix.png', border: 'border-red-600' },
     sophie: { name: 'Sophie Mitchell', station: "Sophie's Market Corner", img: '/images/presenter-sophie.png', border: 'border-pink-400' },
-    jack: { name: 'Jack Thompson', station: 'Sydney Markets Radio', img: '/images/presenter-jack.png', border: 'border-blue-400' }
+    jack: { name: 'Jack Thompson', station: 'Sydney Markets Radio', img: '/images/presenter-jack.png', border: 'border-blue-400' },
+    bateman: { name: 'Patrick Bateman', station: 'Morning Markets with Bateman', img: '/downloads/media/avatar/patrick-bateman.png', border: 'border-gray-600' }
   };
   
   const config = presenterConfig[item.presenter] || presenterConfig.caelix;
