@@ -8889,8 +8889,18 @@ function setupForecastHandlers() {
   
   if (assetSelect) {
     assetSelect.addEventListener('change', () => {
-      forecastData.asset = assetSelect.value;
-      loadForecastFromStorage();
+      const newAsset = assetSelect.value;
+      // Clear existing forecast data for different asset
+      forecastData = {
+        asset: newAsset,
+        generatedAt: null,
+        days: [],
+        history: forecastData.history || []
+      };
+      saveForecastToStorage();
+      updateForecastUI();
+      // Auto-generate new forecast for selected asset
+      generateForecast();
     });
   }
   
@@ -9285,6 +9295,11 @@ function loadForecastFromStorage() {
     const saved = localStorage.getItem('forecastData');
     if (saved) {
       forecastData = JSON.parse(saved);
+      // Sync dropdown with stored asset
+      const assetSelect = document.getElementById('forecastAssetSelect');
+      if (assetSelect && forecastData.asset) {
+        assetSelect.value = forecastData.asset;
+      }
       updateForecastUI();
       updateForecastHistory();
       checkAndRotateForecast();
