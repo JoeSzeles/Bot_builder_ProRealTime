@@ -5168,8 +5168,14 @@ app.post('/api/newscast/generate-video', async (req, res) => {
     
     // Use custom avatar if provided (local path or validated URL)
     if (customAvatarUrl) {
-      if (customAvatarUrl.startsWith('/downloads/')) {
-        // Local uploaded file
+      if (customAvatarUrl.startsWith('/downloads/media/')) {
+        // Local uploaded file - stored in data/media/
+        const localPath = path.join(__dirname, '..', 'data', 'media', customAvatarUrl.replace('/downloads/media/', ''));
+        if (fs.existsSync(localPath)) {
+          mainPresenterImage = localPath;
+        }
+      } else if (customAvatarUrl.startsWith('/downloads/')) {
+        // Other downloads (legacy)
         const localPath = path.join(__dirname, '..', customAvatarUrl.replace(/^\//, ''));
         if (fs.existsSync(localPath)) {
           mainPresenterImage = localPath;
@@ -5216,8 +5222,14 @@ app.post('/api/newscast/generate-video', async (req, res) => {
     // Use background video if provided (local path or validated URL)
     let bgVideoPath = null;
     if (customBgVideoUrl) {
-      if (customBgVideoUrl.startsWith('/downloads/')) {
-        // Local uploaded file
+      if (customBgVideoUrl.startsWith('/downloads/media/')) {
+        // Local uploaded file - stored in data/media/
+        const localPath = path.join(__dirname, '..', 'data', 'media', customBgVideoUrl.replace('/downloads/media/', ''));
+        if (fs.existsSync(localPath)) {
+          bgVideoPath = localPath;
+        }
+      } else if (customBgVideoUrl.startsWith('/downloads/')) {
+        // Other downloads (legacy)
         const localPath = path.join(__dirname, '..', customBgVideoUrl.replace(/^\//, ''));
         if (fs.existsSync(localPath)) {
           bgVideoPath = localPath;
@@ -5247,8 +5259,14 @@ app.post('/api/newscast/generate-video', async (req, res) => {
     // Use background music if provided (local path or validated URL)
     let bgMusicPath = null;
     if (customBgMusicUrl) {
-      if (customBgMusicUrl.startsWith('/downloads/')) {
-        // Local uploaded file
+      if (customBgMusicUrl.startsWith('/downloads/media/')) {
+        // Local uploaded file - stored in data/media/
+        const localPath = path.join(__dirname, '..', 'data', 'media', customBgMusicUrl.replace('/downloads/media/', ''));
+        if (fs.existsSync(localPath)) {
+          bgMusicPath = localPath;
+        }
+      } else if (customBgMusicUrl.startsWith('/downloads/')) {
+        // Other downloads (legacy)
         const localPath = path.join(__dirname, '..', customBgMusicUrl.replace(/^\//, ''));
         if (fs.existsSync(localPath)) {
           bgMusicPath = localPath;
