@@ -11116,25 +11116,25 @@ window.downloadShareAudio = function() {
 };
 
 window.copyVideoLink = async function() {
-  if (!currentShareData?.videoUrl) return;
-  const fullUrl = window.location.origin + currentShareData.videoUrl;
+  if (!currentShareData?.shareUrl) return;
+  // Use the share page URL which has video meta tags for rich previews
   try {
-    await navigator.clipboard.writeText(fullUrl);
-    alert('Video link copied to clipboard!');
+    await navigator.clipboard.writeText(currentShareData.shareUrl);
+    alert('Video share link copied! This link shows rich preview with video on Discord & X.');
   } catch (e) {
-    prompt('Copy this video link:', fullUrl);
+    prompt('Copy this video share link:', currentShareData.shareUrl);
   }
   document.getElementById('shareModal')?.remove();
 };
 
 window.copyAudioLink = async function() {
-  if (!currentShareData?.audioUrl) return;
-  const fullUrl = window.location.origin + currentShareData.audioUrl;
+  if (!currentShareData?.shareUrl) return;
+  // Use the share page URL which has audio meta tags for rich previews
   try {
-    await navigator.clipboard.writeText(fullUrl);
-    alert('Audio link copied to clipboard!');
+    await navigator.clipboard.writeText(currentShareData.shareUrl);
+    alert('Audio share link copied! This link shows rich preview on Discord & X.');
   } catch (e) {
-    prompt('Copy this audio link:', fullUrl);
+    prompt('Copy this audio share link:', currentShareData.shareUrl);
   }
   document.getElementById('shareModal')?.remove();
 };
