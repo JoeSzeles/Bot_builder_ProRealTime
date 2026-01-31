@@ -5439,10 +5439,15 @@ app.post('/api/newscast/generate-video', async (req, res) => {
       ffmpeg.on('error', reject);
     });
     
-    // Cleanup temp files
+    // Cleanup temp files ONLY (don't delete user's uploaded media!)
     try {
-      if (bgVideoPath && fs.existsSync(bgVideoPath)) fs.unlinkSync(bgVideoPath);
-      if (bgMusicPath && fs.existsSync(bgMusicPath)) fs.unlinkSync(bgMusicPath);
+      // Only delete if path is in temp directory
+      if (bgVideoPath && bgVideoPath.includes('/temp/') && fs.existsSync(bgVideoPath)) {
+        fs.unlinkSync(bgVideoPath);
+      }
+      if (bgMusicPath && bgMusicPath.includes('/temp/') && fs.existsSync(bgMusicPath)) {
+        fs.unlinkSync(bgMusicPath);
+      }
       const customAvatarPath = path.join(tempDir, `avatar-${videoId}.png`);
       if (fs.existsSync(customAvatarPath)) fs.unlinkSync(customAvatarPath);
     } catch (e) {
