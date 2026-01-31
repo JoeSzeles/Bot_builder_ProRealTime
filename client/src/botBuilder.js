@@ -10956,17 +10956,86 @@ window.shareHistoryItem = function(idx) {
   const item = newscastHistory[idx];
   if (!item) return;
   
-  const shareUrl = item.videoUrl || item.audioUrl || window.location.href;
-  if (navigator.share) {
-    navigator.share({
-      title: 'Market Radio Broadcast',
-      text: `Check out this market update from ${item.presenter === 'caelix' ? 'Magos Caelix-9' : item.presenter === 'sophie' ? 'Sophie Mitchell' : 'Jack Thompson'}`,
-      url: shareUrl
-    }).catch(() => {});
-  } else {
-    navigator.clipboard.writeText(shareUrl);
-    alert('Link copied to clipboard!');
+  // Extract broadcast ID from audio URL to generate proper share link
+  const audioId = item.audioUrl?.match(/broadcast-\d+/)?.[0];
+  if (!audioId) {
+    alert('Could not generate share link for this broadcast');
+    return;
   }
+  
+  const presenterNames = { caelix: 'Magos Caelix-9', sophie: 'Sophie Mitchell', jack: 'Jack Thompson' };
+  const presenterName = presenterNames[item.presenter] || presenterNames.caelix;
+  const shareUrl = `${window.location.origin}/share/${audioId}`;
+  const shareText = `Listen to ${presenterName}'s market update!`;
+  
+  // Show share modal with social options
+  showShareModal(shareUrl, shareText, presenterName);
+};
+
+// Share modal for social media options
+function showShareModal(shareUrl, shareText, presenterName) {
+  // Remove existing modal if present
+  const existingModal = document.getElementById('shareModal');
+  if (existingModal) existingModal.remove();
+  
+  const modal = document.createElement('div');
+  modal.id = 'shareModal';
+  modal.className = 'fixed inset-0 z-[100] flex items-center justify-center bg-black/70';
+  modal.innerHTML = `
+    <div class="bg-gray-800 rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl border border-gray-700">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-bold text-white">Share Broadcast</h3>
+        <button onclick="document.getElementById('shareModal').remove()" class="text-gray-400 hover:text-white">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <p class="text-gray-400 text-sm mb-4">Share ${presenterName}'s broadcast on social media for rich previews!</p>
+      <div class="space-y-3">
+        <button onclick="shareToTwitter('${encodeURIComponent(shareText)}', '${encodeURIComponent(shareUrl)}')" class="w-full flex items-center gap-3 p-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors">
+          <span class="text-xl">𝕏</span>
+          <span class="text-white font-medium">Share on X (Twitter)</span>
+        </button>
+        <button onclick="shareToDiscord('${shareUrl}')" class="w-full flex items-center gap-3 p-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors">
+          <span class="text-xl">💬</span>
+          <span class="text-white font-medium">Copy for Discord</span>
+        </button>
+        <button onclick="copyShareLink('${shareUrl}')" class="w-full flex items-center gap-3 p-3 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors">
+          <span class="text-xl">📋</span>
+          <span class="text-white font-medium">Copy Link</span>
+        </button>
+      </div>
+      <p class="text-gray-500 text-xs mt-4 text-center">Links show rich previews with presenter image on Discord & X</p>
+    </div>
+  `;
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  document.body.appendChild(modal);
+}
+
+window.shareToTwitter = function(text, url) {
+  window.open(`https://twitter.com/intent/tweet?text=${text}&url=${url}`, '_blank', 'width=600,height=400');
+  document.getElementById('shareModal')?.remove();
+};
+
+window.shareToDiscord = async function(url) {
+  try {
+    await navigator.clipboard.writeText(url);
+    alert('Link copied! Paste in Discord for a rich embed with presenter image.');
+  } catch (e) {
+    prompt('Copy this link and paste in Discord:', url);
+  }
+  document.getElementById('shareModal')?.remove();
+};
+
+window.copyShareLink = async function(url) {
+  try {
+    await navigator.clipboard.writeText(url);
+    alert('Share link copied to clipboard!');
+  } catch (e) {
+    prompt('Copy this share link:', url);
+  }
+  document.getElementById('shareModal')?.remove();
 };
 
 window.deleteHistoryItem = function(idx) {
@@ -11668,36 +11737,8 @@ async function shareVideoPlayer(item) {
   const shareUrl = `${window.location.origin}/share/${audioId}`;
   const shareText = `Listen to ${presenterName}'s market update!`;
   
-  // Show share options modal
-  const shareOptions = [
-    { name: 'Copy Link', icon: '📋', action: async () => {
-      try {
-        await navigator.clipboard.writeText(shareUrl);
-        alert('Link copied! Share on Discord or X for rich previews.');
-      } catch (e) {
-        prompt('Copy this link:', shareUrl);
-      }
-    }},
-    { name: 'Twitter/X', icon: '𝕏', action: () => {
-      window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`, '_blank', 'width=600,height=400');
-    }},
-    { name: 'Discord', icon: '💬', action: async () => {
-      try {
-        await navigator.clipboard.writeText(shareUrl);
-        alert('Link copied! Paste in Discord for rich embed preview.');
-      } catch (e) {
-        prompt('Copy and paste in Discord:', shareUrl);
-      }
-    }}
-  ];
-  
-  // Simple share - just copy to clipboard with instructions
-  try {
-    await navigator.clipboard.writeText(shareUrl);
-    alert(`Share link copied!\n\nPaste on Discord or X for rich previews with the presenter image.\n\nLink: ${shareUrl}`);
-  } catch (e) {
-    prompt('Copy this share link:', shareUrl);
-  }
+  // Use the same share modal as history items
+  showShareModal(shareUrl, shareText, presenterName);
 }
 
 function shareToSocial(platform) {
