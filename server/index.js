@@ -35,7 +35,7 @@ app.use('/images', express.static(path.join(__dirname, '..', 'client', 'public',
 app.use('/meta-images', express.static(path.join(__dirname, '..', 'client', 'public', 'meta-images')));
 
 // Media uploads directory
-const MEDIA_DIR = path.join(DOWNLOADS_DIR, 'media');
+const MEDIA_DIR = path.join(__dirname, '..', 'data', 'media');
 if (!fs.existsSync(MEDIA_DIR)) {
   fs.mkdirSync(MEDIA_DIR, { recursive: true });
 }
