@@ -5137,7 +5137,8 @@ function isValidMediaUrl(url) {
 }
 
 app.post('/api/newscast/generate-video', async (req, res) => {
-  const { audioUrl, podcastSegments, presenter, customAvatarUrl, customBgVideoUrl, customBgMusicUrl, speakerVideos = {}, showTitle = 'MARKET RADIO' } = req.body;
+  const { audioUrl, podcastSegments, presenter, customAvatarUrl, customBgVideoUrl, customBgMusicUrl, bgMusicVolume = 0.15, speakerVideos = {}, showTitle = 'MARKET RADIO' } = req.body;
+  const musicVol = Math.max(0, Math.min(0.5, parseFloat(bgMusicVolume) || 0.15));
   
   if (!audioUrl) {
     return res.status(400).json({ error: 'Audio URL is required' });
@@ -5332,7 +5333,7 @@ app.post('/api/newscast/generate-video', async (req, res) => {
         ffmpegArgs.push('-stream_loop', '-1', '-i', bgMusicPath);
         ffmpegArgs.push(
           '-filter_complex', 
-          `${newsroomFilter('0:v', '1:v')};[2:a]volume=1[speech];[3:a]volume=0.3,afade=t=out:st=${Math.max(0, audioDuration - 3)}:d=3[music];[speech][music]amix=inputs=2:duration=first[a]`,
+          `${newsroomFilter('0:v', '1:v')};[2:a]volume=1[speech];[3:a]volume=${musicVol},afade=t=out:st=${Math.max(0, audioDuration - 3)}:d=3[music];[speech][music]amix=inputs=2:duration=first[a]`,
           '-map', '[v]',
           '-map', '[a]'
         );
@@ -5374,7 +5375,7 @@ app.post('/api/newscast/generate-video', async (req, res) => {
         ];
         ffmpegArgs.push(
           '-filter_complex',
-          `${staticFilter};[1:a]volume=1[speech];[2:a]volume=0.3,afade=t=out:st=${Math.max(0, audioDuration - 3)}:d=3[music];[speech][music]amix=inputs=2:duration=first[a]`,
+          `${staticFilter};[1:a]volume=1[speech];[2:a]volume=${musicVol},afade=t=out:st=${Math.max(0, audioDuration - 3)}:d=3[music];[speech][music]amix=inputs=2:duration=first[a]`,
           '-map', '[v]',
           '-map', '[a]'
         );

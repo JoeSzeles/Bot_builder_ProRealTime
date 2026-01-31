@@ -11439,6 +11439,7 @@ async function generateNewscastVideo() {
   
   try {
     const mediaUrls = getSelectedMediaUrls();
+    const bgMusicVolume = parseInt(document.getElementById('bgMusicVolume')?.value || '15', 10) / 100;
     const response = await fetch('/api/newscast/generate-video', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -11446,6 +11447,7 @@ async function generateNewscastVideo() {
         audioUrl: newscastAudioUrl,
         podcastSegments: newscastPodcastSegments,
         presenter: selectedPresenter,
+        bgMusicVolume,
         ...mediaUrls
       })
     });
@@ -11523,6 +11525,14 @@ function setupMediaUploadHandlers() {
                      'speakerVideoCaelix', 'speakerVideoSophie', 'speakerVideoJack'];
   selectIds.forEach(id => {
     document.getElementById(id)?.addEventListener('change', saveMediaSelections);
+  });
+  
+  // Volume slider updates label and saves
+  const volumeSlider = document.getElementById('bgMusicVolume');
+  const volumeLabel = document.getElementById('bgMusicVolumeLabel');
+  volumeSlider?.addEventListener('input', () => {
+    if (volumeLabel) volumeLabel.textContent = `${volumeSlider.value}%`;
+    saveMediaSelections();
   });
 }
 
@@ -11663,6 +11673,7 @@ function saveMediaSelections() {
     avatar: document.getElementById('customAvatarSelect')?.value || '',
     video: document.getElementById('customBgVideoSelect')?.value || '',
     music: document.getElementById('customBgMusicSelect')?.value || '',
+    musicVolume: document.getElementById('bgMusicVolume')?.value || '15',
     speakerVideoCaelix: document.getElementById('speakerVideoCaelix')?.value || '',
     speakerVideoSophie: document.getElementById('speakerVideoSophie')?.value || '',
     speakerVideoJack: document.getElementById('speakerVideoJack')?.value || ''
@@ -11680,6 +11691,8 @@ function loadMediaSelections() {
     const avatarSelect = document.getElementById('customAvatarSelect');
     const videoSelect = document.getElementById('customBgVideoSelect');
     const musicSelect = document.getElementById('customBgMusicSelect');
+    const volumeSlider = document.getElementById('bgMusicVolume');
+    const volumeLabel = document.getElementById('bgMusicVolumeLabel');
     const caelixSelect = document.getElementById('speakerVideoCaelix');
     const sophieSelect = document.getElementById('speakerVideoSophie');
     const jackSelect = document.getElementById('speakerVideoJack');
@@ -11687,6 +11700,10 @@ function loadMediaSelections() {
     if (avatarSelect && selections.avatar) avatarSelect.value = selections.avatar;
     if (videoSelect && selections.video) videoSelect.value = selections.video;
     if (musicSelect && selections.music) musicSelect.value = selections.music;
+    if (volumeSlider && selections.musicVolume) {
+      volumeSlider.value = selections.musicVolume;
+      if (volumeLabel) volumeLabel.textContent = `${selections.musicVolume}%`;
+    }
     if (caelixSelect && selections.speakerVideoCaelix) caelixSelect.value = selections.speakerVideoCaelix;
     if (sophieSelect && selections.speakerVideoSophie) sophieSelect.value = selections.speakerVideoSophie;
     if (jackSelect && selections.speakerVideoJack) jackSelect.value = selections.speakerVideoJack;

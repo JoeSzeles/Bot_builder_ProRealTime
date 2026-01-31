@@ -747,7 +747,7 @@
                   <!-- Background Music -->
                   <div class="p-2 bg-gray-100 dark:bg-gray-700/50 rounded">
                     <div class="flex items-center justify-between mb-1">
-                      <label class="text-xs text-gray-600 dark:text-gray-300 font-medium">Background Music (30% volume)</label>
+                      <label class="text-xs text-gray-600 dark:text-gray-300 font-medium">Background Music</label>
                       <label class="text-xs text-purple-500 hover:text-purple-700 cursor-pointer">
                         <input type="file" id="musicFileInput" accept=".mp3,.ogg,.wav,.m4a" class="hidden">
                         Upload
@@ -756,6 +756,11 @@
                     <select id="customBgMusicSelect" class="w-full px-2 py-1 text-xs bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-gray-800 dark:text-white">
                       <option value="">No background music</option>
                     </select>
+                    <div class="flex items-center gap-2 mt-2">
+                      <span class="text-xs text-gray-500 dark:text-gray-400 w-16">Volume:</span>
+                      <input type="range" id="bgMusicVolume" min="0" max="50" value="15" class="flex-1 h-1 bg-gray-300 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-purple-500">
+                      <span id="bgMusicVolumeLabel" class="text-xs text-gray-600 dark:text-gray-300 w-8 text-right">15%</span>
+                    </div>
                     <div id="musicUploadStatus" class="text-xs text-gray-500 mt-1 hidden"></div>
                   </div>
                 </div>
