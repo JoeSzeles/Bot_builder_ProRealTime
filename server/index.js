@@ -5136,7 +5136,7 @@ function isValidMediaUrl(url) {
 }
 
 app.post('/api/newscast/generate-video', async (req, res) => {
-  const { audioUrl, podcastSegments, presenter, customAvatarUrl, customBgVideoUrl, customBgMusicUrl } = req.body;
+  const { audioUrl, podcastSegments, presenter, customAvatarUrl, customBgVideoUrl, customBgMusicUrl, speakerVideos = {}, showTitle = 'MARKET RADIO' } = req.body;
   
   if (!audioUrl) {
     return res.status(400).json({ error: 'Audio URL is required' });
@@ -5278,8 +5278,37 @@ app.post('/api/newscast/generate-video', async (req, res) => {
     let ffmpegArgs = [];
     const hasBgMusic = bgMusicPath && fs.existsSync(bgMusicPath);
     
+    // Presenter names for display
+    const presenterNames = {
+      caelix: 'Magos Caelix-9',
+      sophie: 'Sophie Mitchell',
+      jack: 'Jack Thompson'
+    };
+    const presenterName = presenterNames[presenter] || 'Market Radio';
+    const currentDate = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    
+    // Escape special characters for ffmpeg drawtext
+    const escapeText = (text) => text.replace(/:/g, '\\:').replace(/'/g, "\\\\'");
+    
+    // Newsroom-style overlay filter:
+    // - Round avatar with colored border in top-right corner (smaller)
+    // - Center bottom: Show title and presenter name
+    // - Left bottom: Date and show info
+    const newsroomFilter = (bgStream, avatarStream) => {
+      // Avatar: 120px, positioned top-right with 20px margin
+      // Round mask using format=yuva420p and alphaextract/alphamerge for proper circular mask
+      return `[${bgStream}]scale=1280:720,setsar=1[bg];` +
+        `[${avatarStream}]scale=120:120,format=yuva420p,geq=lum='lum(X,Y)':cb='cb(X,Y)':cr='cr(X,Y)':a='if(gt(pow(X-60,2)+pow(Y-60,2),pow(55,2)),0,255)'[avatar_round];` +
+        `[bg][avatar_round]overlay=W-140:20[with_avatar];` +
+        `[with_avatar]drawbox=x=W-145:y=15:w=130:h=130:color=purple@0.6:t=3,` +
+        `drawtext=text='${escapeText(showTitle || 'MARKET RADIO')}':fontsize=36:fontcolor=white:x=(w-text_w)/2:y=h-90:shadowcolor=black:shadowx=2:shadowy=2,` +
+        `drawtext=text='${escapeText(presenterName)}':fontsize=24:fontcolor=yellow:x=(w-text_w)/2:y=h-55:shadowcolor=black:shadowx=1:shadowy=1,` +
+        `drawtext=text='${escapeText(currentDate)}':fontsize=18:fontcolor=white@0.8:x=20:y=h-45:shadowcolor=black:shadowx=1:shadowy=1,` +
+        `drawtext=text='LIVE':fontsize=14:fontcolor=red:x=20:y=h-70:box=1:boxcolor=white@0.8:boxborderw=4[v]`;
+    };
+    
     if (bgVideoPath && fs.existsSync(bgVideoPath)) {
-      // Use background video with avatar overlay - loop video if shorter than audio
+      // Use background video with newsroom-style avatar overlay
       ffmpegArgs = [
         '-stream_loop', '-1',
         '-i', bgVideoPath,
@@ -5288,18 +5317,17 @@ app.post('/api/newscast/generate-video', async (req, res) => {
       ];
       
       if (hasBgMusic) {
-        // Add looped music input
         ffmpegArgs.push('-stream_loop', '-1', '-i', bgMusicPath);
         ffmpegArgs.push(
           '-filter_complex', 
-          `[0:v]scale=1280:720,setsar=1[bg];[1:v]scale=200:200[avatar];[bg][avatar]overlay=(W-w)/2:(H-h)/2-50[v];[2:a]volume=1[speech];[3:a]volume=0.3,afade=t=out:st=${Math.max(0, audioDuration - 3)}:d=3[music];[speech][music]amix=inputs=2:duration=first[a]`,
+          `${newsroomFilter('0:v', '1:v')};[2:a]volume=1[speech];[3:a]volume=0.3,afade=t=out:st=${Math.max(0, audioDuration - 3)}:d=3[music];[speech][music]amix=inputs=2:duration=first[a]`,
           '-map', '[v]',
           '-map', '[a]'
         );
       } else {
         ffmpegArgs.push(
           '-filter_complex', 
-          `[0:v]scale=1280:720,setsar=1[bg];[1:v]scale=200:200[avatar];[bg][avatar]overlay=(W-w)/2:(H-h)/2-50[v]`,
+          newsroomFilter('0:v', '1:v'),
           '-map', '[v]',
           '-map', '2:a'
         );
@@ -5315,9 +5343,15 @@ app.post('/api/newscast/generate-video', async (req, res) => {
         outputPath
       );
     } else {
-      // Static image with optional background music
+      // Static image - use full presenter image as background with newsroom text overlays
+      const staticFilter = `[0:v]scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,` +
+        `drawtext=text='${escapeText(showTitle || 'MARKET RADIO')}':fontsize=42:fontcolor=white:x=(w-text_w)/2:y=h-90:shadowcolor=black:shadowx=2:shadowy=2,` +
+        `drawtext=text='${escapeText(presenterName)}':fontsize=28:fontcolor=yellow:x=(w-text_w)/2:y=h-50:shadowcolor=black:shadowx=1:shadowy=1,` +
+        `drawtext=text='${escapeText(currentDate)}':fontsize=18:fontcolor=white@0.8:x=20:y=h-45:shadowcolor=black:shadowx=1:shadowy=1,` +
+        `drawtext=text='LIVE':fontsize=14:fontcolor=red:x=20:y=h-70:box=1:boxcolor=white@0.8:boxborderw=4[v]`;
+      
       if (hasBgMusic) {
-        // Music needs stream_loop before its input
+        // Properly order inputs: image, audio, then looped music
         ffmpegArgs = [
           '-loop', '1',
           '-i', mainPresenterImage,
@@ -5327,8 +5361,8 @@ app.post('/api/newscast/generate-video', async (req, res) => {
         ];
         ffmpegArgs.push(
           '-filter_complex',
-          `[1:a]volume=1[speech];[2:a]volume=0.3,afade=t=out:st=${Math.max(0, audioDuration - 3)}:d=3[music];[speech][music]amix=inputs=2:duration=first[a]`,
-          '-map', '0:v',
+          `${staticFilter};[1:a]volume=1[speech];[2:a]volume=0.3,afade=t=out:st=${Math.max(0, audioDuration - 3)}:d=3[music];[speech][music]amix=inputs=2:duration=first[a]`,
+          '-map', '[v]',
           '-map', '[a]'
         );
       } else {
@@ -5337,6 +5371,7 @@ app.post('/api/newscast/generate-video', async (req, res) => {
           '-i', mainPresenterImage,
           '-i', audioPath
         ];
+        ffmpegArgs.push('-vf', staticFilter.replace('[v]', ''));
       }
       
       ffmpegArgs.push(
@@ -5345,7 +5380,6 @@ app.post('/api/newscast/generate-video', async (req, res) => {
         '-c:a', 'aac',
         '-b:a', '192k',
         '-pix_fmt', 'yuv420p',
-        '-vf', `scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,drawtext=text='Market Radio':fontsize=48:fontcolor=white:x=(w-text_w)/2:y=h-80:shadowcolor=black:shadowx=2:shadowy=2`,
         '-t', String(audioDuration),
         '-y',
         outputPath
@@ -5390,13 +5424,7 @@ app.post('/api/newscast/generate-video', async (req, res) => {
       console.warn('Could not generate thumbnail:', e.message);
     }
     
-    // Save metadata
-    const presenterNames = {
-      caelix: 'Magos Caelix-9',
-      sophie: 'Sophie Mitchell',
-      jack: 'Jack Thompson'
-    };
-    
+    // Save metadata (using presenterNames defined above)
     const metadata = {
       id: videoId,
       presenter: presenter || 'caelix',

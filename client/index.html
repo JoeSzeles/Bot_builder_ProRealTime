@@ -704,19 +704,44 @@
                     <div id="avatarUploadStatus" class="text-xs text-gray-500 mt-1 hidden"></div>
                   </div>
                   
-                  <!-- Background Video -->
+                  <!-- Per-Speaker Videos (for podcast mode switching) -->
+                  <div class="p-2 bg-purple-100 dark:bg-purple-900/30 rounded border border-purple-200 dark:border-purple-700">
+                    <div class="text-xs text-purple-700 dark:text-purple-300 font-medium mb-2">Speaker Videos (switch when talking)</div>
+                    <div class="grid grid-cols-3 gap-2">
+                      <div>
+                        <label class="text-xs text-gray-600 dark:text-gray-400 block mb-1">Caelix-9</label>
+                        <select id="speakerVideoCaelix" class="w-full px-1 py-1 text-xs bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-gray-800 dark:text-white">
+                          <option value="">None</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label class="text-xs text-gray-600 dark:text-gray-400 block mb-1">Sophie</label>
+                        <select id="speakerVideoSophie" class="w-full px-1 py-1 text-xs bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-gray-800 dark:text-white">
+                          <option value="">None</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label class="text-xs text-gray-600 dark:text-gray-400 block mb-1">Jack</label>
+                        <select id="speakerVideoJack" class="w-full px-1 py-1 text-xs bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-gray-800 dark:text-white">
+                          <option value="">None</option>
+                        </select>
+                      </div>
+                    </div>
+                    <label class="text-xs text-purple-500 hover:text-purple-700 cursor-pointer mt-2 block">
+                      <input type="file" id="videoFileInput" accept=".mp4,.webm,.mov" class="hidden">
+                      + Upload new video
+                    </label>
+                    <div id="videoUploadStatus" class="text-xs text-gray-500 mt-1 hidden"></div>
+                  </div>
+                  
+                  <!-- Background Video (fallback) -->
                   <div class="p-2 bg-gray-100 dark:bg-gray-700/50 rounded">
                     <div class="flex items-center justify-between mb-1">
-                      <label class="text-xs text-gray-600 dark:text-gray-300 font-medium">Background Video</label>
-                      <label class="text-xs text-purple-500 hover:text-purple-700 cursor-pointer">
-                        <input type="file" id="videoFileInput" accept=".mp4,.webm,.mov" class="hidden">
-                        Upload
-                      </label>
+                      <label class="text-xs text-gray-600 dark:text-gray-300 font-medium">Fallback Background</label>
                     </div>
                     <select id="customBgVideoSelect" class="w-full px-2 py-1 text-xs bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-gray-800 dark:text-white">
-                      <option value="">No background video</option>
+                      <option value="">No fallback video</option>
                     </select>
-                    <div id="videoUploadStatus" class="text-xs text-gray-500 mt-1 hidden"></div>
                   </div>
                   
                   <!-- Background Music -->

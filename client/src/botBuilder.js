@@ -10987,15 +10987,25 @@ window.generateVideoForHistoryItem = async function(idx) {
   if (statusText) statusText.textContent = 'Generating video (this may take a minute)...';
   
   try {
+    // Get current speaker video selections
+    const speakerVideos = {
+      caelix: document.getElementById('speakerVideoCaelix')?.value || null,
+      sophie: document.getElementById('speakerVideoSophie')?.value || null,
+      jack: document.getElementById('speakerVideoJack')?.value || null
+    };
+    
     const response = await fetch('/api/newscast/generate-video', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         audioUrl: item.audioUrl,
         presenter: item.presenter,
-        customAvatarUrl: item.customAvatarUrl,
-        customBgVideoUrl: item.customBgVideoUrl,
-        customBgMusicUrl: item.customBgMusicUrl
+        customAvatarUrl: item.customAvatarUrl || document.getElementById('customAvatarSelect')?.value,
+        customBgVideoUrl: item.customBgVideoUrl || document.getElementById('customBgVideoSelect')?.value,
+        customBgMusicUrl: item.customBgMusicUrl || document.getElementById('customBgMusicSelect')?.value,
+        speakerVideos,
+        podcastSegments: item.podcastSegments,
+        showTitle: 'MARKET RADIO'
       })
     });
     
@@ -11428,6 +11438,23 @@ function populateMediaSelects() {
     });
     if (currentValue) musicSelect.value = currentValue;
   }
+  
+  // Per-speaker video selects
+  const speakerSelects = ['speakerVideoCaelix', 'speakerVideoSophie', 'speakerVideoJack'];
+  speakerSelects.forEach(selectId => {
+    const select = document.getElementById(selectId);
+    if (select) {
+      const currentValue = select.value;
+      select.innerHTML = '<option value="">None</option>';
+      availableMediaFiles.video.forEach(f => {
+        const opt = document.createElement('option');
+        opt.value = f.url;
+        opt.textContent = f.filename.substring(14);
+        select.appendChild(opt);
+      });
+      if (currentValue) select.value = currentValue;
+    }
+  });
 }
 
 // Get selected media URLs from dropdowns
@@ -11435,7 +11462,12 @@ function getSelectedMediaUrls() {
   return {
     customAvatarUrl: document.getElementById('customAvatarSelect')?.value || null,
     customBgVideoUrl: document.getElementById('customBgVideoSelect')?.value || null,
-    customBgMusicUrl: document.getElementById('customBgMusicSelect')?.value || null
+    customBgMusicUrl: document.getElementById('customBgMusicSelect')?.value || null,
+    speakerVideos: {
+      caelix: document.getElementById('speakerVideoCaelix')?.value || null,
+      sophie: document.getElementById('speakerVideoSophie')?.value || null,
+      jack: document.getElementById('speakerVideoJack')?.value || null
+    }
   };
 }
 
