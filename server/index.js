@@ -4689,6 +4689,9 @@ app.post('/api/newscast/speak', async (req, res) => {
       speakStyle = 'Read naturally and conversationally with a pleasant Australian accent. Add appropriate pauses and emphasis for key numbers and trading recommendations.';
     }
     
+    // Add speed instruction to all presenters
+    const speedInstruction = 'Speak at a brisk, energetic pace - about 20% faster than normal conversational speed. Keep it lively and engaging.';
+    
     const response = await openai.chat.completions.create({
       model: 'gpt-audio-mini',
       modalities: ['text', 'audio'],
@@ -4697,7 +4700,7 @@ app.post('/api/newscast/speak', async (req, res) => {
       messages: [
         { 
           role: 'system', 
-          content: `You are ${presenterName}, ${presenterDesc}. ${speakStyle}` 
+          content: `You are ${presenterName}, ${presenterDesc}. ${speakStyle} ${speedInstruction}` 
         },
         { role: 'user', content: `Please read this market update aloud:\n\n${text}` }
       ]
@@ -4789,24 +4792,26 @@ app.post('/api/newscast/speak-podcast', async (req, res) => {
   }
   
   try {
+    const speedNote = 'Speak at a brisk, energetic pace - about 20% faster than normal.';
+    
     const voiceConfigs = {
       caelix: {
         voice: 'onyx',
         name: 'Magos Caelix-9',
         desc: 'an ancient Tech-Priest with a deep, authoritative voice',
-        style: 'Read with a deep, authoritative voice at a measured pace. You are a Tech-Priest. Speak clearly with conviction.'
+        style: `Read with a deep, authoritative voice. You are a Tech-Priest. Speak clearly with conviction. ${speedNote}`
       },
       sophie: {
         voice: 'shimmer',
         name: 'Sophie Mitchell',
         desc: 'a warm, cheerful young woman',
-        style: 'Read with a warm, friendly, cheerful tone. Be positive and engaging!'
+        style: `Read with a warm, friendly, cheerful tone. Be positive and engaging! ${speedNote}`
       },
       jack: {
         voice: 'onyx',
         name: 'Jack Thompson',
         desc: 'a relaxed Australian radio presenter',
-        style: 'Read naturally and conversationally with an Australian accent. Be casual and friendly.'
+        style: `Read naturally and conversationally with an Australian accent. Be casual and friendly. ${speedNote}`
       }
     };
     
