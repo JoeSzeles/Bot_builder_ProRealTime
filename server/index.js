@@ -5317,11 +5317,11 @@ app.post('/api/newscast/generate-video', async (req, res) => {
         '-i', bgVideoPath
       ];
       
-      // Handle animated GIFs with -ignore_loop 0 to loop them
+      // Handle animated GIFs with -ignore_loop 0, static images with -loop 1
       if (isAvatarGif) {
         ffmpegArgs.push('-ignore_loop', '0', '-i', mainPresenterImage);
       } else {
-        ffmpegArgs.push('-i', mainPresenterImage);
+        ffmpegArgs.push('-loop', '1', '-i', mainPresenterImage);
       }
       
       ffmpegArgs.push('-i', audioPath);
