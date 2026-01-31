@@ -4692,7 +4692,7 @@ ${forecastContent}
           sophie: { name: 'Sophie Mitchell', voice: 'shimmer', style: 'Cheerful' },
           jack: { name: 'Jack Thompson', voice: 'onyx', style: 'Australian' },
           bateman: { name: 'Patrick Bateman', voice: 'fable', style: 'Wall Street Psycho' },
-          mcafee: { name: 'John McAfee', voice: 'onyx', style: 'Paranoid Crypto Anarchist' }
+          mcafee: { name: 'John McAfee', voice: 'echo', style: 'Paranoid Crypto Anarchist' }
         };
         
         const mainHost = hosts[presenter] || hosts.caelix;
@@ -4866,7 +4866,7 @@ app.post('/api/newscast/speak', async (req, res) => {
       speakStyle = 'Read with cold precision and barely concealed contempt. Your voice drips with superiority and sarcasm. Pause dramatically before insults. Speak like you are addressing people far beneath you.';
       speedInstruction = 'Speak at a measured, deliberate pace. Each word is chosen carefully to maximize condescension.';
     } else if (presenter === 'mcafee') {
-      voice = 'onyx';
+      voice = 'echo';
       presenterName = 'John McAfee';
       presenterDesc = 'a 75-year-old paranoid crypto anarchist with manic energy, broadcasting from a hidden bunker. American with hints of Southern drawl.';
       speakStyle = 'Read with MANIC, FRANTIC energy! You are paranoid, excited, urgent. Your words tumble out rapidly. Interrupt yourself with "Ha!" and sudden intensity. You are on the run and the CIA is listening. Every sentence builds in urgency.';
@@ -5208,7 +5208,7 @@ app.post('/api/newscast/tts-from-text', async (req, res) => {
       sophie: 'shimmer',
       jack: 'echo',
       bateman: 'fable',
-      mcafee: 'onyx'
+      mcafee: 'echo'
     };
     const voice = voiceMap[presenter] || 'onyx';
     
