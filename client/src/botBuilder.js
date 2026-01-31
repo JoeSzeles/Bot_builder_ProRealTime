@@ -10782,6 +10782,8 @@ function updateForecastHistory() {
 // ========== AI MARKET NEWSCAST FEATURE ==========
 let newscastAudio = null;
 let newscastText = '';
+let newscastPodcastSegments = null;
+let newscastIsPodcast = false;
 let newscastIsPlaying = false;
 let newscastAudioUrl = null;
 let newscastShareUrl = null;
@@ -10909,6 +10911,25 @@ function setupNewscastHandlers() {
         presenterImage.className = config.class;
       }
       newscastAudio = null;
+    });
+  }
+  
+  // Daily Podcast checkbox - enable/disable guest participation
+  const dailyPodcastCheck = document.getElementById('newscastDailyPodcastCheck');
+  const guestCheck = document.getElementById('newscastGuestCheck');
+  const guestLabel = document.getElementById('guestParticipationLabel');
+  
+  if (dailyPodcastCheck && guestCheck && guestLabel) {
+    dailyPodcastCheck.addEventListener('change', () => {
+      if (dailyPodcastCheck.checked) {
+        guestCheck.disabled = false;
+        guestCheck.checked = true;
+        guestLabel.classList.remove('opacity-50');
+      } else {
+        guestCheck.disabled = true;
+        guestCheck.checked = false;
+        guestLabel.classList.add('opacity-50');
+      }
     });
   }
   
@@ -11054,12 +11075,16 @@ async function generateNewscast() {
     const introAdCheckbox = document.getElementById('newscastIntroAdCheck');
     const outroAdCheckbox = document.getElementById('newscastOutroAdCheck');
     const worldNewsCheckbox = document.getElementById('newscastWorldNewsCheck');
+    const dailyPodcastCheckbox = document.getElementById('newscastDailyPodcastCheck');
+    const guestParticipationCheckbox = document.getElementById('newscastGuestCheck');
     const adTopicInput = document.getElementById('newscastAdTopic');
     const includeMarketForecast = marketForecastCheckbox ? marketForecastCheckbox.checked : true;
     const include7DayForecast = sevenDayForecastCheckbox ? sevenDayForecastCheckbox.checked : false;
     const includeIntroAd = introAdCheckbox ? introAdCheckbox.checked : false;
     const includeOutroAd = outroAdCheckbox ? outroAdCheckbox.checked : false;
     const includeWorldNews = worldNewsCheckbox ? worldNewsCheckbox.checked : false;
+    const isDailyPodcast = dailyPodcastCheckbox ? dailyPodcastCheckbox.checked : false;
+    const includeGuest = guestParticipationCheckbox ? guestParticipationCheckbox.checked : false;
     const adTopic = adTopicInput ? adTopicInput.value.trim() : '';
     
     const response = await fetch('/api/newscast/generate', {
@@ -11076,6 +11101,8 @@ async function generateNewscast() {
         includeIntroAd,
         includeOutroAd,
         includeWorldNews,
+        isDailyPodcast,
+        includeGuest,
         adTopic
       })
     });
@@ -11084,12 +11111,22 @@ async function generateNewscast() {
     
     const data = await response.json();
     newscastText = data.text;
+    newscastIsPodcast = data.isPodcast || false;
+    newscastPodcastSegments = data.podcastSegments || null;
     
     if (transcriptEl) {
-      transcriptEl.innerHTML = `<p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">${newscastText}</p>`;
+      if (newscastIsPodcast && newscastPodcastSegments) {
+        // Format podcast transcript with speaker labels
+        const formattedTranscript = newscastPodcastSegments.map(seg => 
+          `<div class="mb-2"><span class="font-bold text-purple-600 dark:text-purple-400">${seg.speakerName}:</span> <span class="text-gray-700 dark:text-gray-300">${seg.text}</span></div>`
+        ).join('');
+        transcriptEl.innerHTML = `<div class="text-sm">${formattedTranscript}</div>`;
+      } else {
+        transcriptEl.innerHTML = `<p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">${newscastText}</p>`;
+      }
     }
     
-    statusEl.textContent = 'Ready to play';
+    statusEl.textContent = newscastIsPodcast ? 'Podcast ready to play' : 'Ready to play';
     
     newscastAudio = null;
     newscastAudioUrl = null;
@@ -11139,17 +11176,36 @@ async function toggleNewscastPlayback() {
   
   try {
     playBtn.disabled = true;
-    statusEl.textContent = 'Loading audio...';
     
-    const response = await fetch('/api/newscast/speak', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: newscastText, presenter: selectedPresenter })
-    });
+    // Use appropriate TTS endpoint based on content type
+    let response;
+    if (newscastIsPodcast && newscastPodcastSegments && newscastPodcastSegments.length > 0) {
+      statusEl.textContent = `Generating podcast audio (${newscastPodcastSegments.length} segments)...`;
+      response = await fetch('/api/newscast/speak-podcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ podcastSegments: newscastPodcastSegments, presenter: selectedPresenter })
+      });
+    } else {
+      statusEl.textContent = 'Loading audio...';
+      response = await fetch('/api/newscast/speak', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: newscastText, presenter: selectedPresenter })
+      });
+    }
     
     if (!response.ok) throw new Error('Failed to generate audio');
     
     const data = await response.json();
+    
+    // Show warning if podcast had issues
+    if (data.warning) {
+      const transcriptEl = document.getElementById('newscastTranscript');
+      if (transcriptEl) {
+        transcriptEl.innerHTML = `<div class="mb-2 p-2 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 rounded text-sm">${data.warning}</div>` + transcriptEl.innerHTML;
+      }
+    }
     
     newscastAudioUrl = data.audioUrl;
     newscastShareUrl = data.shareUrl || null;

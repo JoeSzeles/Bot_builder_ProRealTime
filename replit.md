@@ -47,6 +47,16 @@ The application features a modern full-stack architecture with a focus on AI int
 -   **Backtest Simulation**: Runs multiple simulation rounds with various timeframes and trade hold durations.
 -   **Observe Mode**: Real-time market observation mode that polls price data, tracks predictions, and detects advanced patterns.
 -   **AI Trading Panel**: Mock trading engine with multi-timeframe analysis, news sentiment checks, a learning system, and real-time trade signals and statistics.
+-   **Market Radio**: AI-powered audio newscast with market forecasts, text-to-speech, and social sharing.
+    -   Presenters: Caelix-9 (Warhammer 40K Tech-Priest), Sophie Mitchell (cheerful), Jack Thompson (Australian)
+    -   Daily and 7-day forecasts based on real Yahoo Finance 1h candle data
+    -   Daily Podcast mode: Multi-host discussions with voice swapping between speakers
+    -   Customizable broadcast content (news, weather, ads, editorial)
+    -   Social sharing via Discord/Twitter Player Cards
+
+**Known Limitations (Future Improvements):**
+-   Market context analysis uses 24h rolling windows instead of true trading session boundaries
+-   Podcast MP3 concatenation uses buffer joining (works for MVP, may need ffmpeg for production)
 
 ## External Dependencies
 -   **Vite**: Frontend build tool.

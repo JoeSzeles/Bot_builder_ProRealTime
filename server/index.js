@@ -2436,6 +2436,107 @@ async function fetchYahooFinanceData(symbol, interval, range) {
   }
 }
 
+// Analyze previous session market data for realistic forecasts
+async function analyzeMarketContext(asset) {
+  try {
+    const yahooSymbol = YAHOO_SYMBOLS[asset] || YAHOO_SYMBOLS['silver'];
+    
+    // Fetch last 5 days of 1-hour candles for proper session analysis
+    const data = await fetchYahooFinanceData(yahooSymbol, '1h', '5d');
+    if (!data || !data.candles || data.candles.length < 10) {
+      console.log('Insufficient candle data for market context');
+      return null;
+    }
+    
+    const candles = data.candles;
+    const now = Math.floor(Date.now() / 1000);
+    const oneDayAgo = now - (24 * 60 * 60);
+    const twoDaysAgo = now - (48 * 60 * 60);
+    
+    // Split candles into sessions
+    const todayCandles = candles.filter(c => c.time >= oneDayAgo);
+    const yesterdayCandles = candles.filter(c => c.time >= twoDaysAgo && c.time < oneDayAgo);
+    const recentCandles = candles.slice(-48); // Last 48 hours regardless
+    
+    // Calculate session metrics
+    const calcSessionMetrics = (sessionCandles) => {
+      if (!sessionCandles || sessionCandles.length === 0) return null;
+      const highs = sessionCandles.map(c => c.high);
+      const lows = sessionCandles.map(c => c.low);
+      const opens = sessionCandles.map(c => c.open);
+      const closes = sessionCandles.map(c => c.close);
+      
+      const sessionHigh = Math.max(...highs);
+      const sessionLow = Math.min(...lows);
+      const sessionOpen = opens[0];
+      const sessionClose = closes[closes.length - 1];
+      const sessionChange = ((sessionClose - sessionOpen) / sessionOpen) * 100;
+      const sessionRange = ((sessionHigh - sessionLow) / sessionLow) * 100;
+      
+      // Find biggest swing (largest single candle move)
+      let biggestSwing = { percent: 0, direction: 'flat', candle: null };
+      for (const c of sessionCandles) {
+        const candleMove = ((c.close - c.open) / c.open) * 100;
+        if (Math.abs(candleMove) > Math.abs(biggestSwing.percent)) {
+          biggestSwing = {
+            percent: candleMove,
+            direction: candleMove > 0 ? 'up' : 'down',
+            high: c.high,
+            low: c.low,
+            time: new Date(c.time * 1000).toISOString()
+          };
+        }
+      }
+      
+      // Detect if crash or rally (>3% move)
+      let marketEvent = 'normal';
+      if (sessionChange <= -3) marketEvent = 'crash';
+      else if (sessionChange <= -1.5) marketEvent = 'selloff';
+      else if (sessionChange >= 3) marketEvent = 'rally';
+      else if (sessionChange >= 1.5) marketEvent = 'surge';
+      
+      return {
+        open: sessionOpen,
+        high: sessionHigh,
+        low: sessionLow,
+        close: sessionClose,
+        change: sessionChange.toFixed(2),
+        range: sessionRange.toFixed(2),
+        direction: sessionChange > 0.2 ? 'bullish' : sessionChange < -0.2 ? 'bearish' : 'flat',
+        biggestSwing,
+        marketEvent,
+        candleCount: sessionCandles.length
+      };
+    };
+    
+    const todayMetrics = calcSessionMetrics(todayCandles);
+    const yesterdayMetrics = calcSessionMetrics(yesterdayCandles);
+    const overallMetrics = calcSessionMetrics(recentCandles);
+    
+    // Current price and immediate trend
+    const currentPrice = candles[candles.length - 1]?.close;
+    const priceOneHourAgo = candles[candles.length - 2]?.close;
+    const priceFourHoursAgo = candles[candles.length - 5]?.close;
+    
+    const hourlyChange = priceOneHourAgo ? ((currentPrice - priceOneHourAgo) / priceOneHourAgo * 100).toFixed(2) : 0;
+    const fourHourChange = priceFourHoursAgo ? ((currentPrice - priceFourHoursAgo) / priceFourHoursAgo * 100).toFixed(2) : 0;
+    
+    return {
+      asset,
+      currentPrice,
+      hourlyChange,
+      fourHourChange,
+      today: todayMetrics,
+      yesterday: yesterdayMetrics,
+      overall48h: overallMetrics,
+      lastUpdated: new Date().toISOString()
+    };
+  } catch (error) {
+    console.error('Market context analysis error:', error.message);
+    return null;
+  }
+}
+
 // Aggregate hourly candles to 4-hour candles
 function aggregateTo4Hour(candles) {
   if (!candles || candles.length === 0) return candles;
@@ -3903,7 +4004,7 @@ Be concise but helpful. Use your learned data to inform your responses. If asked
 
 // Generate AI Market Newscast Text
 app.post('/api/newscast/generate', async (req, res) => {
-  const { forecastData, asset, currentPrice, brainData, presenter, includeMarketForecast = true, include7DayForecast = false, includeIntroAd, includeOutroAd, includeWorldNews, adTopic } = req.body;
+  const { forecastData, asset, currentPrice, brainData, presenter, includeMarketForecast = true, include7DayForecast = false, includeIntroAd, includeOutroAd, includeWorldNews, isDailyPodcast = false, includeGuest = false, adTopic } = req.body;
   
   const adPromptTopic = adTopic || 'Bot Builder - AI-powered trading bot generator';
   
@@ -4026,13 +4127,47 @@ ${newsOutro}
     
     const assetName = asset === 'silver' ? 'Silver' : asset === 'gold' ? 'Gold' : asset.toUpperCase();
     
+    // FETCH REAL MARKET DATA - This is the key to accurate forecasts
+    const marketContext = await analyzeMarketContext(asset || 'silver');
+    console.log('Market context:', marketContext ? `${assetName} at $${marketContext.currentPrice}, yesterday: ${marketContext.yesterday?.change}%, event: ${marketContext.yesterday?.marketEvent}` : 'unavailable');
+    
+    // Build real market summary from actual candle data
+    let realMarketSummary = '';
+    if (marketContext) {
+      const yest = marketContext.yesterday;
+      const today = marketContext.today;
+      
+      if (yest) {
+        realMarketSummary += `PREVIOUS SESSION: Opened at $${yest.open?.toFixed(2)}, High $${yest.high?.toFixed(2)}, Low $${yest.low?.toFixed(2)}, Closed at $${yest.close?.toFixed(2)}. `;
+        realMarketSummary += `Change: ${yest.change}% (${yest.marketEvent.toUpperCase()}). `;
+        if (yest.biggestSwing && Math.abs(yest.biggestSwing.percent) > 0.5) {
+          realMarketSummary += `Biggest swing: ${yest.biggestSwing.percent.toFixed(2)}% ${yest.biggestSwing.direction}. `;
+        }
+      }
+      
+      if (today) {
+        realMarketSummary += `CURRENT SESSION: Opened at $${today.open?.toFixed(2)}, Current High $${today.high?.toFixed(2)}, Low $${today.low?.toFixed(2)}, Now at $${marketContext.currentPrice?.toFixed(2)}. `;
+        realMarketSummary += `Session change: ${today.change}% (${today.marketEvent.toUpperCase()}). `;
+      }
+      
+      realMarketSummary += `Last hour: ${marketContext.hourlyChange}%, Last 4 hours: ${marketContext.fourHourChange}%.`;
+    }
+    
     const todayForecast = forecastData?.days?.[0] || {};
     const suggestedTrades = todayForecast.suggestedTrades || [];
     const predicted = todayForecast.predicted || [];
     
-    // Get Day 1 direction and confidence from forecast data (same source as 7-day)
-    const dayDirection = todayForecast.direction || 'neutral';
-    const dayConfidence = todayForecast.confidence || 50;
+    // Use real market data for direction instead of guessing
+    let dayDirection = 'neutral';
+    let dayConfidence = 50;
+    if (marketContext?.today) {
+      const change = parseFloat(marketContext.today.change);
+      if (change <= -2) { dayDirection = 'strongly bearish'; dayConfidence = 75; }
+      else if (change <= -0.5) { dayDirection = 'bearish'; dayConfidence = 65; }
+      else if (change >= 2) { dayDirection = 'strongly bullish'; dayConfidence = 75; }
+      else if (change >= 0.5) { dayDirection = 'bullish'; dayConfidence = 65; }
+      else { dayDirection = 'consolidating'; dayConfidence = 55; }
+    }
     const daySummary = todayForecast.summary || '';
     
     let tradesSummary = 'No specific trades recommended at this time.';
@@ -4042,14 +4177,14 @@ ${newsOutro}
       ).join('. ');
     }
     
-    // Build price range from predicted values, or use direction/confidence as fallback
+    // Build price range from actual market data
     let priceRange = '';
-    if (predicted.length > 0) {
+    if (marketContext?.today) {
+      priceRange = `Current range $${marketContext.today.low?.toFixed(2)} to $${marketContext.today.high?.toFixed(2)}, now at $${marketContext.currentPrice?.toFixed(2)}`;
+    } else if (predicted.length > 0) {
       priceRange = `Expected to range from $${Math.min(...predicted).toFixed(2)} to $${Math.max(...predicted).toFixed(2)}`;
-    } else if (dayDirection && dayConfidence) {
-      priceRange = `${dayDirection.toUpperCase()} outlook with ${dayConfidence}% confidence`;
     } else {
-      priceRange = 'awaiting further data'
+      priceRange = 'awaiting further data';
     }
     
     const isCaelix = presenter === 'caelix';
@@ -4114,20 +4249,24 @@ Keep the newscast between 150-250 words - concise but informative.`;
 
 Current Time: ${timeStr} Sydney time, ${dayStr}
 Asset: ${assetName}
-Current Price: $${currentPrice?.toFixed(2) || 'checking'}
-Today's Outlook: ${dayDirection.toUpperCase()} with ${dayConfidence}% confidence
-Price Forecast: ${priceRange}
-${daySummary ? `Analysis: ${daySummary}` : ''}
+Current Price: $${marketContext?.currentPrice?.toFixed(2) || currentPrice?.toFixed(2) || 'checking'}
+
+=== REAL MARKET DATA (FROM ACTUAL PRICE CANDLES) ===
+${realMarketSummary || 'Market data temporarily unavailable.'}
+
+Today's Direction: ${dayDirection.toUpperCase()} with ${dayConfidence}% confidence
+Price Range: ${priceRange}
 Trading Signals: ${tradesSummary}
 
 Generate ${presenterName}'s market update covering:
 1. A warm greeting with the time
-2. Current ${assetName} price and market conditions
-3. Today's forecast direction (${dayDirection}) and confidence level (${dayConfidence}%)
-4. The best trading opportunities (if any)
-5. A friendly sign-off
+2. FIRST: Comment on what happened in the PREVIOUS SESSION (the actual moves, swings, whether it crashed/rallied/consolidated)
+3. THEN: Current ${assetName} price and where we stand now
+4. Today's outlook based on the real data above
+5. Trading opportunities (if any) based on the actual price levels
+6. A friendly sign-off
 
-IMPORTANT: Present the forecast confidently based on the data provided. Do not mention prediction accuracy, lack of data, or make excuses. Focus on the direction and confidence level given.`;
+CRITICAL: You MUST reference the ACTUAL price movements from the data above. If yesterday was a CRASH or SELLOFF, acknowledge it! If there was a big swing, mention it! Do not give generic bullish/bearish statements - be specific about the real numbers.`;
 
     let newscastText = '';
     
@@ -4182,24 +4321,34 @@ IMPORTANT: Present the forecast confidently based on the data provided. Do not m
           forecastCharacterPrompt = `You are a professional market analyst presenting the weekly outlook.`;
         }
         
+        // Include real market context in 7-day forecast for coherence
+        let weekContextSummary = '';
+        if (marketContext?.yesterday) {
+          const yest = marketContext.yesterday;
+          weekContextSummary = `YESTERDAY'S REALITY: The market ${yest.marketEvent === 'crash' ? 'CRASHED' : yest.marketEvent === 'selloff' ? 'sold off' : yest.marketEvent === 'rally' ? 'RALLIED' : yest.marketEvent === 'surge' ? 'surged' : 'moved'} ${yest.change}% (from $${yest.open?.toFixed(2)} to $${yest.close?.toFixed(2)}). Current price: $${marketContext.currentPrice?.toFixed(2)}. Your 7-day forecast MUST account for this recent ${yest.marketEvent === 'crash' || yest.marketEvent === 'selloff' ? 'bearish pressure' : yest.marketEvent === 'rally' || yest.marketEvent === 'surge' ? 'bullish momentum' : 'price action'}.`;
+        }
+        
         const forecastResponse = await openai.chat.completions.create({
           model: 'gpt-4o-mini',
-          max_completion_tokens: 600,
+          max_completion_tokens: 700,
           messages: [
             { 
               role: 'system', 
               content: `${forecastCharacterPrompt}
 
 RULES:
+- FIRST acknowledge what happened recently (crash/rally/consolidation) before forecasting
 - Present each day's forecast briefly (1-2 sentences per day)
 - Include direction (bullish/bearish), confidence level, and key price targets
+- Day 1 forecast must logically follow from yesterday's actual movement
+- Days 2-7 should build coherently from Day 1
 - Stay fully in character
 - NO asterisks, stage directions, or narrative descriptions
 - Output ONLY spoken sentences`
             },
             { 
               role: 'user', 
-              content: `Present this 7-day forecast for ${asset?.toUpperCase() || 'the asset'}:\n${JSON.stringify(daysData, null, 2)}`
+              content: `${weekContextSummary}\n\nNow present this 7-day forecast for ${asset?.toUpperCase() || 'SILVER'}:\n${JSON.stringify(daysData, null, 2)}`
             }
           ]
         });
@@ -4226,11 +4375,114 @@ ${forecastContent}
     }
     
     let finalText = '';
-    if (includeIntroAd) finalText += introAd;
-    if (newscastText) finalText += newscastText;
-    if (sevenDaySection) finalText += sevenDaySection;
-    if (worldNewsSection) finalText += worldNewsSection;
-    if (includeOutroAd) finalText += outroAd;
+    let podcastSegments = null;
+    
+    // Daily Podcast Mode - Multi-host discussion format
+    if (isDailyPodcast && includeGuest) {
+      try {
+        // Determine host and guest based on selected presenter
+        const hosts = {
+          caelix: { name: 'Magos Caelix-9', voice: 'onyx', style: 'Tech-Priest' },
+          sophie: { name: 'Sophie Mitchell', voice: 'shimmer', style: 'Cheerful' },
+          jack: { name: 'Jack Thompson', voice: 'onyx', style: 'Australian' }
+        };
+        
+        const mainHost = hosts[presenter] || hosts.caelix;
+        // Pick a different guest based on main host
+        const guestKey = presenter === 'sophie' ? 'caelix' : presenter === 'caelix' ? 'sophie' : 'sophie';
+        const guest = hosts[guestKey];
+        
+        // Build market context for the discussion
+        let marketSummaryForPodcast = realMarketSummary || `${assetName} is currently trading.`;
+        
+        const podcastPrompt = `Create a podcast script where ${mainHost.name} (main host) discusses the market with ${guest.name} (guest).
+
+MARKET DATA:
+${marketSummaryForPodcast}
+
+FORMAT RULES:
+- Use EXACTLY this format for each line: [SPEAKER_KEY]: dialogue text
+- ${presenter.toUpperCase()}: for ${mainHost.name}
+- ${guestKey.toUpperCase()}: for ${guest.name}
+- 6-10 exchanges total (back and forth)
+- Main host leads the discussion, asks questions, provides analysis
+- Guest responds in their character voice with their perspective
+- NO asterisks, stage directions, or descriptions
+- Output ONLY the dialogue lines
+
+CHARACTERS:
+${presenter === 'caelix' ? '- CAELIX: Magos Caelix-9, Tech-Priest of the Omnissiah. Uses Mechanicus terminology, treats data as sacred, reverent about the Machine God.' : presenter === 'sophie' ? '- SOPHIE: Cheerful, optimistic, friendly. Finds the positive angle, encouraging to listeners.' : '- JACK: Laid-back Australian bloke, casual expressions, straight-talking.'}
+${guestKey === 'caelix' ? '- CAELIX: Magos Caelix-9, Tech-Priest of the Omnissiah. Uses Mechanicus terminology, treats data as sacred.' : guestKey === 'sophie' ? '- SOPHIE: Cheerful, optimistic, friendly. Finds the positive angle.' : '- JACK: Laid-back Australian, casual expressions, straight-talking.'}
+
+START WITH: ${mainHost.name} greeting listeners and introducing today's market discussion.
+END WITH: Both hosts signing off together.`;
+
+        const podcastResponse = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          max_completion_tokens: 1000,
+          messages: [
+            { role: 'system', content: 'You write natural podcast dialogue scripts. Output ONLY dialogue lines in the exact format requested. No narration or descriptions.' },
+            { role: 'user', content: podcastPrompt }
+          ]
+        });
+        
+        const podcastScript = podcastResponse.choices[0]?.message?.content || '';
+        
+        // Parse the script into segments with speaker labels
+        const lines = podcastScript.split('\n').filter(line => line.trim());
+        podcastSegments = [];
+        const validSpeakers = ['caelix', 'sophie', 'jack'];
+        
+        for (const line of lines) {
+          const match = line.match(/^\s*\[?([A-Z]+)\]?:\s*(.+)$/i);
+          if (match) {
+            let speakerKey = match[1].toLowerCase();
+            const text = match[2].trim();
+            
+            // Validate speaker key - only accept known speakers
+            if (!validSpeakers.includes(speakerKey)) {
+              // Try to map common variations
+              if (speakerKey.includes('caelix') || speakerKey.includes('magos')) speakerKey = 'caelix';
+              else if (speakerKey.includes('sophie')) speakerKey = 'sophie';
+              else if (speakerKey.includes('jack')) speakerKey = 'jack';
+              else speakerKey = presenter; // Default to main host
+            }
+            
+            const speaker = hosts[speakerKey] || hosts[presenter];
+            if (text.length > 5) { // Only add substantial lines
+              podcastSegments.push({
+                speaker: speakerKey,
+                speakerName: speaker.name,
+                voice: speaker.voice,
+                text: text
+              });
+            }
+          }
+        }
+        
+        // Require minimum segments for valid podcast
+        if (podcastSegments.length < 3) {
+          console.warn(`Podcast only generated ${podcastSegments.length} segments, falling back to regular broadcast`);
+          podcastSegments = null;
+        } else {
+          // Build final text from podcast segments
+          finalText = podcastSegments.map(seg => `${seg.speakerName}: ${seg.text}`).join('\n\n');
+          console.log(`Generated podcast with ${podcastSegments.length} segments`);
+        }
+      } catch (podcastError) {
+        console.error('Podcast generation error:', podcastError.message);
+        // Fall through to regular broadcast
+      }
+    }
+    
+    // Regular broadcast mode (or fallback if podcast failed)
+    if (!podcastSegments) {
+      if (includeIntroAd) finalText += introAd;
+      if (newscastText) finalText += newscastText;
+      if (sevenDaySection) finalText += sevenDaySection;
+      if (worldNewsSection) finalText += worldNewsSection;
+      if (includeOutroAd) finalText += outroAd;
+    }
     
     // If nothing was generated, provide a fallback
     if (!finalText.trim()) {
@@ -4241,7 +4493,9 @@ ${forecastContent}
       text: finalText,
       timestamp: now.toISOString(),
       asset: assetName,
-      presenter: presenterName
+      presenter: presenterName,
+      isPodcast: !!podcastSegments,
+      podcastSegments: podcastSegments
     });
   } catch (e) {
     console.error('Newscast generation error:', e);
@@ -4367,6 +4621,175 @@ app.post('/api/newscast/speak', async (req, res) => {
     });
   } catch (e) {
     console.error('TTS error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Podcast TTS - Multi-voice generation
+app.post('/api/newscast/speak-podcast', async (req, res) => {
+  const { podcastSegments, presenter } = req.body;
+  
+  if (!podcastSegments || !Array.isArray(podcastSegments) || podcastSegments.length === 0) {
+    return res.status(400).json({ error: 'Podcast segments are required' });
+  }
+  
+  try {
+    const voiceConfigs = {
+      caelix: {
+        voice: 'onyx',
+        name: 'Magos Caelix-9',
+        desc: 'an ancient Tech-Priest with a deep, authoritative voice',
+        style: 'Read with a deep, authoritative voice at a measured pace. You are a Tech-Priest. Speak clearly with conviction.'
+      },
+      sophie: {
+        voice: 'shimmer',
+        name: 'Sophie Mitchell',
+        desc: 'a warm, cheerful young woman',
+        style: 'Read with a warm, friendly, cheerful tone. Be positive and engaging!'
+      },
+      jack: {
+        voice: 'onyx',
+        name: 'Jack Thompson',
+        desc: 'a relaxed Australian radio presenter',
+        style: 'Read naturally and conversationally with an Australian accent. Be casual and friendly.'
+      }
+    };
+    
+    console.log(`Generating podcast with ${podcastSegments.length} segments...`);
+    
+    // Generate audio for each segment
+    const audioBuffers = [];
+    
+    let failedSegments = 0;
+    
+    for (let i = 0; i < podcastSegments.length; i++) {
+      const segment = podcastSegments[i];
+      const speakerKey = segment.speaker || 'caelix';
+      const config = voiceConfigs[speakerKey] || voiceConfigs.caelix;
+      
+      console.log(`Generating segment ${i + 1}/${podcastSegments.length} for ${config.name}...`);
+      
+      try {
+        const response = await openai.chat.completions.create({
+          model: 'gpt-audio-mini',
+          modalities: ['text', 'audio'],
+          audio: { voice: config.voice, format: 'mp3' },
+          max_completion_tokens: 2048,
+          messages: [
+            { 
+              role: 'system', 
+              content: `You are ${config.name}, ${config.desc}. ${config.style}` 
+            },
+            { role: 'user', content: `Say this exactly:\n\n${segment.text}` }
+          ]
+        });
+        
+        const audioData = response.choices[0]?.message?.audio?.data;
+        if (audioData) {
+          audioBuffers.push(Buffer.from(audioData, 'base64'));
+        } else {
+          console.warn(`Segment ${i + 1} returned no audio data`);
+          failedSegments++;
+        }
+      } catch (segmentError) {
+        console.error(`Error generating segment ${i + 1}: ${segmentError.message}`);
+        failedSegments++;
+        // Continue with remaining segments
+      }
+    }
+    
+    console.log(`Audio generation complete: ${audioBuffers.length} successful, ${failedSegments} failed`);
+    
+    if (audioBuffers.length === 0) {
+      throw new Error('No audio segments were generated');
+    }
+    
+    // Warn if too many failures
+    const totalSegments = podcastSegments.length;
+    const successRate = audioBuffers.length / totalSegments;
+    let warning = null;
+    if (successRate < 0.5) {
+      warning = `Podcast is incomplete: only ${audioBuffers.length} of ${totalSegments} segments generated successfully`;
+    }
+    
+    // Concatenate all audio buffers into one MP3
+    const combinedBuffer = Buffer.concat(audioBuffers);
+    
+    const audioId = `podcast-${Date.now()}`;
+    const audioFileName = `${audioId}.mp3`;
+    const metaFileName = `${audioId}.json`;
+    const audioDir = path.join(__dirname, '..', 'downloads', 'broadcasts');
+    
+    if (!fs.existsSync(audioDir)) {
+      fs.mkdirSync(audioDir, { recursive: true });
+    }
+    
+    const audioPath = path.join(audioDir, audioFileName);
+    fs.writeFileSync(audioPath, combinedBuffer);
+    
+    // Save metadata
+    const presenterAvatars = {
+      caelix: '/images/presenter-caelix.png',
+      sophie: '/images/presenter-sophie.png',
+      jack: '/images/presenter-jack.png'
+    };
+    const presenterNames = {
+      caelix: 'Magos Caelix-9',
+      sophie: 'Sophie Mitchell',
+      jack: 'Jack Thompson'
+    };
+    
+    // For podcast, list both hosts
+    const mainHost = presenterNames[presenter] || 'Magos Caelix-9';
+    const guestKey = presenter === 'sophie' ? 'caelix' : presenter === 'caelix' ? 'sophie' : 'sophie';
+    const guestHost = presenterNames[guestKey];
+    
+    const metadata = {
+      id: audioId,
+      presenter: presenter || 'caelix',
+      presenterName: `${mainHost} & ${guestHost}`,
+      stationName: 'Market Radio Podcast',
+      avatar: presenterAvatars[presenter] || '/images/presenter-caelix.png',
+      audioUrl: `/downloads/broadcasts/${audioFileName}`,
+      title: `Market Radio Podcast - ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
+      createdAt: new Date().toISOString(),
+      isPodcast: true,
+      segments: podcastSegments.length
+    };
+    
+    const metaPath = path.join(audioDir, metaFileName);
+    fs.writeFileSync(metaPath, JSON.stringify(metadata, null, 2));
+    
+    // Cleanup old broadcasts (keep last 10)
+    try {
+      const files = fs.readdirSync(audioDir).filter(f => f.endsWith('.mp3')).sort().reverse();
+      if (files.length > 10) {
+        for (const oldFile of files.slice(10)) {
+          fs.unlinkSync(path.join(audioDir, oldFile));
+          const oldMeta = oldFile.replace('.mp3', '.json');
+          if (fs.existsSync(path.join(audioDir, oldMeta))) {
+            fs.unlinkSync(path.join(audioDir, oldMeta));
+          }
+        }
+      }
+    } catch (cleanupErr) {
+      console.error('Cleanup error:', cleanupErr.message);
+    }
+    
+    console.log(`Podcast generated: ${audioFileName} with ${podcastSegments.length} segments`);
+    
+    res.json({ 
+      audio: combinedBuffer.toString('base64'),
+      format: 'mp3',
+      audioUrl: `/downloads/broadcasts/${audioFileName}`,
+      audioId: audioId,
+      shareUrl: `/share/${audioId}`,
+      segments: audioBuffers.length,
+      totalSegments: podcastSegments.length,
+      warning: warning
+    });
+  } catch (e) {
+    console.error('Podcast TTS error:', e);
     res.status(500).json({ error: e.message });
   }
 });
