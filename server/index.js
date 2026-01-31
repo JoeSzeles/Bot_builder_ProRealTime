@@ -5296,10 +5296,10 @@ app.post('/api/newscast/generate-video', async (req, res) => {
     // - Left bottom: Date and show info
     const newsroomFilter = (bgStream, avatarStream) => {
       // Avatar: 120px, positioned top-right with 20px margin
-      // Round mask using format=yuva420p and alphaextract/alphamerge for proper circular mask
+      // Simple scale without circular mask (works with all formats including GIFs)
       return `[${bgStream}]scale=1280:720,setsar=1[bg];` +
-        `[${avatarStream}]scale=120:120,format=yuva420p,geq=lum='lum(X,Y)':cb='cb(X,Y)':cr='cr(X,Y)':a='if(gt(pow(X-60,2)+pow(Y-60,2),pow(55,2)),0,255)'[avatar_round];` +
-        `[bg][avatar_round]overlay=W-140:20[with_avatar];` +
+        `[${avatarStream}]scale=120:120[avatar_scaled];` +
+        `[bg][avatar_scaled]overlay=W-140:20[with_avatar];` +
         `[with_avatar]drawbox=x=W-145:y=15:w=130:h=130:color=purple@0.6:t=3,` +
         `drawtext=text='${escapeText(showTitle || 'MARKET RADIO')}':fontsize=36:fontcolor=white:x=(w-text_w)/2:y=h-90:shadowcolor=black:shadowx=2:shadowy=2,` +
         `drawtext=text='${escapeText(presenterName)}':fontsize=24:fontcolor=yellow:x=(w-text_w)/2:y=h-55:shadowcolor=black:shadowx=1:shadowy=1,` +
@@ -5307,14 +5307,24 @@ app.post('/api/newscast/generate-video', async (req, res) => {
         `drawtext=text='LIVE':fontsize=14:fontcolor=red:x=20:y=h-70:box=1:boxcolor=white@0.8:boxborderw=4[v]`;
     };
     
+    // Check if avatar is animated GIF
+    const isAvatarGif = mainPresenterImage.toLowerCase().endsWith('.gif');
+    
     if (bgVideoPath && fs.existsSync(bgVideoPath)) {
       // Use background video with newsroom-style avatar overlay
       ffmpegArgs = [
         '-stream_loop', '-1',
-        '-i', bgVideoPath,
-        '-i', mainPresenterImage,
-        '-i', audioPath
+        '-i', bgVideoPath
       ];
+      
+      // Handle animated GIFs with -ignore_loop 0 to loop them
+      if (isAvatarGif) {
+        ffmpegArgs.push('-ignore_loop', '0', '-i', mainPresenterImage);
+      } else {
+        ffmpegArgs.push('-i', mainPresenterImage);
+      }
+      
+      ffmpegArgs.push('-i', audioPath);
       
       if (hasBgMusic) {
         ffmpegArgs.push('-stream_loop', '-1', '-i', bgMusicPath);
@@ -5338,6 +5348,7 @@ app.post('/api/newscast/generate-video', async (req, res) => {
         '-c:a', 'aac',
         '-b:a', '192k',
         '-pix_fmt', 'yuv420p',
+        '-shortest',
         '-t', String(audioDuration),
         '-y',
         outputPath
