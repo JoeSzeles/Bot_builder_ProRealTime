@@ -5297,10 +5297,11 @@ app.post('/api/newscast/generate-video', async (req, res) => {
     const newsroomFilter = (bgStream, avatarStream) => {
       // Avatar: 120px, positioned top-right with 20px margin
       // Simple scale without circular mask (works with all formats including GIFs)
+      // Note: overlay uses uppercase W/H, drawbox/drawtext use lowercase w/h
       return `[${bgStream}]scale=1280:720,setsar=1[bg];` +
         `[${avatarStream}]scale=120:120[avatar_scaled];` +
-        `[bg][avatar_scaled]overlay=W-140:20[with_avatar];` +
-        `[with_avatar]drawbox=x=W-145:y=15:w=130:h=130:color=purple@0.6:t=3,` +
+        `[bg][avatar_scaled]overlay=main_w-140:20:shortest=1[with_avatar];` +
+        `[with_avatar]drawbox=x=iw-145:y=15:w=130:h=130:color=purple@0.6:t=3,` +
         `drawtext=text='${escapeText(showTitle || 'MARKET RADIO')}':fontsize=36:fontcolor=white:x=(w-text_w)/2:y=h-90:shadowcolor=black:shadowx=2:shadowy=2,` +
         `drawtext=text='${escapeText(presenterName)}':fontsize=24:fontcolor=yellow:x=(w-text_w)/2:y=h-55:shadowcolor=black:shadowx=1:shadowy=1,` +
         `drawtext=text='${escapeText(currentDate)}':fontsize=18:fontcolor=white@0.8:x=20:y=h-45:shadowcolor=black:shadowx=1:shadowy=1,` +
