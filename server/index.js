@@ -5509,12 +5509,28 @@ app.get('/share/:audioId', (req, res) => {
     }
   }
   
-  // Check if video exists for this broadcast
-  const timestamp = audioId.replace('broadcast-', '');
-  const videoFileName = `video-${timestamp}.mp4`;
-  const videoPath = path.join(videoDir, videoFileName);
-  const hasVideo = fs.existsSync(videoPath);
-  const videoUrl = hasVideo ? `/downloads/videos/${videoFileName}` : null;
+  // Check if video exists for this broadcast by searching video metadata files
+  let hasVideo = false;
+  let videoUrl = null;
+  
+  try {
+    const videoFiles = fs.readdirSync(videoDir).filter(f => f.endsWith('.json'));
+    for (const jsonFile of videoFiles) {
+      const videoMeta = JSON.parse(fs.readFileSync(path.join(videoDir, jsonFile), 'utf8'));
+      // Check if this video was generated from this broadcast
+      if (videoMeta.audioUrl && videoMeta.audioUrl.includes(audioId)) {
+        const mp4File = jsonFile.replace('.json', '.mp4');
+        const mp4Path = path.join(videoDir, mp4File);
+        if (fs.existsSync(mp4Path)) {
+          hasVideo = true;
+          videoUrl = `/downloads/videos/${mp4File}`;
+          break;
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Error searching for video:', e);
+  }
   
   // Get the base URL for absolute URLs
   const baseUrl = `${req.protocol}://${req.get('host')}`;
@@ -5770,12 +5786,27 @@ app.get('/embed/:audioId', (req, res) => {
     } catch (e) {}
   }
   
-  // Check if video exists
-  const timestamp = audioId.replace('broadcast-', '');
-  const videoFileName = `video-${timestamp}.mp4`;
-  const videoPath = path.join(videoDir, videoFileName);
-  const hasVideo = fs.existsSync(videoPath);
-  const videoUrl = hasVideo ? `/downloads/videos/${videoFileName}` : null;
+  // Check if video exists for this broadcast by searching video metadata files
+  let hasVideo = false;
+  let videoUrl = null;
+  
+  try {
+    const videoFiles = fs.readdirSync(videoDir).filter(f => f.endsWith('.json'));
+    for (const jsonFile of videoFiles) {
+      const videoMeta = JSON.parse(fs.readFileSync(path.join(videoDir, jsonFile), 'utf8'));
+      if (videoMeta.audioUrl && videoMeta.audioUrl.includes(audioId)) {
+        const mp4File = jsonFile.replace('.json', '.mp4');
+        const mp4Path = path.join(videoDir, mp4File);
+        if (fs.existsSync(mp4Path)) {
+          hasVideo = true;
+          videoUrl = `/downloads/videos/${mp4File}`;
+          break;
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Error searching for video:', e);
+  }
   
   const baseUrl = `${req.protocol}://${req.get('host')}`;
   
