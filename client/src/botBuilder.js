@@ -11002,11 +11002,30 @@ function showShareModal(shareUrl, shareText, presenterName, videoUrl = null, aud
     `;
   }
   
+  // Build direct link buttons
+  let directLinks = '';
+  if (videoUrl) {
+    directLinks += `
+      <button onclick="copyVideoLink()" class="w-full flex items-center gap-3 p-3 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors">
+        <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg>
+        <span class="text-white font-medium">Copy Video Link (MP4)</span>
+      </button>
+    `;
+  }
+  if (audioUrl) {
+    directLinks += `
+      <button onclick="copyAudioLink()" class="w-full flex items-center gap-3 p-3 bg-green-600 hover:bg-green-700 rounded-lg transition-colors">
+        <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+        <span class="text-white font-medium">Copy Audio Link (MP3)</span>
+      </button>
+    `;
+  }
+  
   const modal = document.createElement('div');
   modal.id = 'shareModal';
   modal.className = 'fixed inset-0 z-[100] flex items-center justify-center bg-black/70';
   modal.innerHTML = `
-    <div class="bg-gray-800 rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl border border-gray-700">
+    <div class="bg-gray-800 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl border border-gray-700 max-h-[90vh] overflow-y-auto">
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-lg font-bold text-white">Share Broadcast</h3>
         <button onclick="document.getElementById('shareModal').remove()" class="text-gray-400 hover:text-white">
@@ -11015,8 +11034,9 @@ function showShareModal(shareUrl, shareText, presenterName, videoUrl = null, aud
           </svg>
         </button>
       </div>
-      <p class="text-gray-400 text-sm mb-4">Share ${presenterName}'s broadcast on social media for rich previews!</p>
-      <div class="space-y-3">
+      
+      <p class="text-gray-300 text-sm font-medium mb-2">Social Media (Rich Preview)</p>
+      <div class="space-y-2 mb-4">
         <button onclick="doShareToTwitter()" class="w-full flex items-center gap-3 p-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors">
           <span class="text-xl">𝕏</span>
           <span class="text-white font-medium">Share on X (Twitter)</span>
@@ -11025,13 +11045,17 @@ function showShareModal(shareUrl, shareText, presenterName, videoUrl = null, aud
           <span class="text-xl">💬</span>
           <span class="text-white font-medium">Copy for Discord</span>
         </button>
-        <button onclick="doCopyShareLink()" class="w-full flex items-center gap-3 p-3 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
-          <span class="text-xl">📋</span>
-          <span class="text-white font-medium">Copy Share Link</span>
-        </button>
-        ${downloadButtons ? '<hr class="border-gray-600 my-2">' + downloadButtons : ''}
       </div>
-      <p class="text-gray-500 text-xs mt-4 text-center">Links show rich previews with presenter image on Discord & X</p>
+      
+      <p class="text-gray-300 text-sm font-medium mb-2">Direct File Links</p>
+      <div class="space-y-2 mb-4">
+        ${directLinks}
+      </div>
+      
+      <p class="text-gray-300 text-sm font-medium mb-2">Downloads</p>
+      <div class="space-y-2">
+        ${downloadButtons || '<p class="text-gray-500 text-sm">No files available</p>'}
+      </div>
     </div>
   `;
   modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
@@ -11088,6 +11112,30 @@ window.downloadShareAudio = function() {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+  document.getElementById('shareModal')?.remove();
+};
+
+window.copyVideoLink = async function() {
+  if (!currentShareData?.videoUrl) return;
+  const fullUrl = window.location.origin + currentShareData.videoUrl;
+  try {
+    await navigator.clipboard.writeText(fullUrl);
+    alert('Video link copied to clipboard!');
+  } catch (e) {
+    prompt('Copy this video link:', fullUrl);
+  }
+  document.getElementById('shareModal')?.remove();
+};
+
+window.copyAudioLink = async function() {
+  if (!currentShareData?.audioUrl) return;
+  const fullUrl = window.location.origin + currentShareData.audioUrl;
+  try {
+    await navigator.clipboard.writeText(fullUrl);
+    alert('Audio link copied to clipboard!');
+  } catch (e) {
+    prompt('Copy this audio link:', fullUrl);
+  }
   document.getElementById('shareModal')?.remove();
 };
 
