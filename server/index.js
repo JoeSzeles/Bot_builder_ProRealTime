@@ -5202,29 +5202,61 @@ app.post('/api/newscast/tts-from-text', async (req, res) => {
   }
   
   try {
-    // Voice mapping
-    const voiceMap = {
-      caelix: 'onyx',
-      sophie: 'shimmer',
-      jack: 'echo',
-      bateman: 'fable',
-      mcafee: 'echo'
-    };
-    const voice = voiceMap[presenter] || 'onyx';
+    // Voice and style mapping
+    let voice, presenterName, presenterDesc, speakStyle, speedInstruction;
     
-    // Generate TTS
-    // McAfee gets double speed
-    const speed = presenter === 'mcafee' ? 2.0 : 1.0;
+    if (presenter === 'caelix') {
+      voice = 'onyx';
+      presenterName = 'Magos Caelix-9';
+      presenterDesc = 'an ancient Tech-Priest of the Adeptus Mechanicus';
+      speakStyle = 'Read with a deep, authoritative voice. Speak clearly with conviction.';
+      speedInstruction = 'Speak at a brisk pace.';
+    } else if (presenter === 'sophie') {
+      voice = 'shimmer';
+      presenterName = 'Sophie Mitchell';
+      presenterDesc = 'a warm, friendly, and cheerful young woman';
+      speakStyle = 'Read with a warm, friendly tone. Be cheerful and positive.';
+      speedInstruction = 'Speak at a brisk pace.';
+    } else if (presenter === 'bateman') {
+      voice = 'fable';
+      presenterName = 'Patrick Bateman';
+      presenterDesc = 'a cold, snobby Wall Street psychopath with an icy American accent';
+      speakStyle = 'Read with cold precision and contempt. Your voice drips with sarcasm.';
+      speedInstruction = 'Speak at a measured, deliberate pace.';
+    } else if (presenter === 'mcafee') {
+      voice = 'echo';
+      presenterName = 'John McAfee';
+      presenterDesc = 'a 75-year-old paranoid crypto anarchist with manic energy';
+      speakStyle = 'Read with MANIC, FRANTIC energy! Words tumble out rapidly with sudden intensity.';
+      speedInstruction = 'Speak EXTREMELY FAST - at DOUBLE normal speed! Racing, manic, breathless delivery!';
+    } else {
+      voice = 'onyx';
+      presenterName = 'Jack Thompson';
+      presenterDesc = 'a confident Australian radio presenter';
+      speakStyle = 'Read naturally with a pleasant Australian accent.';
+      speedInstruction = 'Speak at a brisk pace.';
+    }
     
-    const ttsResponse = await openai.audio.speech.create({
-      model: 'tts-1',
-      voice: voice,
-      input: text.trim(),
-      response_format: 'mp3',
-      speed: speed
+    // Use gpt-audio-mini with audio modalities (same as main speak endpoint)
+    const response = await openai.chat.completions.create({
+      model: 'gpt-audio-mini',
+      modalities: ['text', 'audio'],
+      audio: { voice: voice, format: 'mp3' },
+      max_completion_tokens: 8192,
+      messages: [
+        { 
+          role: 'system', 
+          content: `You are ${presenterName}, ${presenterDesc}. ${speakStyle} ${speedInstruction}` 
+        },
+        { role: 'user', content: `Please read this text aloud exactly as written:\n\n${text.trim()}` }
+      ]
     });
     
-    const audioData = Buffer.from(await ttsResponse.arrayBuffer()).toString('base64');
+    const audioData = response.choices[0]?.message?.audio?.data;
+    
+    if (!audioData) {
+      throw new Error('No audio data returned from API');
+    }
     
     // Save audio file
     const audioId = `custom-${Date.now()}`;
@@ -5267,10 +5299,11 @@ app.post('/api/newscast/tts-from-text', async (req, res) => {
       id: audioId,
       text: text.trim(),
       presenter: presenter,
-      presenterName: presenterNames[presenter] || 'Unknown',
-      presenterImage: presenterAvatars[presenter] || '/images/presenter-caelix.png',
+      presenterName: presenterNames[presenter] || presenterName,
+      avatar: presenterAvatars[presenter] || '/images/presenter-caelix.png',
       stationName: stationNames[presenter] || 'Market Radio',
-      timestamp: new Date().toISOString(),
+      audioUrl: `/downloads/broadcasts/${audioFileName}`,
+      createdAt: new Date().toISOString(),
       isCustomText: true
     };
     fs.writeFileSync(path.join(audioDir, metaFileName), JSON.stringify(metadata, null, 2));
@@ -5280,7 +5313,7 @@ app.post('/api/newscast/tts-from-text', async (req, res) => {
       audioUrl: `/downloads/broadcasts/${audioFileName}`,
       text: text.trim(),
       presenter: presenter,
-      presenterName: presenterNames[presenter] || 'Unknown'
+      presenterName: presenterNames[presenter] || presenterName
     });
     
   } catch (error) {

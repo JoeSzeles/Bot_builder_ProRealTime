@@ -11509,10 +11509,10 @@ async function generateAudioFromText() {
     // Save to storage
     saveNewscastToStorage();
     
-    // Add to history
+    // Add to history (matches format used by regular broadcasts)
     const historyItem = {
       id: `custom-${Date.now()}`,
-      timestamp: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
       presenter: presenter,
       text: newscastText,
       audioUrl: newscastAudioUrl,
