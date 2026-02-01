@@ -5010,8 +5010,11 @@ app.post('/api/newscast/speak-podcast', async (req, res) => {
     
     console.log(`Generating podcast with ${podcastSegments.length} segments...`);
     
-    // Generate audio for each segment
+    // Generate audio for each segment with duration tracking
     const audioBuffers = [];
+    const segmentTimings = []; // Track speaker and duration for each segment
+    const tempDir = path.join(__dirname, '..', 'downloads', 'temp');
+    if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
     
     let failedSegments = 0;
     
@@ -5039,7 +5042,32 @@ app.post('/api/newscast/speak-podcast', async (req, res) => {
         
         const audioData = response.choices[0]?.message?.audio?.data;
         if (audioData) {
-          audioBuffers.push(Buffer.from(audioData, 'base64'));
+          const segmentBuffer = Buffer.from(audioData, 'base64');
+          audioBuffers.push(segmentBuffer);
+          
+          // Write temp file to probe duration
+          const tempSegmentPath = path.join(tempDir, `segment-${Date.now()}-${i}.mp3`);
+          fs.writeFileSync(tempSegmentPath, segmentBuffer);
+          
+          let segmentDuration = 5; // Default fallback
+          try {
+            const probeResult = await execPromise(`ffprobe -v error -show_entries format=duration -of csv=p=0 "${tempSegmentPath}"`);
+            segmentDuration = parseFloat(probeResult.stdout.trim()) || 5;
+          } catch (e) {
+            console.warn(`Could not probe segment ${i + 1} duration:`, e.message);
+          }
+          
+          // Clean up temp file
+          try { fs.unlinkSync(tempSegmentPath); } catch (e) {}
+          
+          segmentTimings.push({
+            speaker: speakerKey,
+            speakerName: config.name,
+            duration: segmentDuration,
+            index: i
+          });
+          
+          console.log(`  Segment ${i + 1} duration: ${segmentDuration.toFixed(2)}s`);
         } else {
           console.warn(`Segment ${i + 1} returned no audio data`);
           failedSegments++;
@@ -5068,6 +5096,22 @@ app.post('/api/newscast/speak-podcast', async (req, res) => {
     // Concatenate all audio buffers into one MP3
     const combinedBuffer = Buffer.concat(audioBuffers);
     
+    // Build segmentsWithTimings ONLY from successful segments (segmentTimings)
+    // This ensures perfect alignment between audio and video segments
+    let runningTime = 0;
+    let segmentsWithTimings = segmentTimings.map((timing) => {
+      const seg = podcastSegments[timing.index];
+      const result = {
+        ...seg,
+        speaker: timing.speaker,
+        speakerName: timing.speakerName,
+        duration: timing.duration,
+        startTime: runningTime
+      };
+      runningTime += timing.duration;
+      return result;
+    });
+    
     const audioId = `podcast-${Date.now()}`;
     const audioFileName = `${audioId}.mp3`;
     const metaFileName = `${audioId}.json`;
@@ -5079,6 +5123,34 @@ app.post('/api/newscast/speak-podcast', async (req, res) => {
     
     const audioPath = path.join(audioDir, audioFileName);
     fs.writeFileSync(audioPath, combinedBuffer);
+    
+    // Validate and adjust segment durations to match actual combined audio length
+    // This prevents A/V desync from ffprobe inaccuracies or codec padding
+    try {
+      const probeResult = await execPromise(`ffprobe -v error -show_entries format=duration -of csv=p=0 "${audioPath}"`);
+      const actualAudioDuration = parseFloat(probeResult.stdout.trim());
+      const summedDurations = segmentsWithTimings.reduce((acc, s) => acc + s.duration, 0);
+      
+      if (actualAudioDuration && summedDurations > 0 && Math.abs(actualAudioDuration - summedDurations) > 0.5) {
+        // Scale segment durations proportionally to match actual audio
+        const scaleFactor = actualAudioDuration / summedDurations;
+        console.log(`Adjusting segment durations: ${summedDurations.toFixed(2)}s -> ${actualAudioDuration.toFixed(2)}s (scale: ${scaleFactor.toFixed(4)})`);
+        
+        let newRunningTime = 0;
+        segmentsWithTimings = segmentsWithTimings.map(seg => {
+          const scaledDuration = seg.duration * scaleFactor;
+          const result = {
+            ...seg,
+            duration: scaledDuration,
+            startTime: newRunningTime
+          };
+          newRunningTime += scaledDuration;
+          return result;
+        });
+      }
+    } catch (e) {
+      console.warn('Could not validate audio duration:', e.message);
+    }
     
     // Save metadata
     const presenterAvatars = {
@@ -5142,7 +5214,8 @@ app.post('/api/newscast/speak-podcast', async (req, res) => {
       shareUrl: `/share/${audioId}`,
       segments: audioBuffers.length,
       totalSegments: podcastSegments.length,
-      warning: warning
+      warning: warning,
+      podcastSegments: segmentsWithTimings
     });
   } catch (e) {
     console.error('Podcast TTS error:', e);
@@ -5540,7 +5613,132 @@ app.post('/api/newscast/generate-video', async (req, res) => {
     // Check if avatar is animated GIF
     const isAvatarGif = mainPresenterImage.toLowerCase().endsWith('.gif');
     
-    if (bgVideoPath && fs.existsSync(bgVideoPath)) {
+    // Check if we have podcast segments with timing info for video switching
+    const hasSegmentTimings = podcastSegments && podcastSegments.length > 0 && 
+                              podcastSegments[0].duration !== undefined;
+    
+    // Safely get speaker videos (may be undefined)
+    const safeSpeakerVideos = speakerVideos || {};
+    
+    if (hasSegmentTimings) {
+      // PODCAST MODE: Create video with segment-based speaker switching
+      console.log(`Generating podcast video with ${podcastSegments.length} segment cuts...`);
+      
+      // Get all unique speakers and their videos/images
+      const speakerMedia = {};
+      const speakers = [...new Set(podcastSegments.map(s => s.speaker).filter(Boolean))];
+      
+      for (const speaker of speakers) {
+        // Try speaker-specific video first, then fall back to avatar image
+        let mediaPath = null;
+        const speakerVideoKey = safeSpeakerVideos[speaker];
+        
+        if (speakerVideoKey && speakerVideoKey.startsWith('/downloads/media/')) {
+          const localPath = path.join(__dirname, '..', 'data', 'media', speakerVideoKey.replace('/downloads/media/', ''));
+          if (fs.existsSync(localPath)) {
+            mediaPath = localPath;
+          }
+        }
+        
+        // Fall back to presenter avatar image
+        if (!mediaPath) {
+          mediaPath = presenterImages[speaker] || presenterImages.caelix;
+          if (!fs.existsSync(mediaPath)) {
+            mediaPath = presenterImages.caelix;
+          }
+        }
+        
+        speakerMedia[speaker] = {
+          path: mediaPath,
+          isVideo: mediaPath.toLowerCase().endsWith('.mp4') || mediaPath.toLowerCase().endsWith('.webm'),
+          name: presenterNames[speaker] || speaker
+        };
+      }
+      
+      console.log('Speaker media:', Object.entries(speakerMedia).map(([k, v]) => `${k}: ${v.isVideo ? 'video' : 'image'}`).join(', '));
+      
+      // Use concat filter approach: create trimmed clips for each segment and concat them
+      // This avoids the overlay persistence issue
+      let filterParts = [];
+      let inputIndex = 0;
+      const inputMap = {};
+      
+      ffmpegArgs = [];
+      
+      // Add speaker media inputs (one per unique speaker)
+      for (const speaker of speakers) {
+        const media = speakerMedia[speaker];
+        if (media.isVideo) {
+          ffmpegArgs.push('-stream_loop', '-1', '-i', media.path);
+        } else {
+          ffmpegArgs.push('-loop', '1', '-i', media.path);
+        }
+        inputMap[speaker] = inputIndex;
+        inputIndex++;
+      }
+      
+      // Add audio
+      ffmpegArgs.push('-i', audioPath);
+      const audioInputIndex = inputIndex;
+      inputIndex++;
+      
+      // Add background music if present
+      if (hasBgMusic) {
+        ffmpegArgs.push('-stream_loop', '-1', '-i', bgMusicPath);
+      }
+      
+      // Create trimmed video segments for each speaker turn and concat them
+      const segmentLabels = [];
+      
+      for (let i = 0; i < podcastSegments.length; i++) {
+        const segment = podcastSegments[i];
+        const speaker = segment.speaker || speakers[0] || 'caelix';
+        const speakerIdx = inputMap[speaker];
+        const duration = segment.duration || 5;
+        const segLabel = `seg${i}`;
+        
+        // Trim each speaker's video to the segment duration
+        // Add newsroom overlays to each segment
+        const segmentOverlays = 
+          `scale=1280:720,setsar=1,` +
+          `drawbox=x=0:y=ih-100:w=iw:h=100:color=black@0.5:t=fill,` +
+          `drawtext=text='${escapeText(showTitle || 'MARKET RADIO')}':fontsize=36:fontcolor=white:x=(w-text_w)/2:y=h-90:shadowcolor=black:shadowx=2:shadowy=2,` +
+          `drawtext=text='${escapeText(presenterName)}':fontsize=24:fontcolor=yellow:x=(w-text_w)/2:y=h-55:shadowcolor=black:shadowx=1:shadowy=1,` +
+          `drawtext=text='${escapeText(currentDate)}':fontsize=18:fontcolor=white@0.8:x=20:y=h-45:shadowcolor=black:shadowx=1:shadowy=1,` +
+          `drawtext=text='LIVE':fontsize=14:fontcolor=red:x=20:y=h-70:box=1:boxcolor=white@0.8:boxborderw=4`;
+        
+        filterParts.push(`[${speakerIdx}:v]trim=0:${duration.toFixed(3)},setpts=PTS-STARTPTS,${segmentOverlays}[${segLabel}]`);
+        segmentLabels.push(`[${segLabel}]`);
+      }
+      
+      // Concat all segments
+      filterParts.push(`${segmentLabels.join('')}concat=n=${podcastSegments.length}:v=1:a=0[v]`);
+      
+      // Audio mixing
+      if (hasBgMusic) {
+        const musicIdx = audioInputIndex + 1;
+        filterParts.push(`[${audioInputIndex}:a]volume=1[speech]`);
+        filterParts.push(`[${musicIdx}:a]volume=${musicVol},afade=t=out:st=${Math.max(0, audioDuration - 3)}:d=3[music]`);
+        filterParts.push(`[speech][music]amix=inputs=2:duration=first[a]`);
+      }
+      
+      const filterComplex = filterParts.join(';');
+      console.log(`Filter has ${podcastSegments.length} segment cuts using concat approach`);
+      
+      ffmpegArgs.push('-filter_complex', filterComplex);
+      ffmpegArgs.push('-map', '[v]');
+      ffmpegArgs.push('-map', hasBgMusic ? '[a]' : `${audioInputIndex}:a`);
+      ffmpegArgs.push(
+        '-c:v', 'libx264',
+        '-c:a', 'aac',
+        '-b:a', '192k',
+        '-pix_fmt', 'yuv420p',
+        '-t', String(audioDuration),
+        '-y',
+        outputPath
+      );
+      
+    } else if (bgVideoPath && fs.existsSync(bgVideoPath)) {
       // Use background video with newsroom-style avatar overlay
       ffmpegArgs = [
         '-stream_loop', '-1',
