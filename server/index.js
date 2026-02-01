@@ -5661,6 +5661,8 @@ app.post('/api/newscast/generate-video', async (req, res) => {
       }
       
       console.log('Speaker media:', Object.entries(speakerMedia).map(([k, v]) => `${k}: ${v.isVideo ? 'video' : 'image'}`).join(', '));
+      console.log('Unique speakers from segments:', speakers);
+      console.log('First 5 segment speakers:', podcastSegments.slice(0, 5).map((s, i) => `seg${i}: ${s.speaker}`).join(', '));
       
       // Use concat filter approach: create trimmed clips for each segment and concat them
       // This avoids the overlay persistence issue
@@ -5679,6 +5681,7 @@ app.post('/api/newscast/generate-video', async (req, res) => {
           ffmpegArgs.push('-loop', '1', '-i', media.path);
         }
         inputMap[speaker] = inputIndex;
+        console.log(`Input ${inputIndex} mapped to speaker: ${speaker} (${media.path})`);
         inputIndex++;
       }
       
@@ -5695,6 +5698,8 @@ app.post('/api/newscast/generate-video', async (req, res) => {
       // Create trimmed video segments for each speaker turn and concat them
       const segmentLabels = [];
       
+      console.log('Input map:', JSON.stringify(inputMap));
+      
       for (let i = 0; i < podcastSegments.length; i++) {
         const segment = podcastSegments[i];
         const speaker = segment.speaker || speakers[0] || 'caelix';
@@ -5704,6 +5709,10 @@ app.post('/api/newscast/generate-video', async (req, res) => {
         const baseDuration = segment.duration || 5;
         const duration = baseDuration * 1.015;
         const segLabel = `seg${i}`;
+        
+        if (i < 5) {
+          console.log(`Segment ${i}: speaker=${speaker}, speakerIdx=${speakerIdx}, duration=${duration.toFixed(2)}s`);
+        }
         
         // Trim each speaker's video to the segment duration
         // Add newsroom overlays to each segment
