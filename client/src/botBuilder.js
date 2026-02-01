@@ -10853,12 +10853,23 @@ function saveNewscastHistory(entry) {
     // Get custom media URLs from selects
     const mediaUrls = getSelectedMediaUrls();
     
-    // Add new entry at the beginning
+    // Get speaker video selections for each presenter
+    const speakerVideos = {
+      caelix: document.getElementById('speakerVideoCaelix')?.value || null,
+      sophie: document.getElementById('speakerVideoSophie')?.value || null,
+      jack: document.getElementById('speakerVideoJack')?.value || null,
+      bateman: document.getElementById('speakerVideoBateman')?.value || null,
+      mcafee: document.getElementById('speakerVideoMcafee')?.value || null
+    };
+    
+    // Add new entry at the beginning (store all info needed for video regeneration)
     newscastHistory.unshift({
       id: Date.now(),
       text: entry.text,
       presenter: entry.presenter,
+      guest: entry.guest || null,
       isPodcast: entry.isPodcast || false,
+      podcastSegments: entry.podcastSegments || null,
       audioUrl: entry.audioUrl,
       videoUrl: entry.videoUrl || null,
       thumbnailUrl: entry.thumbnailUrl || null,
@@ -10866,7 +10877,8 @@ function saveNewscastHistory(entry) {
       duration: entry.duration || null,
       customAvatarUrl: mediaUrls.customAvatarUrl,
       customBgVideoUrl: mediaUrls.customBgVideoUrl,
-      customBgMusicUrl: mediaUrls.customBgMusicUrl
+      customBgMusicUrl: mediaUrls.customBgMusicUrl,
+      speakerVideos: speakerVideos
     });
     
     // Keep only last 20 entries
@@ -10913,7 +10925,11 @@ function renderNewscastHistory() {
       bateman: 'Bateman',
       mcafee: 'McAfee'
     };
-    const presenterName = presenterNameMap[item.presenter] || 'Jack';
+    let presenterName = presenterNameMap[item.presenter] || 'Unknown';
+    // Show both hosts for podcasts
+    if (item.isPodcast && item.guest && presenterNameMap[item.guest]) {
+      presenterName = `${presenterNameMap[item.presenter]} & ${presenterNameMap[item.guest]}`;
+    }
     const presenterImgMap = {
       caelix: '/images/presenter-caelix.png',
       sophie: '/images/presenter-sophie.png',
@@ -10945,6 +10961,7 @@ function renderNewscastHistory() {
           ${(item.audioUrl || item.videoUrl) ? `<button onclick="playHistoryItem(${idx})" class="p-2 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400" title="Play"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>` : ''}
           ${item.audioUrl ? `<a href="${item.audioUrl}" download class="p-2 text-gray-500 hover:text-green-600 dark:hover:text-green-400" title="Download MP3"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg></a>` : ''}
           ${item.videoUrl ? `<a href="${item.videoUrl}" download class="p-2 text-gray-500 hover:text-purple-600 dark:hover:text-purple-400" title="Download MP4"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></svg></a>` : ''}
+          ${item.videoUrl && item.audioUrl ? `<button onclick="generateVideoForHistoryItem(${idx}, true)" class="p-2 text-gray-500 hover:text-yellow-600 dark:hover:text-yellow-400" title="Regenerate Video"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg></button>` : ''}
           ${!item.videoUrl && item.audioUrl ? `<button onclick="generateVideoForHistoryItem(${idx})" class="p-2 text-gray-500 hover:text-purple-600 dark:hover:text-purple-400" title="Generate Video"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button>` : ''}
           <button onclick="shareHistoryItem(${idx})" class="p-2 text-gray-500 hover:text-orange-600 dark:hover:text-orange-400" title="Share"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg></button>
           <button onclick="deleteHistoryItem(${idx})" class="p-2 text-gray-500 hover:text-red-600 dark:hover:text-red-400" title="Delete"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
@@ -10980,7 +10997,7 @@ window.shareHistoryItem = function(idx) {
     return;
   }
   
-  const presenterNames = { caelix: 'Magos Caelix-9', sophie: 'Sophie Mitchell', jack: 'Jack Thompson' };
+  const presenterNames = { caelix: 'Magos Caelix-9', sophie: 'Sophie Mitchell', jack: 'Jack Thompson', bateman: 'Patrick Bateman', mcafee: 'John McAfee' };
   const presenterName = presenterNames[item.presenter] || presenterNames.caelix;
   const shareUrl = `${window.location.origin}/share/${audioId}`;
   const shareText = `Listen to ${presenterName}'s market update!`;
@@ -11168,7 +11185,7 @@ window.deleteHistoryItem = function(idx) {
   renderNewscastHistory();
 };
 
-window.generateVideoForHistoryItem = async function(idx) {
+window.generateVideoForHistoryItem = async function(idx, overwrite = false) {
   const item = newscastHistory[idx];
   if (!item?.audioUrl) return;
   
@@ -11176,15 +11193,17 @@ window.generateVideoForHistoryItem = async function(idx) {
   const statusText = document.getElementById('newscastVideoStatusText');
   
   if (statusDiv) statusDiv.classList.remove('hidden');
-  if (statusText) statusText.textContent = 'Generating video (this may take a minute)...';
+  if (statusText) statusText.textContent = overwrite ? 'Regenerating video...' : 'Generating video (this may take a minute)...';
   
   try {
-    // Get current speaker video selections
-    const speakerVideos = {
+    // Use stored media settings from history item (NOT current UI settings)
+    // Fall back to current UI only if history item has no stored speakerVideos
+    const speakerVideos = item.speakerVideos || {
       caelix: document.getElementById('speakerVideoCaelix')?.value || null,
       sophie: document.getElementById('speakerVideoSophie')?.value || null,
       jack: document.getElementById('speakerVideoJack')?.value || null,
-      bateman: document.getElementById('speakerVideoBateman')?.value || null
+      bateman: document.getElementById('speakerVideoBateman')?.value || null,
+      mcafee: document.getElementById('speakerVideoMcafee')?.value || null
     };
     
     const response = await fetch('/api/newscast/generate-video', {
@@ -11193,12 +11212,15 @@ window.generateVideoForHistoryItem = async function(idx) {
       body: JSON.stringify({
         audioUrl: item.audioUrl,
         presenter: item.presenter,
-        customAvatarUrl: item.customAvatarUrl || document.getElementById('customAvatarSelect')?.value,
-        customBgVideoUrl: item.customBgVideoUrl || document.getElementById('customBgVideoSelect')?.value,
-        customBgMusicUrl: item.customBgMusicUrl || document.getElementById('customBgMusicSelect')?.value,
+        guest: item.guest || null,
+        isPodcast: item.isPodcast || false,
+        customAvatarUrl: item.customAvatarUrl || null,
+        customBgVideoUrl: item.customBgVideoUrl || null,
+        customBgMusicUrl: item.customBgMusicUrl || null,
         speakerVideos,
         podcastSegments: item.podcastSegments,
-        showTitle: 'MARKET RADIO'
+        showTitle: 'MARKET RADIO',
+        overwrite: overwrite
       })
     });
     
@@ -12051,7 +12073,7 @@ function updateVideoPlayerProgress() {
 async function shareVideoPlayer(item) {
   if (!item) return;
   
-  const presenterNames = { caelix: 'Magos Caelix-9', sophie: 'Sophie Mitchell', jack: 'Jack Thompson' };
+  const presenterNames = { caelix: 'Magos Caelix-9', sophie: 'Sophie Mitchell', jack: 'Jack Thompson', bateman: 'Patrick Bateman', mcafee: 'John McAfee' };
   const presenterName = presenterNames[item.presenter] || presenterNames.caelix;
   
   // Extract broadcast ID from audio URL
@@ -12074,7 +12096,7 @@ function shareToSocial(platform) {
     return;
   }
   
-  const presenterNames = { caelix: 'Magos Caelix-9', sophie: 'Sophie Mitchell', jack: 'Jack Thompson' };
+  const presenterNames = { caelix: 'Magos Caelix-9', sophie: 'Sophie Mitchell', jack: 'Jack Thompson', bateman: 'Patrick Bateman', mcafee: 'John McAfee' };
   const stationNames = { caelix: 'Forge World Markets', sophie: "Sophie's Market Corner", jack: 'Sydney Markets Radio' };
   const presenterName = presenterNames[selectedPresenter] || presenterNames.caelix;
   const stationName = stationNames[selectedPresenter] || stationNames.caelix;
@@ -12306,11 +12328,20 @@ async function toggleNewscastPlayback() {
     newscastShareUrl = data.shareUrl || null;
     saveNewscastToStorage();
     
-    // Save to history
+    // Determine guest from podcast segments if available
+    let detectedGuest = null;
+    if (newscastPodcastSegments && newscastPodcastSegments.length > 0) {
+      const speakers = [...new Set(newscastPodcastSegments.map(s => s.speaker).filter(Boolean))];
+      detectedGuest = speakers.find(s => s !== selectedPresenter) || null;
+    }
+    
+    // Save to history (include all info needed for video generation)
     saveNewscastHistory({
       text: newscastText,
       presenter: selectedPresenter,
+      guest: detectedGuest,
       isPodcast: newscastIsPodcast,
+      podcastSegments: newscastPodcastSegments,
       audioUrl: newscastAudioUrl
     });
     

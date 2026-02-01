@@ -5323,7 +5323,7 @@ app.post('/api/newscast/tts-from-text', async (req, res) => {
 });
 
 app.post('/api/newscast/generate-video', async (req, res) => {
-  const { audioUrl, podcastSegments, presenter, customAvatarUrl, customBgVideoUrl, customBgMusicUrl, bgMusicVolume = 0.15, speakerVideos = {}, showTitle = 'MARKET RADIO' } = req.body;
+  const { audioUrl, podcastSegments, presenter, guest, isPodcast, customAvatarUrl, customBgVideoUrl, customBgMusicUrl, bgMusicVolume = 0.15, speakerVideos = {}, showTitle = 'MARKET RADIO' } = req.body;
   const musicVol = Math.max(0, Math.min(0.5, parseFloat(bgMusicVolume) || 0.15));
   
   if (!audioUrl) {
@@ -5343,14 +5343,21 @@ app.post('/api/newscast/generate-video', async (req, res) => {
     if (!fs.existsSync(videoDir)) fs.mkdirSync(videoDir, { recursive: true });
     if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
     
-    // Presenter image paths
+    // Presenter image paths (including custom uploaded avatars for bateman/mcafee)
     const presenterImages = {
       caelix: path.join(__dirname, '..', 'client', 'public', 'images', 'presenter-caelix.png'),
       sophie: path.join(__dirname, '..', 'client', 'public', 'images', 'presenter-sophie.png'),
-      jack: path.join(__dirname, '..', 'client', 'public', 'images', 'presenter-jack.png')
+      jack: path.join(__dirname, '..', 'client', 'public', 'images', 'presenter-jack.png'),
+      bateman: path.join(__dirname, '..', 'data', 'media', 'avatar', 'patrick-bateman.png'),
+      mcafee: path.join(__dirname, '..', 'data', 'media', 'avatar', 'john-mcafee.png')
     };
     
+    // Use presenter-based default image
     let mainPresenterImage = presenterImages[presenter] || presenterImages.caelix;
+    // Verify file exists, fallback to caelix
+    if (!fs.existsSync(mainPresenterImage)) {
+      mainPresenterImage = presenterImages.caelix;
+    }
     
     // Use custom avatar if provided (local path or validated URL)
     if (customAvatarUrl) {
@@ -5489,9 +5496,24 @@ app.post('/api/newscast/generate-video', async (req, res) => {
       caelix: 'Magos Caelix-9',
       sophie: 'Sophie Mitchell',
       jack: 'Jack Thompson',
-      bateman: 'Patrick Bateman'
+      bateman: 'Patrick Bateman',
+      mcafee: 'John McAfee'
     };
-    const presenterName = presenterNames[presenter] || 'Market Radio';
+    
+    // For podcasts with guests, show both host names
+    let presenterName = presenterNames[presenter] || 'Market Radio';
+    if (isPodcast && guest && presenterNames[guest]) {
+      presenterName = `${presenterNames[presenter]} & ${presenterNames[guest]}`;
+    } else if (podcastSegments && podcastSegments.length > 0) {
+      // Try to detect guest from podcast segments
+      const speakers = [...new Set(podcastSegments.map(s => s.speaker).filter(Boolean))];
+      if (speakers.length >= 2) {
+        const guestSpeaker = speakers.find(s => s !== presenter);
+        if (guestSpeaker && presenterNames[guestSpeaker]) {
+          presenterName = `${presenterNames[presenter]} & ${presenterNames[guestSpeaker]}`;
+        }
+      }
+    }
     const currentDate = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     
     // Escape special characters for ffmpeg drawtext
