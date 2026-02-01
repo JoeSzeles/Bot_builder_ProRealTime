@@ -10991,7 +10991,8 @@ window.shareHistoryItem = function(idx) {
   if (!item) return;
   
   // Extract broadcast ID from audio URL to generate proper share link
-  const audioId = item.audioUrl?.match(/broadcast-\d+/)?.[0];
+  // Match both broadcast-XXX and podcast-XXX patterns
+  const audioId = item.audioUrl?.match(/(broadcast|podcast)-\d+/)?.[0];
   if (!audioId) {
     alert('Could not generate share link for this broadcast');
     return;
@@ -12072,8 +12073,8 @@ async function shareVideoPlayer(item) {
   const presenterNames = { caelix: 'Magos Caelix-9', sophie: 'Sophie Mitchell', jack: 'Jack Thompson', bateman: 'Patrick Bateman', mcafee: 'John McAfee' };
   const presenterName = presenterNames[item.presenter] || presenterNames.caelix;
   
-  // Extract broadcast ID from audio URL
-  const audioId = item.audioUrl?.match(/broadcast-\d+/)?.[0];
+  // Extract broadcast ID from audio URL (match both broadcast and podcast)
+  const audioId = item.audioUrl?.match(/(broadcast|podcast)-\d+/)?.[0];
   if (!audioId) {
     alert('Could not generate share link');
     return;

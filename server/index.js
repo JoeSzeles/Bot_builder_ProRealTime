@@ -5699,7 +5699,10 @@ app.post('/api/newscast/generate-video', async (req, res) => {
         const segment = podcastSegments[i];
         const speaker = segment.speaker || speakers[0] || 'caelix';
         const speakerIdx = inputMap[speaker];
-        const duration = segment.duration || 5;
+        // Add small compensation (1.5%) to each segment duration to account for
+        // MP3 encoder padding discrepancies that cause video to switch slightly early
+        const baseDuration = segment.duration || 5;
+        const duration = baseDuration * 1.015;
         const segLabel = `seg${i}`;
         
         // Trim each speaker's video to the segment duration
