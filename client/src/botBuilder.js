@@ -11193,18 +11193,16 @@ window.generateVideoForHistoryItem = async function(idx, overwrite = false) {
   const statusText = document.getElementById('newscastVideoStatusText');
   
   if (statusDiv) statusDiv.classList.remove('hidden');
-  if (statusText) statusText.textContent = overwrite ? 'Regenerating video...' : 'Generating video (this may take a minute)...';
+  if (statusText) statusText.textContent = overwrite ? 'Regenerating video with current settings...' : 'Generating video (this may take a minute)...';
   
   try {
-    // Use stored media settings from history item (NOT current UI settings)
-    // Fall back to current UI only if history item has no stored speakerVideos
-    const speakerVideos = item.speakerVideos || {
-      caelix: document.getElementById('speakerVideoCaelix')?.value || null,
-      sophie: document.getElementById('speakerVideoSophie')?.value || null,
-      jack: document.getElementById('speakerVideoJack')?.value || null,
-      bateman: document.getElementById('speakerVideoBateman')?.value || null,
-      mcafee: document.getElementById('speakerVideoMcafee')?.value || null
-    };
+    // ALWAYS use CURRENT UI media settings for generate/regenerate
+    // This allows user to customize video with different media after recording
+    const currentMediaUrls = getSelectedMediaUrls();
+    const bgMusicVolume = parseInt(document.getElementById('bgMusicVolume')?.value || '15', 10) / 100;
+    
+    console.log('Generating video with segments:', item.podcastSegments?.length, 
+                'has timing:', item.podcastSegments?.[0]?.duration !== undefined);
     
     const response = await fetch('/api/newscast/generate-video', {
       method: 'POST',
@@ -11214,13 +11212,11 @@ window.generateVideoForHistoryItem = async function(idx, overwrite = false) {
         presenter: item.presenter,
         guest: item.guest || null,
         isPodcast: item.isPodcast || false,
-        customAvatarUrl: item.customAvatarUrl || null,
-        customBgVideoUrl: item.customBgVideoUrl || null,
-        customBgMusicUrl: item.customBgMusicUrl || null,
-        speakerVideos,
         podcastSegments: item.podcastSegments,
         showTitle: 'MARKET RADIO',
-        overwrite: overwrite
+        overwrite: overwrite,
+        bgMusicVolume,
+        ...currentMediaUrls
       })
     });
     
@@ -12316,6 +12312,15 @@ async function toggleNewscastPlayback() {
     
     const data = await response.json();
     
+    // IMPORTANT: Update podcastSegments with timing info from TTS response
+    // The TTS endpoint returns segments with duration and startTime fields needed for video generation
+    if (data.podcastSegments && data.podcastSegments.length > 0) {
+      newscastPodcastSegments = data.podcastSegments;
+      console.log('Updated podcastSegments with timing info:', 
+                  newscastPodcastSegments.length, 'segments, first duration:', 
+                  newscastPodcastSegments[0]?.duration);
+    }
+    
     // Show warning if podcast had issues
     if (data.warning) {
       const transcriptEl = document.getElementById('newscastTranscript');
@@ -12336,6 +12341,7 @@ async function toggleNewscastPlayback() {
     }
     
     // Save to history (include all info needed for video generation)
+    // podcastSegments now includes duration/startTime for segment-based video switching
     saveNewscastHistory({
       text: newscastText,
       presenter: selectedPresenter,

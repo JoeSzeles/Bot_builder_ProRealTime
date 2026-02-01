@@ -5617,8 +5617,13 @@ app.post('/api/newscast/generate-video', async (req, res) => {
     const hasSegmentTimings = podcastSegments && podcastSegments.length > 0 && 
                               podcastSegments[0].duration !== undefined;
     
+    // Debug logging for segment-based video switching
+    console.log(`Video generation: isPodcast=${isPodcast}, segments=${podcastSegments?.length || 0}, ` +
+                `hasTimings=${hasSegmentTimings}, firstSegDuration=${podcastSegments?.[0]?.duration}`);
+    
     // Safely get speaker videos (may be undefined)
     const safeSpeakerVideos = speakerVideos || {};
+    console.log('Speaker videos:', Object.entries(safeSpeakerVideos).filter(([k,v]) => v).map(([k,v]) => k).join(', ') || 'none');
     
     if (hasSegmentTimings) {
       // PODCAST MODE: Create video with segment-based speaker switching
