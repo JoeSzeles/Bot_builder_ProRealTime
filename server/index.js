@@ -5633,13 +5633,17 @@ app.post('/api/newscast/generate-video', async (req, res) => {
       const speakerMedia = {};
       const speakers = [...new Set(podcastSegments.map(s => s.speaker).filter(Boolean))];
       
+      console.log('Received speakerVideos:', JSON.stringify(safeSpeakerVideos));
+      
       for (const speaker of speakers) {
         // Try speaker-specific video first, then fall back to avatar image
         let mediaPath = null;
         const speakerVideoKey = safeSpeakerVideos[speaker];
+        console.log(`Looking up video for speaker '${speaker}': key='${speakerVideoKey}'`);
         
         if (speakerVideoKey && speakerVideoKey.startsWith('/downloads/media/')) {
           const localPath = path.join(__dirname, '..', 'data', 'media', speakerVideoKey.replace('/downloads/media/', ''));
+          console.log(`  Resolved path: ${localPath}, exists: ${fs.existsSync(localPath)}`);
           if (fs.existsSync(localPath)) {
             mediaPath = localPath;
           }
